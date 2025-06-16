@@ -7,8 +7,8 @@ use crate::state::{
     Config, PendingData, PublishedData, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA,
 };
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Decimal, Decimal256, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdError, StdResult, Uint128,
+    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::PrefixBound;
@@ -162,7 +162,7 @@ fn publish_data(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
 
-    // Permission check: only registered oracles can publish data
+    // permission check: only registered oracles can publish data
     if !config.oracles.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
@@ -191,12 +191,12 @@ fn publish_data(
         .may_load(deps.storage, pending_slot_key.clone())?
         .unwrap_or_default();
 
-    // Check if the oracle has already published for this slot
+    // check if the oracle has already published for this slot
     if pending_slots.iter().any(|s| s.oracle == info.sender) {
         return Err(ContractError::AlreadyPublished {});
     }
 
-    // Save the new_data to the pending_data[(slot, data_hash)] state
+    // save the new_data to the pending_data[(slot, data_hash)] state
     let new_pending_data = PendingData {
         data: new_data.clone(),
         oracle: info.sender.clone(),
@@ -210,7 +210,7 @@ fn publish_data(
         .add_attribute("slot", new_data.slot.to_string())
         .add_attribute("oracle", info.sender.to_string());
 
-    // Check that consensus is reached or not for the new_data.slot
+    // check that consensus is reached or not for the new_data.slot
     let consensus_reached = pending_slots.len() as u32 >= config.threshold;
     if consensus_reached {
         // If consensus is reached, rewrite last_published_data item in the State
@@ -225,7 +225,7 @@ fn publish_data(
             .add_attribute("consensus_reached", "true")
             .add_attribute("published_at", env.block.time.to_string());
 
-        // Clear pending data for this slot to save space
+        // clear obsolete pending data for this slot to save space
         let obsolete_data: Vec<((u64, String), _)> = PENDING_DATA
             .prefix_range(
                 deps.as_ref().storage,
@@ -246,16 +246,16 @@ fn publish_data(
 //  Queries
 // ----------------------------------------
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
-        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::GetData {} => to_json_binary(&query_get_data(deps)?),
-        QueryMsg::GetAUM {} => to_json_binary(&query_get_aum(deps, env)?),
+        QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
+        QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps)?)?),
+        QueryMsg::GetAUM {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
     }
 }
 
 /// Returns the current contract configuration.
-fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
         admin: config.admin.to_string(),
@@ -267,7 +267,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 }
 
 /// Returns the last successfully published and finalized Solana data.
-fn query_get_data(deps: Deps) -> StdResult<GetDataResponse> {
+fn query_get_data(deps: Deps) -> Result<GetDataResponse, ContractError> {
     let last_published_data = LAST_PUBLISHED_DATA.load(deps.storage).ok();
     Ok(GetDataResponse {
         data: last_published_data.map(|d| d.data),
@@ -275,17 +275,15 @@ fn query_get_data(deps: Deps) -> StdResult<GetDataResponse> {
 }
 
 /// Returns Jupiter AUM value represented in BTC.
-fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
+fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let data = LAST_PUBLISHED_DATA
         .load(deps.storage)
-        .map_err(|_| StdError::generic_err("no data published"))?
+        .map_err(|_| ContractError::NoDataPublished {})?
         .data;
 
-    // TODO: use data.timestamp or lastPublishedData.timestamp?
     if env.block.time.seconds() > data.timestamp.seconds() + config.valid_period {
-        // return Err(ContractError::DataNotValid {});
-        return Err(StdError::generic_err("DataNotValid"));
+        return Err(ContractError::DataNotValid {});
     }
 
     let btc_price_in_usd = query_btc_price_in_usd(deps)?;
@@ -294,7 +292,7 @@ fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
     Ok(GetAUMResponse { aum_in_btc })
 }
 
-fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, StdError> {
+fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
         base: USD_DENOM.to_string(),
@@ -303,28 +301,43 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, StdError> {
     let btc_price_in_usd = Uint128::from_str(
         &btc_usd_price_result
             .price
-            .ok_or(StdError::generic_err("no price for BTC/USD pair"))?
+            .ok_or(ContractError::SlinkyBTCPriceMissing {})?
             .price,
     )?;
 
     let btc_price_in_usd =
         Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
-            |e| {
-                StdError::generic_err("exceeded") // TODO
+            |e| ContractError::DecimalError {
+                reason: e.to_string(),
             },
         )?;
     Ok(btc_price_in_usd)
 }
 
-pub fn calculate_aum_in_btc(data: SolanaData, btc_price_in_usd: Decimal) -> StdResult<Uint128> {
-    let strategy_jlp_balance = Decimal::from_atomics(data.strategy_jlp_balance, 0)
-        .map_err(|e| StdError::generic_err(format!("strategy jlp balance error: {}", e)))?;
+pub fn calculate_aum_in_btc(
+    data: SolanaData,
+    btc_price_in_usd: Decimal,
+) -> Result<Uint128, ContractError> {
+    let strategy_jlp_balance =
+        Decimal::from_atomics(data.strategy_jlp_balance, 0).map_err(|e| {
+            ContractError::DecimalError {
+                reason: e.to_string(),
+            }
+        })?;
     let jlp_virtual_price = Decimal::checked_from_ratio(data.aum_usd, data.jlp_total_supply)
-        .map_err(|e| StdError::generic_err("checked div failed"))?;
-    let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
+        .map_err(|e| ContractError::DecimalError {
+            reason: e.to_string(),
+        })?;
+    let jlp_balance_in_usd = jlp_virtual_price
+        .checked_mul(strategy_jlp_balance)
+        .map_err(|e| ContractError::DecimalError {
+            reason: e.to_string(),
+        })?;
     let aum_in_btc = jlp_balance_in_usd
         .checked_div(btc_price_in_usd)
-        .map_err(|e| StdError::generic_err("checked div failed"))?;
+        .map_err(|e| ContractError::DecimalError {
+            reason: e.to_string(),
+        })?;
     Ok(aum_in_btc.to_uint_floor())
 }
 

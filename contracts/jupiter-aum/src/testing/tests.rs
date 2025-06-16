@@ -102,8 +102,8 @@ fn test_update_config() {
 fn test_calculate_aum_in_btc() {
     let data = SolanaData {
         timestamp: Default::default(),
-        slot: 0,
-        custody_assets: vec![],
+        slot: Default::default(),
+        custody_assets: Default::default(),
         aum_usd: Uint128::new(500000),
         jlp_total_supply: Uint128::new(1000),
         strategy_jlp_balance: Uint128::new(10000),

@@ -2,10 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use cosmwasm_std::{to_json_binary, Addr, StdError, Timestamp, Uint128};
+use cosmwasm_std::{to_json_binary, Addr, Timestamp, Uint128};
 use cw_storage_plus::{Item, Map};
 use hex::encode as hex_encode;
-use sha2::{Digest, Sha256}; // from `hex` crate
+use sha2::{Digest, Sha256};
 
 /// Config defines the contract's configuration parameters.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -18,7 +18,7 @@ pub struct Config {
     pub threshold: u32,
     /// Data must be extracted from Solana from each extract_period slot.
     pub extract_period: u64,
-    /// How long (in seconds) do we consider data as valid after publishing.
+    /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
     pub valid_period: u64,
 }
 
@@ -39,10 +39,7 @@ impl Config {
             });
         }
         if self.extract_period == 0 {
-            // TODO: specific error
-            return Err(ContractError::Std(StdError::generic_err(
-                "extract period must be greater than 0",
-            )));
+            return Err(ContractError::InvalidPeriod {});
         }
         Ok(())
     }
@@ -68,8 +65,7 @@ pub struct SolanaData {
 
 impl SolanaData {
     pub fn hash(&self) -> Result<String, ContractError> {
-        let bin =
-            to_json_binary(self).map_err(|_| StdError::generic_err("json serialization error"))?; // TODO: contract error
+        let bin = to_json_binary(self).map_err(|e| ContractError::Std(e))?;
         let hash = Sha256::digest(bin).as_slice().to_vec();
         Ok(hex_encode(hash))
     }
@@ -81,16 +77,18 @@ pub struct CustodyAsset {
     pub owned: u64,
     pub locked: u64,
     pub guaranteed_usd: u64,
+    /// How many decimals in each number above.
     pub decimals: u8,
+    /// Custody denom.
     pub denom: String,
 }
 
-/// PendingData stores an individual oracle's publication for a specific Solana slot.
+/// PendingData stores an individual oracle's publication for a specific Solana slot and hash.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct PendingData {
     /// The Solana data published by an oracle.
     pub data: SolanaData,
-    /// TODO
+    /// Oracle address that did the publishing.
     pub oracle: Addr,
 }
 
@@ -111,8 +109,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 /// LAST_PUBLISHED_DATA stores the most recent Solana data that achieved consensus.
 pub const LAST_PUBLISHED_DATA: Item<PublishedData> = Item::new("last_published_data");
 
-/// ORACLE_PUBLICATIONS stores currently pending data from Solana from each oracle, grouped by slot.
-/// This acts as the `pending_data` map.
+/// ORACLE_PUBLICATIONS stores currently pending data from Solana from each oracle, grouped by slot and data hash.
 /// The key is a tuple: (solana_slot, solana_data_hash).
-/// The value is the `PublishedData` submitted by that oracle for that slot.
+/// The value is the list of pending data submitted for this specific slot and data.
 pub const PENDING_DATA: Map<(u64, String), Vec<PendingData>> = Map::new("pending_data");

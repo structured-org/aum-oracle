@@ -12,6 +12,9 @@ pub enum ContractError {
     #[error("Invalid threshold: {threshold} is greater than the number of oracles {oracles}")]
     InvalidThreshold { threshold: u32, oracles: usize },
 
+    #[error("Period should be greater than 0")]
+    InvalidPeriod {},
+
     #[error("No data published yet")]
     NoDataPublished {},
 
@@ -35,4 +38,10 @@ pub enum ContractError {
 
     #[error("Division by zero for AUM calculation")]
     DivisionByZero {},
+
+    #[error("Overflow: {reason}")]
+    DecimalError { reason: String },
+
+    #[error("Slinky BTC/USD price is missing")]
+    SlinkyBTCPriceMissing {},
 }

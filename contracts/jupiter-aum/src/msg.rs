@@ -64,6 +64,7 @@ pub enum QueryMsg {
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
     GetData {},
     /// GetAUM calculates and returns the current Jupiter AUM value represented in BTC.
+    /// Returns error if data is not valid.
     GetAUM {},
 }
 
