@@ -17,8 +17,6 @@ pub struct InstantiateMsg {
     pub extract_period: u64,
     /// Initial valid period for data in seconds.
     pub valid_period: u64,
-    /// Initial address for the Slinky price oracle contract.
-    pub slinky_oracle_address: String,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.

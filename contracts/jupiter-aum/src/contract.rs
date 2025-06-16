@@ -11,7 +11,7 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 use cw2::set_contract_version;
-use neutron_std::types::slinky::oracle;
+use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
 
@@ -267,16 +267,21 @@ fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
         .map_err(|_| StdError::generic_err("no data published"))?
         .data;
 
-    // // Rule: if last_published_data.timestamp + config.valid_period < current_timestamp()
-    // // the contract must consider last_published_data as invalid and throw an error.
-    if env.block.time.seconds() > data.timestamp.seconds() + config.valid_period
     // TODO: use data.timestamp or lastPublishedData.timestamp?
-    {
+    if env.block.time.seconds() > data.timestamp.seconds() + config.valid_period {
         // return Err(ContractError::DataNotValid {});
         return Err(StdError::generic_err("DataNotValid"));
     }
 
-    let querier = oracle::v1::OracleQuerier::new(&deps.querier);
+    // TODO: downgrade conversion?
+    let btc_price_in_usd = query_btc_price_in_usd(deps)?;
+    let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
+
+    Ok(GetAUMResponse { aum_in_btc })
+}
+
+fn query_btc_price_in_usd(deps: Deps) -> Result<Uint128, StdError> {
+    let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
         base: "USD".to_string(), // TODO: extract into constants
         quote: "BTC".to_string(),
@@ -288,9 +293,7 @@ fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
             .ok_or(StdError::generic_err("no price for BTC/USD pair"))?
             .price,
     )? / Uint128::new(10).pow(btc_usd_price_result.decimals as u32); // TODO: downgrade conversion?
-    let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
-
-    Ok(GetAUMResponse { aum_in_btc })
+    Ok(btc_price_in_usd)
 }
 
 pub fn calculate_aum_in_btc(data: SolanaData, btc_price_in_usd: Uint128) -> StdResult<Uint128> {
