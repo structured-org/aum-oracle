@@ -1,9 +1,11 @@
-use crate::contract::{execute, instantiate, query};
-use crate::error::ContractError::Unauthorized;
+use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
+use crate::error::ContractError::{InvalidThreshold, Unauthorized};
 use crate::msg::{ExecuteMsg, InstantiateMsg};
-use crate::state::CONFIG;
+use crate::state::{PendingData, SolanaData, CONFIG, PENDING_DATA};
 use cosmwasm_std::testing::{message_info, mock_env};
 use cosmwasm_std::testing::{mock_dependencies, MockApi};
+use cosmwasm_std::{Order, StdResult, Uint128};
+use cw_storage_plus::PrefixBound;
 
 // Helper to create a default instantiate message
 fn default_init_msg(api: MockApi) -> InstantiateMsg {
@@ -19,13 +21,10 @@ fn default_init_msg(api: MockApi) -> InstantiateMsg {
     }
 }
 
-// Test instantiate
-// Test instantiate with invalid config
-
 /// Tests the following scenario:
 ///     1.  A non-authorized address tries to update config's contract (error)
-///     2.  An authorized address tries to update config's contract
-///     3.  TODO: An authorized address tries to update config's contract with invalid date
+///     2.  An authorized address tries to update config's contract with invalid date
+///     3.  An authorized address tries to update config's contract
 #[test]
 fn test_update_config() {
     let mut deps = mock_dependencies();
@@ -61,6 +60,28 @@ fn test_update_config() {
     );
     assert_eq!(unauthorized_res.err().unwrap(), Unauthorized {});
 
+    // Authorized update but new config is invalid
+    let invalid_update_msg = ExecuteMsg::UpdateConfig {
+        admin: Some(deps.api.addr_make("admin2").to_string()),
+        oracles: Some(vec![deps.api.addr_make("oracle3").to_string()]),
+        threshold: Some(2),
+        extract_period: Some(100000),
+        valid_period: Some(50000),
+    };
+    let authorized_res = execute(
+        deps.as_mut(),
+        env.clone(),
+        admin.clone(),
+        invalid_update_msg.clone(),
+    );
+    assert_eq!(
+        authorized_res.err().unwrap(),
+        InvalidThreshold {
+            threshold: 2,
+            oracles: 1
+        }
+    );
+
     // Authorized update
     let authorized_res = execute(deps.as_mut(), env.clone(), admin.clone(), update_msg);
     assert!(authorized_res.is_ok());
@@ -75,4 +96,19 @@ fn test_update_config() {
     assert_eq!(config.threshold, 2);
     assert_eq!(config.extract_period, 100000);
     assert_eq!(config.valid_period, 50000);
+}
+
+#[test]
+fn test_calculate_aum_in_btc() {
+    let data = SolanaData {
+        timestamp: Default::default(),
+        slot: 0,
+        custody_assets: vec![],
+        aum_usd: Uint128::new(500000),
+        jlp_total_supply: Uint128::new(1000),
+        strategy_jlp_balance: Uint128::new(10000),
+    };
+    let btc_price_in_usd = Uint128::new(109000);
+    let res = calculate_aum_in_btc(data, btc_price_in_usd);
+    assert_eq!(res.unwrap(), Uint128::new(45))
 }

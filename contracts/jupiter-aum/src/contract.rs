@@ -7,10 +7,11 @@ use crate::state::{
     Config, PendingData, PublishedData, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA,
 };
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
+    StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
+use cw_storage_plus::PrefixBound;
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
@@ -152,7 +153,7 @@ fn update_config(
 /// Allows an oracle to publish Solana data.
 /// Only registered oracles can call this.
 /// Oracle can only publish once per slot.
-/// If consensus is reached, the `last_published_data` is updated.
+/// If consensus is reached, the `LAST_PUBLISHED_DATA` is updated.
 fn publish_data(
     deps: DepsMut,
     env: Env,
@@ -166,14 +167,14 @@ fn publish_data(
         return Err(ContractError::Unauthorized {});
     }
 
-    // Rule 1: if new_data.slot % config.N ≠ 0: reject such publishing
+    // if new_data.slot % config.N ≠ 0: reject such publishing
     if new_data.slot % config.extract_period != 0 {
         return Err(ContractError::InvalidSolanaSlot {
             extract_period: config.extract_period,
         });
     }
 
-    // Rule 2: if new_data.slot <= last_published_data.slot: reject such publishing
+    // if new_data.slot <= last_published_data.slot: reject such publishing
     if let Ok(last_published) = LAST_PUBLISHED_DATA.load(deps.storage) {
         if new_data.slot <= last_published.data.slot {
             return Err(ContractError::SlotTooOld {
@@ -183,19 +184,19 @@ fn publish_data(
         }
     }
 
+    // write into the key that includes hash so that we can track whether we reached consensus for the slot
     let new_data_hash = new_data.hash()?;
-
-    // Check if the oracle has already published for this slot
-    let pending_slot_key = (new_data.slot, new_data_hash);
+    let pending_slot_key = (new_data.slot, new_data_hash.clone());
     let mut pending_slots = PENDING_DATA
         .may_load(deps.storage, pending_slot_key.clone())?
         .unwrap_or_default();
 
+    // Check if the oracle has already published for this slot
     if pending_slots.iter().any(|s| s.oracle == info.sender) {
         return Err(ContractError::AlreadyPublished {});
     }
 
-    // Rule 3: save the new_data to the pending_data[new_data.slot] State;
+    // Save the new_data to the pending_data[(slot, data_hash)] state
     let new_pending_data = PendingData {
         data: new_data.clone(),
         oracle: info.sender.clone(),
@@ -216,16 +217,26 @@ fn publish_data(
         LAST_PUBLISHED_DATA.save(
             deps.storage,
             &PublishedData {
-                data: new_data,
+                data: new_data.clone(),
                 published_at: env.block.time,
             },
         )?;
-        response = response.add_attribute("consensus_reached", "true");
-        // .add_attribute("finalized_slot", new_data.slot.to_string())
-        // .add_attribute("finalized_aum_usd", new_data.aum_usd.to_string());
+        response = response
+            .add_attribute("consensus_reached", "true")
+            .add_attribute("published_at", env.block.time.to_string());
 
         // Clear pending data for this slot to save space
-        // TODO: iterate over all slots <= published slot and remove them
+        let obsolete_data: Vec<((u64, String), _)> = PENDING_DATA
+            .prefix_range(
+                deps.as_ref().storage,
+                None,
+                Some(PrefixBound::inclusive(new_data.slot)),
+                Order::Ascending,
+            )
+            .collect::<StdResult<Vec<(_, _)>>>()?;
+        for (key, _) in obsolete_data {
+            PENDING_DATA.remove(deps.storage, key);
+        }
     }
 
     Ok(response)
