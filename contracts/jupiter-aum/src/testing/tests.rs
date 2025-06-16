@@ -112,3 +112,25 @@ fn test_calculate_aum_in_btc() {
     let res = calculate_aum_in_btc(data, btc_price_in_usd);
     assert_eq!(res.unwrap(), Uint128::new(45))
 }
+
+// === test_publish_data
+// error cases:
+// - not oracle
+// - incorrect slot (extract_period)
+// - too old
+// - double publishing
+
+// green cases:
+//  - first publish
+//  - first consensus reached
+//  - next consensus reached
+//    - pending data removed
+//  - consensus reached, there are already publications for the next slot
+//    - correct slot published, pending data removed
+//  - multiple different data's for one slot, already publications for the next slot, consensus reached for one version
+//    - consensus version published, pending data removed
+
+fn test_publish_data() {}
+
+// === test query_get_aum
+// write possible edge cases, including when querier returns no data
