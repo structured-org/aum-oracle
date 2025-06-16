@@ -15,14 +15,18 @@ use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
 
-const CONTRACT_NAME: &str = "crates.io:jupiter-atm";
+const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// USD/BTC query constants
+const USD_DENOM: &'static str = "USD";
+const BTC_DENOM: &'static str = "BTC";
 
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -47,7 +51,7 @@ pub fn instantiate(
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
-        .add_attribute("admin", info.sender.to_string()))
+        .add_attribute("admin", config.admin.to_string()))
 }
 
 #[entry_point]
@@ -283,8 +287,8 @@ fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
 fn query_btc_price_in_usd(deps: Deps) -> Result<Uint128, StdError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
-        base: "USD".to_string(), // TODO: extract into constants
-        quote: "BTC".to_string(),
+        base: USD_DENOM.to_string(),
+        quote: BTC_DENOM.to_string(),
     }))?;
     // TODO: think about rounding
     let btc_price_in_usd = Uint128::from_str(

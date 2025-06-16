@@ -19,9 +19,13 @@ fn default_init_msg(api: MockApi) -> InstantiateMsg {
     }
 }
 
+// Test instantiate
+// Test instantiate with invalid config
+
 /// Tests the following scenario:
 ///     1.  A non-authorized address tries to update config's contract (error)
 ///     2.  An authorized address tries to update config's contract
+///     3.  TODO: An authorized address tries to update config's contract with invalid date
 #[test]
 fn test_update_config() {
     let mut deps = mock_dependencies();
