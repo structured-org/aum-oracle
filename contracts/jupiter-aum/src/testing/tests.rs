@@ -1,11 +1,11 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::error::ContractError::{InvalidThreshold, Unauthorized};
 use crate::msg::{ExecuteMsg, InstantiateMsg};
-use crate::state::{PendingData, SolanaData, CONFIG, PENDING_DATA};
+use crate::state::{SolanaData, CONFIG};
 use cosmwasm_std::testing::{message_info, mock_env};
 use cosmwasm_std::testing::{mock_dependencies, MockApi};
-use cosmwasm_std::{Order, StdResult, Uint128};
-use cw_storage_plus::PrefixBound;
+use cosmwasm_std::{Decimal, Uint128};
+use std::str::FromStr;
 
 // Helper to create a default instantiate message
 fn default_init_msg(api: MockApi) -> InstantiateMsg {
@@ -108,7 +108,7 @@ fn test_calculate_aum_in_btc() {
         jlp_total_supply: Uint128::new(1000),
         strategy_jlp_balance: Uint128::new(10000),
     };
-    let btc_price_in_usd = Uint128::new(109000);
+    let btc_price_in_usd = Decimal::from_str("109000.0").unwrap();
     let res = calculate_aum_in_btc(data, btc_price_in_usd);
     assert_eq!(res.unwrap(), Uint128::new(45))
 }

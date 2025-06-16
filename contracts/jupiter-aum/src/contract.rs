@@ -7,8 +7,8 @@ use crate::state::{
     Config, PendingData, PublishedData, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA,
 };
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
-    StdError, StdResult, Uint128,
+    entry_point, to_json_binary, Addr, Binary, Decimal, Decimal256, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::PrefixBound;
@@ -288,34 +288,44 @@ fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAUMResponse> {
         return Err(StdError::generic_err("DataNotValid"));
     }
 
-    // TODO: downgrade conversion?
     let btc_price_in_usd = query_btc_price_in_usd(deps)?;
     let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
 
     Ok(GetAUMResponse { aum_in_btc })
 }
 
-fn query_btc_price_in_usd(deps: Deps) -> Result<Uint128, StdError> {
+fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, StdError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
         base: USD_DENOM.to_string(),
         quote: BTC_DENOM.to_string(),
     }))?;
-    // TODO: think about rounding
     let btc_price_in_usd = Uint128::from_str(
         &btc_usd_price_result
             .price
             .ok_or(StdError::generic_err("no price for BTC/USD pair"))?
             .price,
-    )? / Uint128::new(10).pow(btc_usd_price_result.decimals as u32); // TODO: downgrade conversion?
+    )?;
+
+    let btc_price_in_usd =
+        Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
+            |e| {
+                StdError::generic_err("exceeded") // TODO
+            },
+        )?;
     Ok(btc_price_in_usd)
 }
 
-pub fn calculate_aum_in_btc(data: SolanaData, btc_price_in_usd: Uint128) -> StdResult<Uint128> {
-    let jlp_virtual_price = data.aum_usd.checked_div(data.jlp_total_supply)?;
-    let jlp_balance_in_usd = jlp_virtual_price * data.strategy_jlp_balance;
-    let aum_in_btc = jlp_balance_in_usd.checked_div(btc_price_in_usd)?;
-    Ok(aum_in_btc)
+pub fn calculate_aum_in_btc(data: SolanaData, btc_price_in_usd: Decimal) -> StdResult<Uint128> {
+    let strategy_jlp_balance = Decimal::from_atomics(data.strategy_jlp_balance, 0)
+        .map_err(|e| StdError::generic_err(format!("strategy jlp balance error: {}", e)))?;
+    let jlp_virtual_price = Decimal::checked_from_ratio(data.aum_usd, data.jlp_total_supply)
+        .map_err(|e| StdError::generic_err("checked div failed"))?;
+    let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
+    let aum_in_btc = jlp_balance_in_usd
+        .checked_div(btc_price_in_usd)
+        .map_err(|e| StdError::generic_err("checked div failed"))?;
+    Ok(aum_in_btc.to_uint_floor())
 }
 
 // ----------------------------------------
