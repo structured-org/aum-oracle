@@ -102,7 +102,7 @@ pub fn execute(
 }
 
 /// Updates configuration parameters for the contract.
-/// Only the current admin can call this method.
+/// Only admin can call this method.
 #[allow(clippy::too_many_arguments)]
 fn update_config(
     deps: DepsMut,
@@ -115,7 +115,7 @@ fn update_config(
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
-    // Ensure only the contract admin can update the configuration
+    // ensure only the contract admin can update the configuration
     if info.sender != config.admin {
         return Err(ContractError::Unauthorized {});
     }
@@ -213,7 +213,7 @@ fn publish_data(
     // check that consensus is reached or not for the new_data.slot
     let consensus_reached = pending_slots.len() as u32 >= config.threshold;
     if consensus_reached {
-        // If consensus is reached, rewrite last_published_data item in the State
+        // if consensus is reached, rewrite last_published_data item in the State
         LAST_PUBLISHED_DATA.save(
             deps.storage,
             &PublishedData {
