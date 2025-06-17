@@ -3,8 +3,8 @@ use cosmwasm_std::{
     from_json, Binary, ContractResult, Empty, GrpcQuery, OwnedDeps, Querier, QuerierResult,
     QueryRequest, SystemError, SystemResult,
 };
-use std::marker::PhantomData;
 use neutron_std::types::slinky::oracle::v1::QuotePrice;
+use std::marker::PhantomData;
 
 pub fn mock_dependencies() -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
     let custom_storage = MockStorage::default();
@@ -51,7 +51,7 @@ impl WasmMockQuerier {
             QueryRequest::Grpc(GrpcQuery { data: _, path }) => match path.as_str() {
                 neutron_std::types::slinky::oracle::v1::GetPriceRequest::PATH => {
                     let resp = neutron_std::types::slinky::oracle::v1::GetPriceResponse {
-                        price: Some(QuotePrice{
+                        price: Some(QuotePrice {
                             price: self.price.to_string(),
                             block_timestamp: None,
                             block_height: 0,
@@ -60,7 +60,7 @@ impl WasmMockQuerier {
                         decimals: 6,
                         id: 0,
                     }
-                        .to_proto_bytes();
+                    .to_proto_bytes();
                     SystemResult::Ok(ContractResult::Ok(Binary::new(resp.to_vec())))
                 }
                 _ => unimplemented!(),
@@ -72,6 +72,9 @@ impl WasmMockQuerier {
 
 impl WasmMockQuerier {
     fn new(base: MockQuerier) -> WasmMockQuerier {
-        WasmMockQuerier { base, price: Default::default() }
+        WasmMockQuerier {
+            base,
+            price: Default::default(),
+        }
     }
 }

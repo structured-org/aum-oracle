@@ -24,6 +24,7 @@ const USD_DENOM: &'static str = "USD";
 const BTC_DENOM: &'static str = "BTC";
 
 const DECIMAL_PRECISION: u32 = 6;
+const DECIMAL_MULTIPLIER: u128 = 1_000_000; // 6 points
 
 #[entry_point]
 pub fn instantiate(
@@ -320,26 +321,25 @@ pub fn calculate_aum_in_btc(
     data: SolanaData,
     btc_price_in_usd: Decimal,
 ) -> Result<Uint128, ContractError> {
-    let strategy_jlp_balance =
-        Decimal::from_atomics(data.strategy_jlp_balance, DECIMAL_PRECISION).map_err(|e| {
-            ContractError::DecimalError {
-                reason: e.to_string(),
-            }
+    let strategy_jlp_balance = Decimal::from_atomics(data.strategy_jlp_balance, DECIMAL_PRECISION)
+        .map_err(|e| ContractError::DecimalError {
+            reason: e.to_string(),
         })?;
     let aum_usd = Decimal::from_atomics(data.aum_usd, DECIMAL_PRECISION).map_err(|e| {
         ContractError::DecimalError {
             reason: e.to_string(),
         }
     })?;
-    let total_jlp_supply = Decimal::from_atomics(data.total_jlp_supply, DECIMAL_PRECISION).map_err(|e| {
-        ContractError::DecimalError {
-            reason: e.to_string(),
-        }
-    })?;
-    let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)
+    let total_jlp_supply = Decimal::from_atomics(data.total_jlp_supply, DECIMAL_PRECISION)
         .map_err(|e| ContractError::DecimalError {
             reason: e.to_string(),
         })?;
+    let jlp_virtual_price =
+        aum_usd
+            .checked_div(total_jlp_supply)
+            .map_err(|e| ContractError::DecimalError {
+                reason: e.to_string(),
+            })?;
     let jlp_balance_in_usd = jlp_virtual_price
         .checked_mul(strategy_jlp_balance)
         .map_err(|e| ContractError::DecimalError {
@@ -350,7 +350,13 @@ pub fn calculate_aum_in_btc(
         .map_err(|e| ContractError::DecimalError {
             reason: e.to_string(),
         })?;
-    Ok(aum_in_btc.to_uint_floor())
+    // convert to multiplier to make it integer with decimal places
+    let multiplier =
+        Decimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| ContractError::DecimalError {
+            reason: e.to_string(),
+        })?;
+    let result = (aum_in_btc * multiplier).to_uint_floor();
+    Ok(result)
 }
 
 // ----------------------------------------
