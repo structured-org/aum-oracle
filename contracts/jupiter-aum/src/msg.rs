@@ -49,7 +49,7 @@ pub enum ExecuteMsg {
         /// Jupiter's Assets Under Management value in USD.
         aum_usd: Uint128,
         /// The total supply of JLP tokens.
-        jlp_total_supply: Uint128,
+        total_jlp_supply: Uint128,
         /// The balance of JLP tokens held by the strategy.
         strategy_jlp_balance: Uint128,
     },

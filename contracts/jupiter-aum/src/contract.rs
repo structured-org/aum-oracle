@@ -23,6 +23,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const USD_DENOM: &'static str = "USD";
 const BTC_DENOM: &'static str = "BTC";
 
+const DECIMAL_PRECISION: u32 = 6;
+
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -83,7 +85,7 @@ pub fn execute(
             slot,
             custody_assets,
             aum_usd,
-            jlp_total_supply,
+            total_jlp_supply,
             strategy_jlp_balance,
         } => publish_data(
             deps,
@@ -94,7 +96,7 @@ pub fn execute(
                 slot,
                 custody_assets,
                 aum_usd,
-                jlp_total_supply,
+                total_jlp_supply,
                 strategy_jlp_balance,
             },
         ),
@@ -295,8 +297,8 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
 fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
-        base: USD_DENOM.to_string(),
-        quote: BTC_DENOM.to_string(),
+        base: BTC_DENOM.to_string(),
+        quote: USD_DENOM.to_string(),
     }))?;
     let btc_price_in_usd = Uint128::from_str(
         &btc_usd_price_result
@@ -319,12 +321,22 @@ pub fn calculate_aum_in_btc(
     btc_price_in_usd: Decimal,
 ) -> Result<Uint128, ContractError> {
     let strategy_jlp_balance =
-        Decimal::from_atomics(data.strategy_jlp_balance, 0).map_err(|e| {
+        Decimal::from_atomics(data.strategy_jlp_balance, DECIMAL_PRECISION).map_err(|e| {
             ContractError::DecimalError {
                 reason: e.to_string(),
             }
         })?;
-    let jlp_virtual_price = Decimal::checked_from_ratio(data.aum_usd, data.jlp_total_supply)
+    let aum_usd = Decimal::from_atomics(data.aum_usd, DECIMAL_PRECISION).map_err(|e| {
+        ContractError::DecimalError {
+            reason: e.to_string(),
+        }
+    })?;
+    let total_jlp_supply = Decimal::from_atomics(data.total_jlp_supply, DECIMAL_PRECISION).map_err(|e| {
+        ContractError::DecimalError {
+            reason: e.to_string(),
+        }
+    })?;
+    let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)
         .map_err(|e| ContractError::DecimalError {
             reason: e.to_string(),
         })?;

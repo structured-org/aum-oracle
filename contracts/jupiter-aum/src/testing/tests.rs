@@ -117,9 +117,9 @@ mod tests {
                     owned: 100, locked: 50, guaranteed_usd: 150, decimals: 6, denom: "USDC".to_string()
                 }
             ],
-            aum_usd: Uint128::new(500000), // $500,000 AUM USD
-            jlp_total_supply: Uint128::new(1000), // 1000 JLP total supply
-            strategy_jlp_balance: Uint128::new(10000), // 10,000 JLP balance
+            aum_usd: Uint128::new(500_000), // $500,000 AUM USD
+            total_jlp_supply: Uint128::new(1_000), // 1000 JLP total supply
+            strategy_jlp_balance: Uint128::new(10_000), // 10,000 JLP balance
         };
         let btc_price_in_usd1 = Decimal::from_str("25000.0").unwrap(); // $25,000 per BTC
         // jlp_virtual_price = 500,000 / 1000 = 500 USD/JLP
@@ -138,7 +138,7 @@ mod tests {
                 }
             ],
             aum_usd: Uint128::new(1_000_000_000), // $1 Billion AUM
-            jlp_total_supply: Uint128::new(50_000), // 50,000 JLP total
+            total_jlp_supply: Uint128::new(50_000), // 50,000 JLP total
             strategy_jlp_balance: Uint128::new(20_000), // 20,000 JLP balance
         };
         let btc_price_in_usd2 = Decimal::from_str("50000.0").unwrap(); // $50,000 per BTC
@@ -148,13 +148,13 @@ mod tests {
         let res2 = calculate_aum_in_btc(data2, btc_price_in_usd2);
         assert_eq!(res2.unwrap(), Uint128::new(8000), "Test Case 2 Failed");
 
-        // Test case 3: Division by zero for jlp_total_supply
+        // Test case 3: Division by zero for total_jlp_supply
         let data3 = SolanaData {
             timestamp: Timestamp::from_seconds(1),
             slot: 1,
             custody_assets: vec![],
             aum_usd: Uint128::new(100),
-            jlp_total_supply: Uint128::new(0), // Zero supply
+            total_jlp_supply: Uint128::new(0), // Zero supply
             strategy_jlp_balance: Uint128::new(10),
         };
         let btc_price_in_usd3 = Decimal::from_str("1.0").unwrap();
@@ -167,7 +167,7 @@ mod tests {
             slot: 1,
             custody_assets: vec![],
             aum_usd: Uint128::new(100),
-            jlp_total_supply: Uint128::new(10),
+            total_jlp_supply: Uint128::new(10),
             strategy_jlp_balance: Uint128::new(5),
         };
         let btc_price_in_usd4 = Decimal::from_str("0.0").unwrap(); // Zero BTC price
@@ -178,7 +178,7 @@ mod tests {
 
     /// Comprehensive test suite for the `publish_data` execute message.
     #[test]
-    fn test_publish_data() {
+    fn test_publish_data_errors() {
         let mut deps = mock_dependencies();
         let mut env = mock_env();
 
@@ -194,27 +194,17 @@ mod tests {
         // --- Error Cases ---
 
         // Case 1: Not an oracle
-        let data_unauth = SolanaData {
-            timestamp: env.block.time,
-            slot: 10,
-            custody_assets: vec![CustodyAsset {
-                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
-            }],
-            aum_usd: Uint128::new(1000),
-            jlp_total_supply: Uint128::new(100),
-            strategy_jlp_balance: Uint128::new(50),
-        };
         let err = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&non_oracle, &[]),
             ExecuteMsg::PublishData {
-                timestamp: data_unauth.timestamp,
-                slot: data_unauth.slot,
-                custody_assets: data_unauth.custody_assets,
-                aum_usd: data_unauth.aum_usd,
-                jlp_total_supply: data_unauth.jlp_total_supply,
-                strategy_jlp_balance: data_unauth.strategy_jlp_balance,
+                timestamp: env.block.time,
+                slot: 10,
+                custody_assets: custody_asset(),
+                aum_usd: Uint128::new(1000),
+                total_jlp_supply: Uint128::new(100),
+                strategy_jlp_balance: Uint128::new(50),
             },
         )
             .unwrap_err();
@@ -224,11 +214,9 @@ mod tests {
         let data_invalid_slot = SolanaData {
             timestamp: env.block.time,
             slot: 11, // Not a multiple of 10
-            custody_assets: vec![CustodyAsset {
-                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
-            }],
+            custody_assets: custody_asset(),
             aum_usd: Uint128::new(1000),
-            jlp_total_supply: Uint128::new(100),
+            total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
         let err = execute(
@@ -240,7 +228,7 @@ mod tests {
                 slot: data_invalid_slot.slot,
                 custody_assets: data_invalid_slot.custody_assets,
                 aum_usd: data_invalid_slot.aum_usd,
-                jlp_total_supply: data_invalid_slot.jlp_total_supply,
+                total_jlp_supply: data_invalid_slot.total_jlp_supply,
                 strategy_jlp_balance: data_invalid_slot.strategy_jlp_balance,
             },
         )
@@ -257,25 +245,16 @@ mod tests {
         let data_s10_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 10,
-            custody_assets: vec![CustodyAsset {
-                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
-            }],
+            custody_assets: custody_asset(),
             aum_usd: Uint128::new(1000),
-            jlp_total_supply: Uint128::new(100),
+            total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s10_v1.timestamp,
-                slot: data_s10_v1.slot,
-                custody_assets: data_s10_v1.clone().custody_assets,
-                aum_usd: data_s10_v1.aum_usd,
-                jlp_total_supply: data_s10_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s10_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s10_v1),
         )
             .unwrap();
         // Now, publish data from oracle2 for slot 10 to reach consensus
@@ -283,18 +262,11 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s10_v1.timestamp,
-                slot: data_s10_v1.slot,
-                custody_assets: data_s10_v1.clone().custody_assets,
-                aum_usd: data_s10_v1.aum_usd,
-                jlp_total_supply: data_s10_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s10_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s10_v1),
         )
             .unwrap();
-        // Verify LAST_PUBLISHED_DATA is set
-        assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_ok());
+        // Verify LAST_PUBLISHED_DATA is updated
+        assert_eq!(LAST_PUBLISHED_DATA.load(&deps.storage).unwrap().data.slot, 10);
 
         let data_s10_too_old = SolanaData {
             timestamp: env.block.time,
@@ -303,21 +275,14 @@ mod tests {
                 owned: 200, locked: 0, guaranteed_usd: 200, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(2000),
-            jlp_total_supply: Uint128::new(200),
+            total_jlp_supply: Uint128::new(200),
             strategy_jlp_balance: Uint128::new(100),
         };
         let err = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle3, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s10_too_old.timestamp,
-                slot: data_s10_too_old.slot,
-                custody_assets: data_s10_too_old.custody_assets,
-                aum_usd: data_s10_too_old.aum_usd,
-                jlp_total_supply: data_s10_too_old.jlp_total_supply,
-                strategy_jlp_balance: data_s10_too_old.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s10_too_old),
         )
             .unwrap_err();
         assert_eq!(
@@ -332,11 +297,9 @@ mod tests {
         let data_s20_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 20,
-            custody_assets: vec![CustodyAsset {
-                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
-            }],
+            custody_assets: custody_asset(),
             aum_usd: Uint128::new(1000),
-            jlp_total_supply: Uint128::new(100),
+            total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
         execute(
@@ -348,7 +311,7 @@ mod tests {
                 slot: data_s20_v1.slot,
                 custody_assets: data_s20_v1.clone().custody_assets,
                 aum_usd: data_s20_v1.aum_usd,
-                jlp_total_supply: data_s20_v1.jlp_total_supply,
+                total_jlp_supply: data_s20_v1.total_jlp_supply,
                 strategy_jlp_balance: data_s20_v1.strategy_jlp_balance,
             },
         )
@@ -363,17 +326,18 @@ mod tests {
                 slot: data_s20_v1.slot,
                 custody_assets: data_s20_v1.custody_assets,
                 aum_usd: data_s20_v1.aum_usd,
-                jlp_total_supply: data_s20_v1.jlp_total_supply,
+                total_jlp_supply: data_s20_v1.total_jlp_supply,
                 strategy_jlp_balance: data_s20_v1.strategy_jlp_balance,
             },
         )
             .unwrap_err(); // Second publish for slot 20 by oracle1
         assert_eq!(err, AlreadyPublished {});
-
-
-        // --- Green Cases ---
-        // Reset state for green cases
+    }
+    #[test]
+    fn test_publish_data_green_path() {
         let mut deps = mock_dependencies();
+        let mut env = mock_env();
+
         let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
         let oracle1 = deps.api.addr_make("oracle1");
         let oracle2 = deps.api.addr_make("oracle2");
@@ -393,21 +357,14 @@ mod tests {
                 owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(1000),
-            jlp_total_supply: Uint128::new(100),
+            total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
         let res = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s30_v1.timestamp,
-                slot: data_s30_v1.slot,
-                custody_assets: data_s30_v1.clone().custody_assets,
-                aum_usd: data_s30_v1.aum_usd,
-                jlp_total_supply: data_s30_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s30_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s30_v1),
         )
             .unwrap();
         assert_eq!(res.attributes.len(), 3); // action, slot, oracle
@@ -424,14 +381,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s30_v1.timestamp,
-                slot: data_s30_v1.slot,
-                custody_assets: data_s30_v1.clone().custody_assets,
-                aum_usd: data_s30_v1.aum_usd,
-                jlp_total_supply: data_s30_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s30_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s30_v1),
         )
             .unwrap();
         assert_eq!(res.attributes.len(), 5); // action, slot, oracle, consensus_reached, published_at
@@ -455,35 +405,21 @@ mod tests {
                 owned: 200, locked: 0, guaranteed_usd: 200, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(2000),
-            jlp_total_supply: Uint128::new(200),
+            total_jlp_supply: Uint128::new(200),
             strategy_jlp_balance: Uint128::new(100),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s40_v1.timestamp,
-                slot: data_s40_v1.slot,
-                custody_assets: data_s40_v1.clone().custody_assets,
-                aum_usd: data_s40_v1.aum_usd,
-                jlp_total_supply: data_s40_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s40_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s40_v1),
         )
             .unwrap();
         let res = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s40_v1.timestamp,
-                slot: data_s40_v1.slot,
-                custody_assets: data_s40_v1.clone().custody_assets,
-                aum_usd: data_s40_v1.aum_usd,
-                jlp_total_supply: data_s40_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s40_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s40_v1),
         )
             .unwrap();
         assert_eq!(res.attributes.len(), 5);
@@ -504,7 +440,7 @@ mod tests {
                 owned: 300, locked: 0, guaranteed_usd: 300, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(3000),
-            jlp_total_supply: Uint128::new(300),
+            total_jlp_supply: Uint128::new(300),
             strategy_jlp_balance: Uint128::new(150),
         };
         let data_s60_v1 = SolanaData {
@@ -514,7 +450,7 @@ mod tests {
                 owned: 400, locked: 0, guaranteed_usd: 400, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(4000),
-            jlp_total_supply: Uint128::new(400),
+            total_jlp_supply: Uint128::new(400),
             strategy_jlp_balance: Uint128::new(200),
         };
         // Publish for slot 60 first (no consensus yet)
@@ -522,14 +458,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s60_v1.timestamp,
-                slot: data_s60_v1.slot,
-                custody_assets: data_s60_v1.clone().custody_assets,
-                aum_usd: data_s60_v1.aum_usd,
-                jlp_total_supply: data_s60_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s60_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s60_v1),
         )
             .unwrap();
         let pending_key_s60 = (data_s60_v1.slot, data_s60_v1.hash().unwrap());
@@ -540,28 +469,14 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s50_v1.timestamp,
-                slot: data_s50_v1.slot,
-                custody_assets: data_s50_v1.clone().custody_assets,
-                aum_usd: data_s50_v1.aum_usd,
-                jlp_total_supply: data_s50_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s50_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s50_v1),
         )
             .unwrap();
         let res = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s50_v1.timestamp,
-                slot: data_s50_v1.slot,
-                custody_assets: data_s50_v1.clone().custody_assets,
-                aum_usd: data_s50_v1.aum_usd,
-                jlp_total_supply: data_s50_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s50_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s50_v1),
         )
             .unwrap();
         assert_eq!(LAST_PUBLISHED_DATA.load(&deps.storage).unwrap().data, data_s50_v1);
@@ -582,7 +497,7 @@ mod tests {
                 owned: 500, locked: 0, guaranteed_usd: 500, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(5000),
-            jlp_total_supply: Uint128::new(500),
+            total_jlp_supply: Uint128::new(500),
             strategy_jlp_balance: Uint128::new(250),
         };
         let data_s70_v2 = SolanaData {
@@ -592,7 +507,7 @@ mod tests {
                 owned: 510, locked: 0, guaranteed_usd: 510, decimals: 6, denom: "USDC".to_string()
             }], // Different value
             aum_usd: Uint128::new(5100),
-            jlp_total_supply: Uint128::new(510),
+            total_jlp_supply: Uint128::new(510),
             strategy_jlp_balance: Uint128::new(255),
         };
         // Publish for slot 80 first (pending data for next slot)
@@ -603,21 +518,14 @@ mod tests {
                 owned: 600, locked: 0, guaranteed_usd: 600, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(6000),
-            jlp_total_supply: Uint128::new(600),
+            total_jlp_supply: Uint128::new(600),
             strategy_jlp_balance: Uint128::new(300),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s80_v1.timestamp,
-                slot: data_s80_v1.slot,
-                custody_assets: data_s80_v1.clone().custody_assets,
-                aum_usd: data_s80_v1.aum_usd,
-                jlp_total_supply: data_s80_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s80_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s80_v1),
         )
             .unwrap();
         let pending_key_s80 = (data_s80_v1.slot, data_s80_v1.hash().unwrap());
@@ -628,14 +536,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s70_v1.timestamp,
-                slot: data_s70_v1.slot,
-                custody_assets: data_s70_v1.clone().custody_assets,
-                aum_usd: data_s70_v1.aum_usd,
-                jlp_total_supply: data_s70_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s70_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s70_v1),
         )
             .unwrap();
         // Oracle2 publishes data_s70_v2 (different)
@@ -643,14 +544,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s70_v2.timestamp,
-                slot: data_s70_v2.slot,
-                custody_assets: data_s70_v2.clone().custody_assets,
-                aum_usd: data_s70_v2.aum_usd,
-                jlp_total_supply: data_s70_v2.jlp_total_supply,
-                strategy_jlp_balance: data_s70_v2.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s70_v2),
         )
             .unwrap();
         // Oracle3 publishes data_s70_v1 (reaching consensus for v1)
@@ -658,14 +552,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle3, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s70_v1.timestamp,
-                slot: data_s70_v1.slot,
-                custody_assets: data_s70_v1.clone().custody_assets,
-                aum_usd: data_s70_v1.aum_usd,
-                jlp_total_supply: data_s70_v1.jlp_total_supply,
-                strategy_jlp_balance: data_s70_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s70_v1),
         )
             .unwrap();
         // Assert v1 is finalized
@@ -678,7 +565,6 @@ mod tests {
         // Pending data for slot 80 should remain
         assert!(PENDING_DATA.has(&deps.storage, pending_key_s80));
     }
-
 
     /// Comprehensive test suite for the `query_get_aum` query message.
     #[test]
@@ -706,35 +592,21 @@ mod tests {
                 owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(500_000),
-            jlp_total_supply: Uint128::new(1000),
+            total_jlp_supply: Uint128::new(1000),
             strategy_jlp_balance: Uint128::new(10000),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: initial_data.timestamp,
-                slot: initial_data.slot,
-                custody_assets: initial_data.clone().custody_assets,
-                aum_usd: initial_data.aum_usd,
-                jlp_total_supply: initial_data.jlp_total_supply,
-                strategy_jlp_balance: initial_data.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&initial_data),
         )
             .unwrap();
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: initial_data.timestamp,
-                slot: initial_data.slot,
-                custody_assets: initial_data.custody_assets,
-                aum_usd: initial_data.aum_usd,
-                jlp_total_supply: initial_data.jlp_total_supply,
-                strategy_jlp_balance: initial_data.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&initial_data),
         )
             .unwrap();
         assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_ok()); // Ensure data is published
@@ -754,7 +626,7 @@ mod tests {
         // Revert querier to return a valid price
         deps.querier.with_price((25_000u64 * 1_000_000u64).to_string());
 
-        // Case 4: Division by zero (jlp_total_supply) - Requires re-publishing data
+        // Case 4: Division by zero (total_jlp_supply) - Requires re-publishing data
         let data_zero_jlp_supply = SolanaData {
             timestamp: env.block.time,
             slot: 20,
@@ -762,39 +634,25 @@ mod tests {
                 owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(100),
-            jlp_total_supply: Uint128::new(0), // Zero supply
+            total_jlp_supply: Uint128::new(0), // Zero supply
             strategy_jlp_balance: Uint128::new(5),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_zero_jlp_supply.timestamp,
-                slot: data_zero_jlp_supply.slot,
-                custody_assets: data_zero_jlp_supply.clone().custody_assets,
-                aum_usd: data_zero_jlp_supply.aum_usd,
-                jlp_total_supply: data_zero_jlp_supply.jlp_total_supply,
-                strategy_jlp_balance: data_zero_jlp_supply.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_zero_jlp_supply),
         )
             .unwrap();
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_zero_jlp_supply.timestamp,
-                slot: data_zero_jlp_supply.slot,
-                custody_assets: data_zero_jlp_supply.custody_assets,
-                aum_usd: data_zero_jlp_supply.aum_usd,
-                jlp_total_supply: data_zero_jlp_supply.jlp_total_supply,
-                strategy_jlp_balance: data_zero_jlp_supply.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_zero_jlp_supply),
         )
             .unwrap();
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-        assert!(matches!(err, ContractError::DecimalError { reason } if reason.contains("Division by zero")), "Expected DecimalError for zero jlp_total_supply");
+        assert!(matches!(err, ContractError::DecimalError { reason } if reason.contains("Division by zero")), "Expected DecimalError for zero total_jlp_supply");
 
         // Case 5: Division by zero (btc_price_in_usd) - Requires re-setting querier
         let data_valid_aum = SolanaData {
@@ -804,35 +662,21 @@ mod tests {
                 owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(100),
-            jlp_total_supply: Uint128::new(10),
+            total_jlp_supply: Uint128::new(10),
             strategy_jlp_balance: Uint128::new(5),
         };
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_valid_aum.timestamp,
-                slot: data_valid_aum.slot,
-                custody_assets: data_valid_aum.clone().custody_assets,
-                aum_usd: data_valid_aum.aum_usd,
-                jlp_total_supply: data_valid_aum.jlp_total_supply,
-                strategy_jlp_balance: data_valid_aum.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_valid_aum),
         )
             .unwrap();
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_valid_aum.timestamp,
-                slot: data_valid_aum.slot,
-                custody_assets: data_valid_aum.custody_assets,
-                aum_usd: data_valid_aum.aum_usd,
-                jlp_total_supply: data_valid_aum.jlp_total_supply,
-                strategy_jlp_balance: data_valid_aum.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_valid_aum),
         )
             .unwrap();
 
@@ -855,7 +699,7 @@ mod tests {
                 owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
             }],
             aum_usd: Uint128::new(500_000_000_000u128), // 500 Billion USD
-            jlp_total_supply: Uint128::new(1_000_000_000u128), // 1 Billion JLP
+            total_jlp_supply: Uint128::new(1_000_000_000u128), // 1 Billion JLP
             strategy_jlp_balance: Uint128::new(10_000_000u128), // 10 Million JLP
         };
         // Re-publish to update LAST_PUBLISHED_DATA with these large values
@@ -863,28 +707,14 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: initial_data_large_values.timestamp,
-                slot: initial_data_large_values.slot,
-                custody_assets: initial_data_large_values.clone().custody_assets,
-                aum_usd: initial_data_large_values.aum_usd,
-                jlp_total_supply: initial_data_large_values.jlp_total_supply,
-                strategy_jlp_balance: initial_data_large_values.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&initial_data_large_values),
         )
             .unwrap();
         execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: initial_data_large_values.timestamp,
-                slot: initial_data_large_values.slot,
-                custody_assets: initial_data_large_values.custody_assets,
-                aum_usd: initial_data_large_values.aum_usd,
-                jlp_total_supply: initial_data_large_values.jlp_total_supply,
-                strategy_jlp_balance: initial_data_large_values.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&initial_data_large_values),
         )
             .unwrap();
 
@@ -892,5 +722,26 @@ mod tests {
         let res: GetAUMResponse =
             from_json(&query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap()).unwrap();
         assert_eq!(res.aum_in_btc, Uint128::new(200_000), "Case 6 Failed: Large values AUM calculation");
+    }
+
+    fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
+        ExecuteMsg::PublishData {
+            timestamp: data.timestamp,
+            slot: data.slot,
+            custody_assets: data.clone().custody_assets,
+            aum_usd: data.aum_usd,
+            total_jlp_supply: data.total_jlp_supply,
+            strategy_jlp_balance: data.strategy_jlp_balance,
+        }
+    }
+
+    fn custody_asset() -> Vec<CustodyAsset> {
+        vec![CustodyAsset {
+            owned: 100,
+            locked: 0,
+            guaranteed_usd: 100,
+            decimals: 6,
+            denom: "USDC".to_string()
+        }]
     }
 }

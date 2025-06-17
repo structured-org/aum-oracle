@@ -58,7 +58,7 @@ pub struct SolanaData {
     /// Jupiter's Assets Under Management value in USD.
     pub aum_usd: Uint128,
     /// The total supply of JLP (Jupiter Liquidity Provider) tokens.
-    pub jlp_total_supply: Uint128,
+    pub total_jlp_supply: Uint128,
     /// The balance of JLP tokens held by the strategy.
     pub strategy_jlp_balance: Uint128,
 }
@@ -73,9 +73,11 @@ impl SolanaData {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct CustodyAsset {
-    // TODO: field descriptions
+    /// Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
     pub owned: u64,
+    /// Amount of locked tokens (used in trading?) in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
     pub locked: u64,
+    /// The value in each custody account represents a total size estimate of all long positions
     pub guaranteed_usd: u64,
     /// How many decimals in each number above.
     pub decimals: u8,
