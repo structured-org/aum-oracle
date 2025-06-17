@@ -306,7 +306,8 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
             .price
             .ok_or(ContractError::SlinkyBTCPriceMissing {})?
             .price,
-    )?;
+    )
+    .map_err(|_| ContractError::SlinkyBTCPriceIncorrect {})?;
 
     let btc_price_in_usd =
         Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(

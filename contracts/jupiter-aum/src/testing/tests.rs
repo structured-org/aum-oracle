@@ -209,18 +209,19 @@ mod tests {
         // --- Error Cases ---
 
         // Case 1: Not an oracle
+        let data_valid_slot = SolanaData {
+            timestamp: env.block.time,
+            slot: 10,
+            custody_assets: custody_asset(),
+            aum_usd: Uint128::new(1000),
+            total_jlp_supply: Uint128::new(100),
+            strategy_jlp_balance: Uint128::new(50),
+        };
         let err = execute(
             deps.as_mut(),
             env.clone(),
             message_info(&non_oracle, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: env.block.time,
-                slot: 10,
-                custody_assets: custody_asset(),
-                aum_usd: Uint128::new(1000),
-                total_jlp_supply: Uint128::new(100),
-                strategy_jlp_balance: Uint128::new(50),
-            },
+            publish_msg_from_solana_data(&data_valid_slot),
         )
         .unwrap_err();
         assert_eq!(err, Unauthorized {});
@@ -238,14 +239,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_invalid_slot.timestamp,
-                slot: data_invalid_slot.slot,
-                custody_assets: data_invalid_slot.custody_assets,
-                aum_usd: data_invalid_slot.aum_usd,
-                total_jlp_supply: data_invalid_slot.total_jlp_supply,
-                strategy_jlp_balance: data_invalid_slot.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_invalid_slot),
         )
         .unwrap_err();
         assert_eq!(err, ContractError::InvalidSolanaSlot { extract_period: 10 });
@@ -323,14 +317,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s20_v1.timestamp,
-                slot: data_s20_v1.slot,
-                custody_assets: data_s20_v1.clone().custody_assets,
-                aum_usd: data_s20_v1.aum_usd,
-                total_jlp_supply: data_s20_v1.total_jlp_supply,
-                strategy_jlp_balance: data_s20_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s20_v1),
         )
         .unwrap(); // First publish for slot 20 by oracle1
 
@@ -338,14 +325,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             message_info(&oracle1, &[]),
-            ExecuteMsg::PublishData {
-                timestamp: data_s20_v1.timestamp,
-                slot: data_s20_v1.slot,
-                custody_assets: data_s20_v1.custody_assets,
-                aum_usd: data_s20_v1.aum_usd,
-                total_jlp_supply: data_s20_v1.total_jlp_supply,
-                strategy_jlp_balance: data_s20_v1.strategy_jlp_balance,
-            },
+            publish_msg_from_solana_data(&data_s20_v1),
         )
         .unwrap_err(); // Second publish for slot 20 by oracle1
         assert_eq!(err, AlreadyPublished {});
@@ -369,13 +349,7 @@ mod tests {
         let data_s30_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 30,
-            custody_assets: vec![CustodyAsset {
-                owned: 100,
-                locked: 0,
-                guaranteed_usd: 100,
-                decimals: 6,
-                denom: "USDC".to_string(),
-            }],
+            custody_assets: custody_asset(),
             aum_usd: Uint128::new(1000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -506,7 +480,7 @@ mod tests {
             publish_msg_from_solana_data(&data_s50_v1),
         )
         .unwrap();
-        let res = execute(
+        execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle2, &[]),
@@ -599,7 +573,7 @@ mod tests {
         )
         .unwrap();
         // Oracle3 publishes data_s70_v1 (reaching consensus for v1)
-        let res = execute(
+        execute(
             deps.as_mut(),
             env.clone(),
             message_info(&oracle3, &[]),
@@ -642,6 +616,7 @@ mod tests {
 
         let init_msg = default_init_msg(&deps.api);
         instantiate(deps.as_mut(), env.clone(), admin_info.clone(), init_msg).unwrap();
+
         // --- Error Cases ---
 
         // Case 1: No data published yet
@@ -691,7 +666,7 @@ mod tests {
         deps.querier.with_price("".to_string());
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::DecimalError { reason } if reason.contains("Failed to parse price string")),
+            matches!(err, ContractError::SlinkyBTCPriceIncorrect {}),
             "Expected DecimalError for empty price string"
         );
         // Revert querier to return a valid price
@@ -729,7 +704,7 @@ mod tests {
         .unwrap();
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::DecimalError { reason } if reason.contains("Division by zero")),
+            matches!(err, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
             "Expected DecimalError for zero total_jlp_supply"
         );
 
@@ -766,7 +741,7 @@ mod tests {
         deps.querier.with_price("0".to_string());
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::DecimalError { reason } if reason.contains("Division by zero")),
+            matches!(err, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
             "Expected DecimalError for zero BTC price"
         );
 

@@ -41,4 +41,7 @@ pub enum ContractError {
 
     #[error("Slinky BTC/USD price is missing")]
     SlinkyBTCPriceMissing {},
+
+    #[error("SlinkyBTCPriceIncorrect")]
+    SlinkyBTCPriceIncorrect {},
 }
