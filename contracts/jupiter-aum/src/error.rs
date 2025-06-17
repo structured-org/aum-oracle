@@ -36,9 +36,6 @@ pub enum ContractError {
     #[error("Slinky oracle price query failed")]
     SlinkyOracleQueryFailed {},
 
-    #[error("Division by zero for AUM calculation")]
-    DivisionByZero {},
-
     #[error("Overflow: {reason}")]
     DecimalError { reason: String },
 

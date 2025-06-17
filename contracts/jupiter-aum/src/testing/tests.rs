@@ -1,19 +1,16 @@
 
-// ----------------------------------------
-//  Tests
-// ----------------------------------------
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{
         mock_env, message_info, MockApi
     };
-    use cosmwasm_std::{attr, from_json, Decimal, Timestamp, Uint128};
     use std::str::FromStr;
+    use cosmwasm_std::{attr, from_json, Decimal, Timestamp, Uint128};
     use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
     use crate::error::ContractError;
-    use crate::error::ContractError::{AlreadyPublished, DataNotValid, InvalidThreshold, Unauthorized};
+    use crate::error::ContractError::{AlreadyPublished, InvalidThreshold, Unauthorized};
     use crate::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
-    use crate::state::{SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
+    use crate::state::{CustodyAsset, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
     use crate::testing::mock_querier::mock_dependencies;
 
     // Helper to create a default instantiate message
@@ -25,11 +22,12 @@ mod tests {
                 api.addr_make("oracle2").to_string(),
                 api.addr_make("oracle3").to_string(),
             ],
-            threshold: 2, // Default threshold for tests
+            threshold: 2,
             extract_period: 10,
             valid_period: 1000,
         }
     }
+
 
     /// Tests the following scenario:
     ///     1.  A non-authorized address tries to update config's contract (error)
@@ -114,7 +112,11 @@ mod tests {
         let data1 = SolanaData {
             timestamp: Timestamp::from_seconds(1),
             slot: 1,
-            custody_assets: Uint128::new(0), // Not used in this specific AUM formula
+            custody_assets: vec![
+                CustodyAsset {
+                    owned: 100, locked: 50, guaranteed_usd: 150, decimals: 6, denom: "USDC".to_string()
+                }
+            ],
             aum_usd: Uint128::new(500000), // $500,000 AUM USD
             jlp_total_supply: Uint128::new(1000), // 1000 JLP total supply
             strategy_jlp_balance: Uint128::new(10000), // 10,000 JLP balance
@@ -124,15 +126,17 @@ mod tests {
         // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
         // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
         let res1 = calculate_aum_in_btc(data1, btc_price_in_usd1);
-        // The `calculate_aum_in_btc` now uses `Decimal` internally and returns `to_uint_floor()`.
-        // So `200` is the expected integer part of the BTC value.
         assert_eq!(res1.unwrap(), Uint128::new(200), "Test Case 1 Failed");
 
         // Test case 2: Different values
         let data2 = SolanaData {
             timestamp: Timestamp::from_seconds(1),
             slot: 1,
-            custody_assets: Uint128::new(0),
+            custody_assets: vec![
+                CustodyAsset {
+                    owned: 200, locked: 100, guaranteed_usd: 300, decimals: 6, denom: "USDT".to_string()
+                }
+            ],
             aum_usd: Uint128::new(1_000_000_000), // $1 Billion AUM
             jlp_total_supply: Uint128::new(50_000), // 50,000 JLP total
             strategy_jlp_balance: Uint128::new(20_000), // 20,000 JLP balance
@@ -148,27 +152,27 @@ mod tests {
         let data3 = SolanaData {
             timestamp: Timestamp::from_seconds(1),
             slot: 1,
-            custody_assets: Uint128::new(0),
+            custody_assets: vec![],
             aum_usd: Uint128::new(100),
             jlp_total_supply: Uint128::new(0), // Zero supply
             strategy_jlp_balance: Uint128::new(10),
         };
         let btc_price_in_usd3 = Decimal::from_str("1.0").unwrap();
         let err3 = calculate_aum_in_btc(data3, btc_price_in_usd3).unwrap_err();
-        assert!(matches!(err3, ContractError::DecimalError { reason } if reason.contains("Division by zero")), "Test Case 3 Failed: {:?}", err3);
+        assert!(matches!(&err3, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")), "Test Case 3 Failed: {:?}", err3);
 
         // Test case 4: Division by zero for btc_price_in_usd
         let data4 = SolanaData {
             timestamp: Timestamp::from_seconds(1),
             slot: 1,
-            custody_assets: Uint128::new(0),
+            custody_assets: vec![],
             aum_usd: Uint128::new(100),
             jlp_total_supply: Uint128::new(10),
             strategy_jlp_balance: Uint128::new(5),
         };
         let btc_price_in_usd4 = Decimal::from_str("0.0").unwrap(); // Zero BTC price
         let err4 = calculate_aum_in_btc(data4, btc_price_in_usd4).unwrap_err();
-        assert!(matches!(err4, ContractError::DecimalError { reason } if reason.contains("Division by zero")), "Test Case 4 Failed: {:?}", err4);
+        assert!(matches!(&err4, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")), "Test Case 4 Failed: {:?}", err4);
     }
 
 
@@ -193,7 +197,9 @@ mod tests {
         let data_unauth = SolanaData {
             timestamp: env.block.time,
             slot: 10,
-            custody_assets: Uint128::new(100),
+            custody_assets: vec![CustodyAsset {
+                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(1000),
             jlp_total_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -218,7 +224,9 @@ mod tests {
         let data_invalid_slot = SolanaData {
             timestamp: env.block.time,
             slot: 11, // Not a multiple of 10
-            custody_assets: Uint128::new(100),
+            custody_assets: vec![CustodyAsset {
+                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(1000),
             jlp_total_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -239,7 +247,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err,
-            InvalidSolanaSlot {
+            ContractError::InvalidSolanaSlot {
                 extract_period: 10
             }
         );
@@ -249,7 +257,9 @@ mod tests {
         let data_s10_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 10,
-            custody_assets: Uint128::new(100),
+            custody_assets: vec![CustodyAsset {
+                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(1000),
             jlp_total_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -261,7 +271,7 @@ mod tests {
             ExecuteMsg::PublishData {
                 timestamp: data_s10_v1.timestamp,
                 slot: data_s10_v1.slot,
-                custody_assets: data_s10_v1.custody_assets,
+                custody_assets: data_s10_v1.clone().custody_assets,
                 aum_usd: data_s10_v1.aum_usd,
                 jlp_total_supply: data_s10_v1.jlp_total_supply,
                 strategy_jlp_balance: data_s10_v1.strategy_jlp_balance,
@@ -276,7 +286,7 @@ mod tests {
             ExecuteMsg::PublishData {
                 timestamp: data_s10_v1.timestamp,
                 slot: data_s10_v1.slot,
-                custody_assets: data_s10_v1.custody_assets,
+                custody_assets: data_s10_v1.clone().custody_assets,
                 aum_usd: data_s10_v1.aum_usd,
                 jlp_total_supply: data_s10_v1.jlp_total_supply,
                 strategy_jlp_balance: data_s10_v1.strategy_jlp_balance,
@@ -289,7 +299,9 @@ mod tests {
         let data_s10_too_old = SolanaData {
             timestamp: env.block.time,
             slot: 10, // Same slot as last published
-            custody_assets: Uint128::new(200),
+            custody_assets: vec![CustodyAsset {
+                owned: 200, locked: 0, guaranteed_usd: 200, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(2000),
             jlp_total_supply: Uint128::new(200),
             strategy_jlp_balance: Uint128::new(100),
@@ -310,7 +322,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err,
-            SlotTooOld {
+            ContractError::SlotTooOld {
                 new_slot: 10,
                 last_slot: 10
             }
@@ -320,7 +332,9 @@ mod tests {
         let data_s20_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 20,
-            custody_assets: Uint128::new(100),
+            custody_assets: vec![CustodyAsset {
+                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(1000),
             jlp_total_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -375,7 +389,9 @@ mod tests {
         let data_s30_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 30,
-            custody_assets: Uint128::new(100),
+            custody_assets: vec![CustodyAsset {
+                owned: 100, locked: 0, guaranteed_usd: 100, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(1000),
             jlp_total_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
@@ -398,7 +414,7 @@ mod tests {
         assert_eq!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err(), true); // No consensus yet
         let pending_key = (data_s30_v1.slot, data_s30_v1.hash().unwrap());
         assert!(PENDING_DATA.has(&deps.storage, pending_key.clone()));
-        let pending_entries = PENDING_DATA.load(&deps.storage, pending_key).unwrap();
+        let pending_entries = PENDING_DATA.load(&deps.storage, pending_key.clone()).unwrap();
         assert_eq!(pending_entries.len(), 1);
 
 
@@ -411,7 +427,7 @@ mod tests {
             ExecuteMsg::PublishData {
                 timestamp: data_s30_v1.timestamp,
                 slot: data_s30_v1.slot,
-                custody_assets: data_s30_v1.custody_assets,
+                custody_assets: data_s30_v1.clone().custody_assets,
                 aum_usd: data_s30_v1.aum_usd,
                 jlp_total_supply: data_s30_v1.jlp_total_supply,
                 strategy_jlp_balance: data_s30_v1.strategy_jlp_balance,
@@ -435,7 +451,9 @@ mod tests {
         let data_s40_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 40,
-            custody_assets: Uint128::new(200),
+            custody_assets: vec![CustodyAsset {
+                owned: 200, locked: 0, guaranteed_usd: 200, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(2000),
             jlp_total_supply: Uint128::new(200),
             strategy_jlp_balance: Uint128::new(100),
@@ -482,7 +500,9 @@ mod tests {
         let data_s50_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 50,
-            custody_assets: Uint128::new(300),
+            custody_assets: vec![CustodyAsset {
+                owned: 300, locked: 0, guaranteed_usd: 300, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(3000),
             jlp_total_supply: Uint128::new(300),
             strategy_jlp_balance: Uint128::new(150),
@@ -490,7 +510,9 @@ mod tests {
         let data_s60_v1 = SolanaData {
             timestamp: env.block.time.plus_seconds(10), // A bit later
             slot: 60,
-            custody_assets: Uint128::new(400),
+            custody_assets: vec![CustodyAsset {
+                owned: 400, locked: 0, guaranteed_usd: 400, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(4000),
             jlp_total_supply: Uint128::new(400),
             strategy_jlp_balance: Uint128::new(200),
@@ -511,7 +533,7 @@ mod tests {
         )
             .unwrap();
         let pending_key_s60 = (data_s60_v1.slot, data_s60_v1.hash().unwrap());
-        assert!(PENDING_DATA.has(&deps.storage, pending_key_s60));
+        assert!(PENDING_DATA.has(&deps.storage, pending_key_s60.clone()));
 
         // Now, publish for slot 50 to reach consensus
         execute(
@@ -556,7 +578,9 @@ mod tests {
         let data_s70_v1 = SolanaData {
             timestamp: env.block.time,
             slot: 70,
-            custody_assets: Uint128::new(500),
+            custody_assets: vec![CustodyAsset {
+                owned: 500, locked: 0, guaranteed_usd: 500, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(5000),
             jlp_total_supply: Uint128::new(500),
             strategy_jlp_balance: Uint128::new(250),
@@ -564,7 +588,9 @@ mod tests {
         let data_s70_v2 = SolanaData {
             timestamp: env.block.time,
             slot: 70,
-            custody_assets: Uint128::new(510), // Different value
+            custody_assets: vec![CustodyAsset {
+                owned: 510, locked: 0, guaranteed_usd: 510, decimals: 6, denom: "USDC".to_string()
+            }], // Different value
             aum_usd: Uint128::new(5100),
             jlp_total_supply: Uint128::new(510),
             strategy_jlp_balance: Uint128::new(255),
@@ -573,7 +599,9 @@ mod tests {
         let data_s80_v1 = SolanaData {
             timestamp: env.block.time.plus_seconds(10),
             slot: 80,
-            custody_assets: Uint128::new(600),
+            custody_assets: vec![CustodyAsset {
+                owned: 600, locked: 0, guaranteed_usd: 600, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(6000),
             jlp_total_supply: Uint128::new(600),
             strategy_jlp_balance: Uint128::new(300),
@@ -593,7 +621,7 @@ mod tests {
         )
             .unwrap();
         let pending_key_s80 = (data_s80_v1.slot, data_s80_v1.hash().unwrap());
-        assert!(PENDING_DATA.has(&deps.storage, pending_key_s80));
+        assert!(PENDING_DATA.has(&deps.storage, pending_key_s80.clone()));
 
         // Oracle1 publishes data_s70_v1
         execute(
@@ -668,13 +696,15 @@ mod tests {
 
         // Case 1: No data published yet
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-        assert_eq!(err, NoDataPublished {});
+        assert_eq!(err, ContractError::NoDataPublished {});
 
         // First, publish some data and finalize it to set LAST_PUBLISHED_DATA
         let initial_data = SolanaData {
             timestamp: env.block.time,
             slot: 10,
-            custody_assets: Uint128::new(1),
+            custody_assets: vec![CustodyAsset {
+                owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(500_000),
             jlp_total_supply: Uint128::new(1000),
             strategy_jlp_balance: Uint128::new(10000),
@@ -686,7 +716,7 @@ mod tests {
             ExecuteMsg::PublishData {
                 timestamp: initial_data.timestamp,
                 slot: initial_data.slot,
-                custody_assets: initial_data.custody_assets,
+                custody_assets: initial_data.clone().custody_assets,
                 aum_usd: initial_data.aum_usd,
                 jlp_total_supply: initial_data.jlp_total_supply,
                 strategy_jlp_balance: initial_data.strategy_jlp_balance,
@@ -712,7 +742,7 @@ mod tests {
         // Case 2: Data not valid anymore
         env.block.time = env.block.time.plus_seconds(1001); // Advance time past valid_period (1000s)
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-        assert_eq!(err, DataNotValid {});
+        assert_eq!(err, ContractError::DataNotValid {});
 
         // Reset time for further tests
         env.block.time = env.block.time.minus_seconds(1000); // Go back to original +1s
@@ -722,13 +752,15 @@ mod tests {
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(matches!(err, ContractError::DecimalError { reason } if reason.contains("Failed to parse price string")), "Expected DecimalError for empty price string");
         // Revert querier to return a valid price
-        deps.querier.with_price((25_000 * 1_000_000).to_string());
+        deps.querier.with_price((25_000u64 * 1_000_000u64).to_string());
 
         // Case 4: Division by zero (jlp_total_supply) - Requires re-publishing data
         let data_zero_jlp_supply = SolanaData {
             timestamp: env.block.time,
             slot: 20,
-            custody_assets: Uint128::new(1),
+            custody_assets: vec![CustodyAsset {
+                owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(100),
             jlp_total_supply: Uint128::new(0), // Zero supply
             strategy_jlp_balance: Uint128::new(5),
@@ -768,7 +800,9 @@ mod tests {
         let data_valid_aum = SolanaData {
             timestamp: env.block.time,
             slot: 30,
-            custody_assets: Uint128::new(1),
+            custody_assets: vec![CustodyAsset {
+                owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(100),
             jlp_total_supply: Uint128::new(10),
             strategy_jlp_balance: Uint128::new(5),
@@ -807,7 +841,7 @@ mod tests {
         assert!(matches!(err, ContractError::DecimalError { reason } if reason.contains("Division by zero")), "Expected DecimalError for zero BTC price");
 
         // Revert querier to return a valid price again for green case
-        deps.querier.with_price((25_000 * 1_000_000).to_string());
+        deps.querier.with_price((25_000u64 * 1_000_000u64).to_string());
 
 
         // --- Green Cases ---
@@ -817,7 +851,9 @@ mod tests {
         let initial_data_large_values = SolanaData {
             timestamp: env.block.time,
             slot: 40, // Use a new slot to override previous LAST_PUBLISHED_DATA
-            custody_assets: Uint128::new(1),
+            custody_assets: vec![CustodyAsset {
+                owned: 1, locked: 0, guaranteed_usd: 1, decimals: 6, denom: "USDC".to_string()
+            }],
             aum_usd: Uint128::new(500_000_000_000u128), // 500 Billion USD
             jlp_total_supply: Uint128::new(1_000_000_000u128), // 1 Billion JLP
             strategy_jlp_balance: Uint128::new(10_000_000u128), // 10 Million JLP
