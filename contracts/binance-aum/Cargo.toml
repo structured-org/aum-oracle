@@ -1,0 +1,22 @@
+[package]
+authors = []
+description = "Binance AUM oracle contract"
+edition = "2021"
+name = "binance-aum-oracle-contract"
+repository = "https://github.com/structured-org/aum-oracle"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+cosmwasm-schema = { version = "2.2.0" }
+cosmwasm-std = { version = "2.2.0" }
+cw-storage-plus = "2.0.0"
+cw2 = "2.0.0"
+serde = { version = "1.0.219", features = ["derive"] }
+consensus = {path = "../../packages/consensus" }

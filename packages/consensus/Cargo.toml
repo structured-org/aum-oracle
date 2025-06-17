@@ -1,0 +1,19 @@
+[package]
+authors = []
+description = "Oracle Consensus package"
+edition = "2021"
+name = "consensus"
+repository = "https://github.com/structured-org/aum-oracle"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+cosmwasm-std = { version = "2.2.0" }
+cw-storage-plus = "2.0.0"
+serde = { version = "1.0.219", features = ["derive"] }
