@@ -94,7 +94,7 @@ pub struct PendingData {
     pub oracle: Addr,
 }
 
-/// PublishedData stores published data.
+/// PublishedData stores data that achieved consensus.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct PublishedData {
     /// The Solana data published by an oracle.

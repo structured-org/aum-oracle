@@ -1,3 +1,6 @@
+use crate::error::ContractError::{InvalidPeriod, InvalidThreshold};
+use crate::state::Config;
+
 #[cfg(test)]
 mod tests {
     use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
@@ -818,4 +821,61 @@ mod tests {
     }
 }
 
-// TODO: Config.validate?() tests
+#[test]
+fn test_config_validate() {
+    let addr = |name| cosmwasm_std::Addr::unchecked(name);
+
+    // valid config: threshold == oracles.len(), extract_period > 0
+    let config = Config {
+        admin: addr("admin"),
+        oracles: vec![addr("oracle1"), addr("oracle2"), addr("oracle3")],
+        threshold: 3,
+        extract_period: 1,
+        valid_period: 1000,
+    };
+    assert!(config.validate().is_ok(), "valid config should pass");
+
+    // valid config: threshold < oracles.len()
+    let config = Config {
+        threshold: 2,
+        ..config.clone()
+    };
+    assert!(config.validate().is_ok(), "threshold < len should pass");
+
+    // invalid config: threshold == 0
+    let config = Config {
+        threshold: 0,
+        ..config.clone()
+    };
+    let err = config.validate().unwrap_err();
+    assert_eq!(
+        err,
+        InvalidThreshold {
+            threshold: 0,
+            oracles: 3
+        }
+    );
+
+    // invalid config: threshold > oracles.len()
+    let config = Config {
+        threshold: 4,
+        ..config.clone()
+    };
+    let err = config.validate().unwrap_err();
+    assert_eq!(
+        err,
+        InvalidThreshold {
+            threshold: 4,
+            oracles: 3
+        }
+    );
+
+    // invalid config: extract_period == 0
+    let config = Config {
+        threshold: 2,
+        extract_period: 0,
+        ..config.clone()
+    };
+    let err = config.validate().unwrap_err();
+    assert_eq!(err, InvalidPeriod {});
+}
