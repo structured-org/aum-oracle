@@ -366,9 +366,9 @@ fn test_publish_data_green_path() {
         res.attributes
             .iter()
             .any(|a| a.key == "consensus_reached" && a.value == "false"),
-        "Expected not 'consensus_reached' = false attribute"
+        "Expected to not reach consensus"
     );
-    assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err()); // No consensus yet
+    assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err());
     let pending_key = (data_s30_v1.slot, data_s30_v1.hash().unwrap());
     assert!(PENDING_DATA.has(&deps.storage, pending_key.clone()));
     let pending_entries = PENDING_DATA
@@ -389,7 +389,7 @@ fn test_publish_data_green_path() {
         res.attributes
             .iter()
             .any(|a| a.key == "consensus_reached" && a.value == "true"),
-        "Expected 'consensus_reached' = true attribute"
+        "Expected to reach consensus"
     );
     assert_eq!(
         res.attributes.last().unwrap(),
@@ -435,7 +435,7 @@ fn test_publish_data_green_path() {
         res.attributes
             .iter()
             .any(|a| a.key == "consensus_reached" && a.value == "true"),
-        "Expected 'consensus_reached' = true attribute"
+        "Expected to reach consensus",
     );
     let last_published = LAST_PUBLISHED_DATA.load(&deps.storage).unwrap();
     assert_eq!(last_published.data, data_s40_v1);
@@ -506,7 +506,7 @@ fn test_publish_data_green_path() {
     );
     // Pending data for slot 50 should be cleared
     let pending_key_s50 = (data_s50_v1.slot, data_s50_v1.hash().unwrap());
-    assert!(PENDING_DATA.load(&deps.storage, pending_key_s50).is_err(),);
+    assert!(PENDING_DATA.load(&deps.storage, pending_key_s50).is_err());
     // Pending data for slot 60 should remain
     assert!(PENDING_DATA.has(&deps.storage, pending_key_s60));
 
