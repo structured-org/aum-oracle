@@ -19,8 +19,8 @@ const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // BTC/USD oracle query constants
-const BTC_DENOM: &'static str = "BTC";
-const USD_DENOM: &'static str = "USD";
+const BTC_DENOM: &str = "BTC";
+const USD_DENOM: &str = "USD";
 
 // Solana data precision constants
 const DECIMAL_PRECISION: u32 = 6;

@@ -64,8 +64,8 @@ pub struct SolanaData {
 
 impl SolanaData {
     pub fn hash(&self) -> Result<String, ContractError> {
-        let bin = to_json_binary(self).map_err(|e| ContractError::Std(e))?;
-        let hash = Sha256::digest(bin).as_slice().to_vec();
+        let binary = to_json_binary(self).map_err(ContractError::Std)?;
+        let hash = Sha256::digest(binary).as_slice().to_vec();
         Ok(hex_encode(hash))
     }
 }
@@ -104,12 +104,14 @@ pub struct PublishedData {
 
 #[test]
 fn test_config_validate() {
-    let addr = |name| cosmwasm_std::Addr::unchecked(name);
-
     // valid config: threshold == oracles.len(), extract_period > 0
     let config = Config {
-        admin: addr("admin"),
-        oracles: vec![addr("oracle1"), addr("oracle2"), addr("oracle3")],
+        admin: Addr::unchecked("admin"),
+        oracles: vec![
+            Addr::unchecked("oracle1"),
+            Addr::unchecked("oracle2"),
+            Addr::unchecked("oracle3"),
+        ],
         threshold: 3,
         extract_period: 1,
         valid_period: 1000,
