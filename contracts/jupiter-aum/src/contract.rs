@@ -1,17 +1,16 @@
-use crate::error::ContractError;
-use crate::msg::{
-    ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg,
-};
-use crate::state::{
-    Config, PendingData, PublishedData, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA,
-};
+use crate::state::{CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::PrefixBound;
+use jupiter_aum_common::error::ContractError;
+use jupiter_aum_common::msg::{
+    ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
+    QueryMsg,
+};
+use jupiter_aum_common::types::{Config, PendingData, PublishedData, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;

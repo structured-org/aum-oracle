@@ -696,8 +696,16 @@ dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
- "hex",
+ "jupiter-aum-common",
  "neutron-std",
+]
+
+[[package]]
+name = "jupiter-aum-common"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-std",
+ "hex",
  "schemars",
  "serde",
  "sha2",

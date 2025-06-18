@@ -1,8 +1,7 @@
+use crate::types::{CustodyAsset, PublishedData, SolanaData};
 use cosmwasm_std::{Timestamp, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-use crate::state::{CustodyAsset, PublishedData, SolanaData};
 
 /// InstantiateMsg defines the message used to initialize the contract.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

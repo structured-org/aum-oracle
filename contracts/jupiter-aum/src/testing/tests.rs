@@ -1,16 +1,13 @@
-use crate::error::ContractError::{InvalidPeriod, InvalidThreshold};
-use crate::state::Config;
-
 #[cfg(test)]
 mod tests {
     use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
-    use crate::error::ContractError;
-    use crate::error::ContractError::{AlreadyPublished, InvalidThreshold, Unauthorized};
-    use crate::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
-    use crate::state::{CustodyAsset, SolanaData, CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
+    use crate::state::{CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
     use crate::testing::mock_querier::mock_dependencies;
     use cosmwasm_std::testing::{message_info, mock_env, MockApi};
     use cosmwasm_std::{attr, from_json, Decimal, Timestamp, Uint128};
+    use jupiter_aum_common::error::ContractError;
+    use jupiter_aum_common::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
+    use jupiter_aum_common::types::{CustodyAsset, SolanaData};
     use std::str::FromStr;
 
     // Helper to create a default instantiate message
@@ -65,7 +62,10 @@ mod tests {
             stranger_info,
             update_msg.clone(),
         );
-        assert_eq!(unauthorized_res.err().unwrap(), Unauthorized {});
+        assert_eq!(
+            unauthorized_res.err().unwrap(),
+            ContractError::Unauthorized {}
+        );
 
         // Authorized update but new config is invalid (threshold > oracles.len())
         let invalid_update_msg = ExecuteMsg::UpdateConfig {
@@ -83,7 +83,7 @@ mod tests {
         );
         assert_eq!(
             authorized_res.err().unwrap(),
-            InvalidThreshold {
+            ContractError::InvalidThreshold {
                 threshold: 2,
                 oracles: 1
             }
@@ -227,7 +227,7 @@ mod tests {
             publish_msg_from_solana_data(&data_valid_slot),
         )
         .unwrap_err();
-        assert_eq!(err, Unauthorized {});
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // Case 2: Incorrect slot (not multiple of extract_period)
         let data_invalid_slot = SolanaData {
@@ -331,7 +331,7 @@ mod tests {
             publish_msg_from_solana_data(&data_s20_v1),
         )
         .unwrap_err(); // Second publish for slot 20 by oracle1
-        assert_eq!(err, AlreadyPublished {});
+        assert_eq!(err, ContractError::AlreadyPublished {});
     }
     #[test]
     fn test_publish_data_green_path() {
@@ -834,63 +834,4 @@ mod tests {
             denom: "USDC".to_string(),
         }]
     }
-}
-
-#[test]
-fn test_config_validate() {
-    let addr = |name| cosmwasm_std::Addr::unchecked(name);
-
-    // valid config: threshold == oracles.len(), extract_period > 0
-    let config = Config {
-        admin: addr("admin"),
-        oracles: vec![addr("oracle1"), addr("oracle2"), addr("oracle3")],
-        threshold: 3,
-        extract_period: 1,
-        valid_period: 1000,
-    };
-    assert!(config.validate().is_ok(), "valid config should pass");
-
-    // valid config: threshold < oracles.len()
-    let config = Config {
-        threshold: 2,
-        ..config.clone()
-    };
-    assert!(config.validate().is_ok(), "threshold < len should pass");
-
-    // invalid config: threshold == 0
-    let config = Config {
-        threshold: 0,
-        ..config.clone()
-    };
-    let err = config.validate().unwrap_err();
-    assert_eq!(
-        err,
-        InvalidThreshold {
-            threshold: 0,
-            oracles: 3
-        }
-    );
-
-    // invalid config: threshold > oracles.len()
-    let config = Config {
-        threshold: 4,
-        ..config.clone()
-    };
-    let err = config.validate().unwrap_err();
-    assert_eq!(
-        err,
-        InvalidThreshold {
-            threshold: 4,
-            oracles: 3
-        }
-    );
-
-    // invalid config: extract_period == 0
-    let config = Config {
-        threshold: 2,
-        extract_period: 0,
-        ..config.clone()
-    };
-    let err = config.validate().unwrap_err();
-    assert_eq!(err, InvalidPeriod {});
 }

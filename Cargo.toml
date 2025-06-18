@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "contracts/jupiter-aum"
+    "contracts/jupiter-aum",
+    "packages/*",
 ]
 
 [profile.release]
