@@ -21,7 +21,7 @@ mod tests {
             ],
             threshold: 2,
             extract_period: 10,
-            valid_period: 1000,
+            valid_period: 1_000,
         }
     }
 
@@ -50,8 +50,8 @@ mod tests {
                 deps.api.addr_make("oracle4").to_string(),
             ]),
             threshold: Some(2),
-            extract_period: Some(100000),
-            valid_period: Some(50000),
+            extract_period: Some(100_000),
+            valid_period: Some(50_000),
         };
 
         // Unauthorized update
@@ -69,8 +69,8 @@ mod tests {
             admin: Some(deps.api.addr_make("admin2").to_string()),
             oracles: Some(vec![deps.api.addr_make("oracle3").to_string()]), // Only 1 oracle
             threshold: Some(2),                                             // Threshold 2
-            extract_period: Some(100000),
-            valid_period: Some(50000),
+            extract_period: Some(100_000),
+            valid_period: Some(50_000),
         };
         let authorized_res = execute(
             deps.as_mut(),
@@ -98,8 +98,8 @@ mod tests {
             vec![deps.api.addr_make("oracle3"), deps.api.addr_make("oracle4")]
         );
         assert_eq!(config.threshold, 2);
-        assert_eq!(config.extract_period, 100000);
-        assert_eq!(config.valid_period, 50000);
+        assert_eq!(config.extract_period, 100_000);
+        assert_eq!(config.valid_period, 50_000);
     }
 
     #[test]
@@ -116,11 +116,11 @@ mod tests {
                 denom: "USDC".to_string(),
             }],
             aum_usd: Uint128::new(500_000_000_000), // $500,000 AUM USD
-            total_jlp_supply: Uint128::new(1_000_000_000), // 1000 JLP total supply
+            total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
             strategy_jlp_balance: Uint128::new(10_000_000_000), // 10,000 JLP balance
         };
         let btc_price_in_usd1 = Decimal::from_str("25000.0").unwrap(); // $25,000 per BTC
-                                                                       // jlp_virtual_price = 500,000 / 1000 = 500 USD/JLP
+                                                                       // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
                                                                        // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
                                                                        // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
         let res1 = calculate_aum_in_btc(data1, btc_price_in_usd1);
@@ -213,7 +213,7 @@ mod tests {
             timestamp: env.block.time,
             slot: 10,
             custody_assets: custody_asset(),
-            aum_usd: Uint128::new(1000),
+            aum_usd: Uint128::new(1_000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
@@ -231,7 +231,7 @@ mod tests {
             timestamp: env.block.time,
             slot: 11, // Not a multiple of 10
             custody_assets: custody_asset(),
-            aum_usd: Uint128::new(1000),
+            aum_usd: Uint128::new(1_000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
@@ -250,7 +250,7 @@ mod tests {
             timestamp: env.block.time,
             slot: 10,
             custody_assets: custody_asset(),
-            aum_usd: Uint128::new(1000),
+            aum_usd: Uint128::new(1_000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
@@ -309,7 +309,7 @@ mod tests {
             timestamp: env.block.time,
             slot: 20,
             custody_assets: custody_asset(),
-            aum_usd: Uint128::new(1000),
+            aum_usd: Uint128::new(1_000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
@@ -350,7 +350,7 @@ mod tests {
             timestamp: env.block.time,
             slot: 30,
             custody_assets: custody_asset(),
-            aum_usd: Uint128::new(1000),
+            aum_usd: Uint128::new(1_000),
             total_jlp_supply: Uint128::new(100),
             strategy_jlp_balance: Uint128::new(50),
         };
@@ -635,8 +635,8 @@ mod tests {
                 denom: "USDC".to_string(),
             }],
             aum_usd: Uint128::new(500_000),
-            total_jlp_supply: Uint128::new(1000),
-            strategy_jlp_balance: Uint128::new(10000),
+            total_jlp_supply: Uint128::new(1_000),
+            strategy_jlp_balance: Uint128::new(10_000),
         };
         execute(
             deps.as_mut(),
@@ -655,12 +655,12 @@ mod tests {
         assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_ok()); // Ensure data is published
 
         // Case 2: Data not valid anymore
-        env.block.time = env.block.time.plus_seconds(1001); // Advance time past valid_period (1000s)
+        env.block.time = env.block.time.plus_seconds(1_001); // Advance time past valid_period (1000s)
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert_eq!(err, ContractError::DataNotValid {});
 
         // Reset time for further tests
-        env.block.time = env.block.time.minus_seconds(1000); // Go back to original +1s
+        env.block.time = env.block.time.minus_seconds(1_000); // Go back to original +1s
 
         // Case 3: Slinky BTC price missing or query fails (e.g., empty price string)
         deps.querier.with_price("".to_string());
@@ -676,7 +676,7 @@ mod tests {
         deps.querier
             .with_price((25_000u64 * 1_000_000u64).to_string());
 
-        // Case 4: Division by zero (total_jlp_supply) - Requires re-publishing data
+        // Case 4: Division by zero (total_jlp_supply)
         let data_zero_jlp_supply = SolanaData {
             timestamp: env.block.time,
             slot: 20,
@@ -711,7 +711,7 @@ mod tests {
             "Expected DecimalError for zero total_jlp_supply"
         );
 
-        // Case 5: Division by zero (btc_price_in_usd) - Requires re-setting querier
+        // Case 5: Division by zero (btc_price_in_usd)
         let data_valid_aum = SolanaData {
             timestamp: env.block.time,
             slot: 30,
@@ -817,3 +817,5 @@ mod tests {
         }]
     }
 }
+
+// TODO: Config.validate?() tests

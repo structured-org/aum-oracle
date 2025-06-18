@@ -21,9 +21,6 @@ pub enum ContractError {
     #[error("Data is not valid anymore")]
     DataNotValid {},
 
-    #[error("Consensus not reached: {agreements} out of {threshold} required")]
-    ConsensusNotReached { agreements: u32, threshold: u32 },
-
     #[error("Oracle already published data for this slot")]
     AlreadyPublished {},
 
@@ -32,9 +29,6 @@ pub enum ContractError {
 
     #[error("Invalid Solana slot: New data slot ({new_slot}) must be greater than last published slot ({last_slot})")]
     SlotTooOld { new_slot: u64, last_slot: u64 },
-
-    #[error("Slinky oracle price query failed")]
-    SlinkyOracleQueryFailed {},
 
     #[error("Overflow: {error}")]
     DecimalError { error: String },

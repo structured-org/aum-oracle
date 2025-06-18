@@ -40,9 +40,9 @@ pub enum ExecuteMsg {
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData {
-        // TODO: descriptions
+        // Timestamp when the data has been published
         timestamp: Timestamp,
-        // TODO: descriptions
+        // Jupiter's Custody assets
         custody_assets: Vec<CustodyAsset>,
         /// The Solana slot number of the published data.
         slot: u64,
@@ -64,6 +64,7 @@ pub enum QueryMsg {
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
     GetData {},
     /// GetAUM calculates and returns the current Jupiter AUM value represented in BTC.
+    /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
     /// Returns error if data is not valid.
     GetAUM {},
 }
@@ -109,24 +110,3 @@ pub struct GetAUMResponse {
 /// MigrateMsg is used for contract migration.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct MigrateMsg {}
-
-// --- Slinky Oracle Common Message (Example, would ideally be in a separate crate) ---
-
-/// SlinkyQueryMsg defines the query messages expected by a Slinky price oracle contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SlinkyQueryMsg {
-    /// GetPrice queries the price of a specific asset.
-    GetPrice {
-        /// The symbol of the asset to query (e.g., "BTC", "ETH").
-        asset: String,
-    },
-}
-
-/// SlinkyPriceResponse defines the response structure for a Slinky price query.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct SlinkyPriceResponse {
-    /// The price of the asset, typically represented as a Uint128 where
-    /// 1 unit (e.g., 1 USD) equals `U128_PRECISION` (1,000,000).
-    pub price: Uint128,
-}

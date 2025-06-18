@@ -1,10 +1,9 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use crate::error::ContractError;
 use cosmwasm_std::{to_json_binary, Addr, Timestamp, Uint128};
 use cw_storage_plus::{Item, Map};
 use hex::encode as hex_encode;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Config defines the contract's configuration parameters.
@@ -24,7 +23,8 @@ pub struct Config {
 
 impl Config {
     /// Validates the configuration parameters.
-    /// Ensures that the consensus threshold is valid (not zero and not greater than the number of oracles).
+    /// Ensures that the consensus threshold is valid (not zero and not greater than the number of oracles)
+    /// and extract_period is valid (not zero).
     pub fn validate(&self) -> Result<(), ContractError> {
         if self.threshold == 0 {
             return Err(ContractError::InvalidThreshold {
@@ -75,7 +75,7 @@ impl SolanaData {
 pub struct CustodyAsset {
     /// Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
     pub owned: u64,
-    /// Amount of locked tokens (used in trading?) in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
+    /// Amount of locked tokens (used by traders) in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
     pub locked: u64,
     /// The value in each custody account represents a total size estimate of all long positions
     pub guaranteed_usd: u64,
@@ -111,7 +111,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 /// LAST_PUBLISHED_DATA stores the most recent Solana data that achieved consensus.
 pub const LAST_PUBLISHED_DATA: Item<PublishedData> = Item::new("last_published_data");
 
-/// ORACLE_PUBLICATIONS stores currently pending data from Solana from each oracle, grouped by slot and data hash.
+/// PENDING_DATA stores currently pending data from Solana from each oracle, grouped by slot and data hash.
 /// The key is a tuple: (solana_slot, solana_data_hash).
 /// The value is the list of pending data submitted for this specific slot and data.
 pub const PENDING_DATA: Map<(u64, String), Vec<PendingData>> = Map::new("pending_data");
