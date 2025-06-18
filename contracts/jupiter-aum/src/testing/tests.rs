@@ -364,7 +364,12 @@ mod tests {
             publish_msg_from_solana_data(&data_s30_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 4); // action, slot, oracle, hash
+        assert!(
+            res.attributes
+                .iter()
+                .any(|a| a.key == "consensus_reached" && a.value == "false"),
+            "Expected not 'consensus_reached' = false attribute"
+        );
         assert_eq!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err(), true); // No consensus yet
         let pending_key = (data_s30_v1.slot, data_s30_v1.hash().unwrap());
         assert!(PENDING_DATA.has(&deps.storage, pending_key.clone()));
@@ -382,7 +387,12 @@ mod tests {
             publish_msg_from_solana_data(&data_s30_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 6); // action, slot, oracle, hash, consensus_reached, published_at
+        assert!(
+            res.attributes
+                .iter()
+                .any(|a| a.key == "consensus_reached" && a.value == "true"),
+            "Expected 'consensus_reached' = true attribute"
+        );
         assert_eq!(
             res.attributes.last().unwrap(),
             &attr("published_at", env.block.time.to_string())
@@ -423,7 +433,12 @@ mod tests {
             publish_msg_from_solana_data(&data_s40_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 6);
+        assert!(
+            res.attributes
+                .iter()
+                .any(|a| a.key == "consensus_reached" && a.value == "true"),
+            "Expected 'consensus_reached' = true attribute"
+        );
         let last_published = LAST_PUBLISHED_DATA.load(&deps.storage).unwrap();
         assert_eq!(last_published.data, data_s40_v1);
         assert_eq!(last_published.published_at, env.block.time);

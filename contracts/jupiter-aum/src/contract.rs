@@ -213,6 +213,7 @@ fn publish_data(
 
     // check that consensus is reached or not for the new_data.slot
     let consensus_reached = pending_slots.len() as u32 >= config.threshold;
+    response = response.add_attribute("consensus_reached", consensus_reached.to_string());
     if consensus_reached {
         // if consensus is reached, rewrite last_published_data item in the State
         LAST_PUBLISHED_DATA.save(
@@ -222,9 +223,7 @@ fn publish_data(
                 published_at: env.block.time,
             },
         )?;
-        response = response
-            .add_attribute("consensus_reached", "true")
-            .add_attribute("published_at", env.block.time.to_string());
+        response = response.add_attribute("published_at", env.block.time.to_string());
 
         // clear obsolete pending data
         let obsolete_data: Vec<((u64, String), _)> = PENDING_DATA
