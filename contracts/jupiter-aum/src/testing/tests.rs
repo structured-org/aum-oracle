@@ -168,7 +168,7 @@ mod tests {
         let btc_price_in_usd3 = Decimal::from_str("1.0").unwrap();
         let err3 = calculate_aum_in_btc(data3, btc_price_in_usd3).unwrap_err();
         assert!(
-            matches!(&err3, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
+            matches!(&err3, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
             "Test Case 3 Failed: {:?}",
             err3
         );
@@ -185,7 +185,7 @@ mod tests {
         let btc_price_in_usd4 = Decimal::from_str("0.0").unwrap(); // Zero BTC price
         let err4 = calculate_aum_in_btc(data4, btc_price_in_usd4).unwrap_err();
         assert!(
-            matches!(&err4, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
+            matches!(&err4, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
             "Test Case 4 Failed: {:?}",
             err4
         );
@@ -361,7 +361,7 @@ mod tests {
             publish_msg_from_solana_data(&data_s30_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 3); // action, slot, oracle
+        assert_eq!(res.attributes.len(), 4); // action, slot, oracle, hash
         assert_eq!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err(), true); // No consensus yet
         let pending_key = (data_s30_v1.slot, data_s30_v1.hash().unwrap());
         assert!(PENDING_DATA.has(&deps.storage, pending_key.clone()));
@@ -379,7 +379,7 @@ mod tests {
             publish_msg_from_solana_data(&data_s30_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 5); // action, slot, oracle, consensus_reached, published_at
+        assert_eq!(res.attributes.len(), 6); // action, slot, oracle, hash, consensus_reached, published_at
         assert_eq!(
             res.attributes.last().unwrap(),
             &attr("published_at", env.block.time.to_string())
@@ -420,7 +420,7 @@ mod tests {
             publish_msg_from_solana_data(&data_s40_v1),
         )
         .unwrap();
-        assert_eq!(res.attributes.len(), 5);
+        assert_eq!(res.attributes.len(), 6);
         let last_published = LAST_PUBLISHED_DATA.load(&deps.storage).unwrap();
         assert_eq!(last_published.data, data_s40_v1);
         assert_eq!(last_published.published_at, env.block.time);
@@ -666,7 +666,10 @@ mod tests {
         deps.querier.with_price("".to_string());
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::SlinkyBTCPriceIncorrect {}),
+            matches!(
+                err,
+                ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ }
+            ),
             "Expected DecimalError for empty price string"
         );
         // Revert querier to return a valid price
@@ -704,7 +707,7 @@ mod tests {
         .unwrap();
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
+            matches!(err, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
             "Expected DecimalError for zero total_jlp_supply"
         );
 
@@ -741,11 +744,11 @@ mod tests {
         deps.querier.with_price("0".to_string());
         let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
         assert!(
-            matches!(err, ContractError::DecimalError { reason } if reason.contains("Denominator must not be zero")),
+            matches!(err, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
             "Expected DecimalError for zero BTC price"
         );
 
-        // Revert querier to return a valid price again for green case
+        // Revert querier to return a valid price again for the green case
         deps.querier
             .with_price((25_000u64 * 1_000_000u64).to_string());
 

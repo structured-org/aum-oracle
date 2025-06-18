@@ -19,10 +19,11 @@ use std::str::FromStr;
 const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// USD/BTC query constants
-const USD_DENOM: &'static str = "USD";
+// BTC/USD oracle query constants
 const BTC_DENOM: &'static str = "BTC";
+const USD_DENOM: &'static str = "USD";
 
+// Solana data precision constants
 const DECIMAL_PRECISION: u32 = 6;
 const DECIMAL_MULTIPLIER: u128 = 1_000_000; // 6 points
 
@@ -35,17 +36,13 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let admin = deps.api.addr_validate(&msg.admin)?;
-    let oracles: Result<Vec<Addr>, _> = msg
-        .oracles
-        .into_iter()
-        .map(|addr| deps.api.addr_validate(&addr))
-        .collect();
-    let oracles = oracles?;
-
     let config = Config {
-        admin,
-        oracles,
+        admin: deps.api.addr_validate(&msg.admin)?,
+        oracles: msg
+            .oracles
+            .into_iter()
+            .map(|addr| deps.api.addr_validate(&addr))
+            .collect::<Result<Vec<Addr>, _>>()?,
         threshold: msg.threshold,
         extract_period: msg.extract_period,
         valid_period: msg.valid_period,
@@ -123,16 +120,15 @@ fn update_config(
         return Err(ContractError::Unauthorized {});
     }
 
-    if let Some(admin) = admin {
-        config.admin = deps.api.addr_validate(&admin)?;
+    if let Some(new_admin) = admin {
+        config.admin = deps.api.addr_validate(&new_admin)?;
     }
 
-    if let Some(oracles_addrs) = oracles {
-        let new_oracles: Result<Vec<Addr>, _> = oracles_addrs
+    if let Some(new_oracles) = oracles {
+        config.oracles = new_oracles
             .into_iter()
             .map(|addr| deps.api.addr_validate(&addr))
-            .collect();
-        config.oracles = new_oracles?;
+            .collect::<Result<Vec<Addr>, _>>()?;
     }
 
     if let Some(new_threshold) = threshold {
@@ -156,7 +152,8 @@ fn update_config(
 /// Allows an oracle to publish Solana data.
 /// Only registered oracles can call this.
 /// Oracle can only publish once per slot.
-/// If consensus is reached, the `LAST_PUBLISHED_DATA` is updated.
+/// If consensus is reached, the `LAST_PUBLISHED_DATA` is updated
+/// and old pending slots are removed.
 fn publish_data(
     deps: DepsMut,
     env: Env,
@@ -211,7 +208,8 @@ fn publish_data(
     let mut response = Response::new()
         .add_attribute("action", "publish_data")
         .add_attribute("slot", new_data.slot.to_string())
-        .add_attribute("oracle", info.sender.to_string());
+        .add_attribute("oracle", info.sender.to_string())
+        .add_attribute("data_hash", new_data_hash);
 
     // check that consensus is reached or not for the new_data.slot
     let consensus_reached = pending_slots.len() as u32 >= config.threshold;
@@ -228,7 +226,7 @@ fn publish_data(
             .add_attribute("consensus_reached", "true")
             .add_attribute("published_at", env.block.time.to_string());
 
-        // clear obsolete pending data for this slot to save space
+        // clear obsolete pending data
         let obsolete_data: Vec<((u64, String), _)> = PENDING_DATA
             .prefix_range(
                 deps.as_ref().storage,
@@ -271,7 +269,7 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
 
 /// Returns the last successfully published and finalized Solana data.
 fn query_get_data(deps: Deps) -> Result<GetDataResponse, ContractError> {
-    let last_published_data = LAST_PUBLISHED_DATA.load(deps.storage).ok();
+    let last_published_data = LAST_PUBLISHED_DATA.may_load(deps.storage)?;
     Ok(GetDataResponse {
         data: last_published_data.map(|d| d.data),
     })
@@ -281,8 +279,8 @@ fn query_get_data(deps: Deps) -> Result<GetDataResponse, ContractError> {
 fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let data = LAST_PUBLISHED_DATA
-        .load(deps.storage)
-        .map_err(|_| ContractError::NoDataPublished {})?
+        .may_load(deps.storage)?
+        .ok_or(ContractError::NoDataPublished {})?
         .data;
 
     if env.block.time.seconds() > data.timestamp.seconds() + config.valid_period {
@@ -301,18 +299,21 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
         base: BTC_DENOM.to_string(),
         quote: USD_DENOM.to_string(),
     }))?;
-    let btc_price_in_usd = Uint128::from_str(
-        &btc_usd_price_result
-            .price
-            .ok_or(ContractError::SlinkyBTCPriceMissing {})?
-            .price,
-    )
-    .map_err(|_| ContractError::SlinkyBTCPriceIncorrect {})?;
+    let btc_usd_price_string = btc_usd_price_result
+        .price
+        .ok_or(ContractError::SlinkyBTCPriceMissing {})?
+        .price;
+    let btc_price_in_usd = Uint128::from_str(&btc_usd_price_string).map_err(|e| {
+        ContractError::SlinkyBTCPriceIncorrect {
+            price: btc_usd_price_string,
+            error: e.to_string(),
+        }
+    })?;
 
     let btc_price_in_usd =
         Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
             |e| ContractError::DecimalError {
-                reason: e.to_string(),
+                error: e.to_string(),
             },
         )?;
     Ok(btc_price_in_usd)
@@ -324,37 +325,37 @@ pub fn calculate_aum_in_btc(
 ) -> Result<Uint128, ContractError> {
     let strategy_jlp_balance = Decimal::from_atomics(data.strategy_jlp_balance, DECIMAL_PRECISION)
         .map_err(|e| ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         })?;
     let aum_usd = Decimal::from_atomics(data.aum_usd, DECIMAL_PRECISION).map_err(|e| {
         ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         }
     })?;
     let total_jlp_supply = Decimal::from_atomics(data.total_jlp_supply, DECIMAL_PRECISION)
         .map_err(|e| ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         })?;
     let jlp_virtual_price =
         aum_usd
             .checked_div(total_jlp_supply)
             .map_err(|e| ContractError::DecimalError {
-                reason: e.to_string(),
+                error: e.to_string(),
             })?;
     let jlp_balance_in_usd = jlp_virtual_price
         .checked_mul(strategy_jlp_balance)
         .map_err(|e| ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         })?;
     let aum_in_btc = jlp_balance_in_usd
         .checked_div(btc_price_in_usd)
         .map_err(|e| ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         })?;
     // convert to multiplier to make it integer with decimal places
     let multiplier =
         Decimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| ContractError::DecimalError {
-            reason: e.to_string(),
+            error: e.to_string(),
         })?;
     let result = (aum_in_btc * multiplier).to_uint_floor();
     Ok(result)

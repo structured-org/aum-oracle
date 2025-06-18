@@ -36,12 +36,12 @@ pub enum ContractError {
     #[error("Slinky oracle price query failed")]
     SlinkyOracleQueryFailed {},
 
-    #[error("Overflow: {reason}")]
-    DecimalError { reason: String },
+    #[error("Overflow: {error}")]
+    DecimalError { error: String },
 
     #[error("Slinky BTC/USD price is missing")]
     SlinkyBTCPriceMissing {},
 
-    #[error("SlinkyBTCPriceIncorrect")]
-    SlinkyBTCPriceIncorrect {},
+    #[error("Slinky BTC/USD price ({price}) is invalid: {error}")]
+    SlinkyBTCPriceIncorrect { price: String, error: String },
 }
