@@ -1,16 +1,17 @@
-use crate::state::{CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
+use crate::state::{CONFIG, CONSENSUS_STATE};
+use consensus::consensus::Config as ConsensusConfig;
+use consensus::consensus::OracleData;
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdResult, Uint128,
+    attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Response, Uint128,
 };
 use cw2::set_contract_version;
-use cw_storage_plus::PrefixBound;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
     QueryMsg,
 };
-use jupiter_aum_common::types::{Config, PendingData, PublishedData, SolanaData};
+use jupiter_aum_common::types::{Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
@@ -29,7 +30,7 @@ const DECIMAL_MULTIPLIER: u128 = 1_000_000; // 6 points
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
@@ -37,17 +38,22 @@ pub fn instantiate(
 
     let config = Config {
         admin: deps.api.addr_validate(&msg.admin)?,
+        valid_period: msg.valid_period,
+    };
+    config.validate()?;
+    CONFIG.save(deps.storage, &config)?;
+
+    let consensus_config = ConsensusConfig {
         oracles: msg
             .oracles
             .into_iter()
             .map(|addr| deps.api.addr_validate(&addr))
             .collect::<Result<Vec<Addr>, _>>()?,
         threshold: msg.threshold,
-        extract_period: msg.extract_period,
-        valid_period: msg.valid_period,
+        data_delta_ppm: msg.data_delta_ppm,
+        round_length: msg.round_length,
     };
-    config.validate()?;
-    CONFIG.save(deps.storage, &config)?;
+    CONSENSUS_STATE.initialize(deps.storage, &env, consensus_config)?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -64,41 +70,14 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig {
             admin,
-            oracles,
-            threshold,
-            extract_period,
             valid_period,
-        } => update_config(
-            deps,
-            info,
-            admin,
-            oracles,
-            threshold,
-            extract_period,
-            valid_period,
-        ),
-        ExecuteMsg::PublishData {
-            timestamp,
-            slot,
-            custody_assets,
-            aum_usd,
-            total_jlp_supply,
-            strategy_jlp_balance,
-        } => publish_data(
-            deps,
-            env,
-            info,
-            SolanaData {
-                timestamp,
-                slot,
-                custody_assets,
-                aum_usd,
-                total_jlp_supply,
-                strategy_jlp_balance,
-            },
-        ),
+        } => update_config(deps, info, admin, valid_period),
+        ExecuteMsg::PublishData { data } => publish_data(deps, env, info, data),
     }
 }
+
+// TODO: update_consensus_config
+// oracles: Option<Vec<String>>,
 
 /// Updates configuration parameters for the contract.
 /// Only admin can call this method.
@@ -107,9 +86,6 @@ fn update_config(
     deps: DepsMut,
     info: MessageInfo,
     admin: Option<String>,
-    oracles: Option<Vec<String>>,
-    threshold: Option<u32>,
-    extract_period: Option<u64>,
     valid_period: Option<u64>,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
@@ -121,21 +97,6 @@ fn update_config(
 
     if let Some(new_admin) = admin {
         config.admin = deps.api.addr_validate(&new_admin)?;
-    }
-
-    if let Some(new_oracles) = oracles {
-        config.oracles = new_oracles
-            .into_iter()
-            .map(|addr| deps.api.addr_validate(&addr))
-            .collect::<Result<Vec<Addr>, _>>()?;
-    }
-
-    if let Some(new_threshold) = threshold {
-        config.threshold = new_threshold;
-    }
-
-    if let Some(new_extract_period) = extract_period {
-        config.extract_period = new_extract_period;
     }
 
     if let Some(new_valid_period) = valid_period {
@@ -157,86 +118,55 @@ fn publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    new_data: SolanaData,
+    new_data: OracleData<SolanaData>,
 ) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
+    let config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     // permission check: only registered oracles can publish data
     if !config.oracles.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
 
-    // if new_data.slot % config.N ≠ 0: reject such publishing
-    if new_data.slot % config.extract_period != 0 {
-        return Err(ContractError::InvalidSolanaSlot {
-            extract_period: config.extract_period,
-        });
-    }
+    // Check if there's published data for this round before the update
+    let last_published_before = CONSENSUS_STATE.last_published_data.may_load(deps.storage)?;
+    let current_round = CONSENSUS_STATE.pending_round.load(deps.storage)?.round;
 
-    // if new_data.slot <= last_published_data.slot: reject such publishing
-    if let Ok(last_published) = LAST_PUBLISHED_DATA.load(deps.storage) {
-        if new_data.slot <= last_published.data.slot {
-            return Err(ContractError::SlotTooOld {
-                new_slot: new_data.slot,
-                last_slot: last_published.data.slot,
-            });
+    CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
+
+    let mut response = Response::new();
+
+    // Check if there's published data for this round after the update
+    let last_published_after = CONSENSUS_STATE.last_published_data.may_load(deps.storage)?;
+
+    // If we have new published data for the current round, consensus was reached
+    if let Some(published_data) = last_published_after {
+        if published_data.round == current_round
+            && (last_published_before.is_none()
+                || last_published_before.unwrap().round != current_round)
+        {
+            response = response.add_attribute("action", "publish_consensus");
         }
     }
 
-    // write into the key that includes hash so that we can track whether we reached consensus for the slot
-    let new_data_hash = new_data.hash()?;
-    let pending_slot_key = (new_data.slot, new_data_hash.clone());
-    let mut pending_slots = PENDING_DATA
-        .may_load(deps.storage, pending_slot_key.clone())?
-        .unwrap_or_default();
-
-    // check if the oracle has already published for this slot
-    if pending_slots.iter().any(|s| s.oracle == info.sender) {
-        return Err(ContractError::AlreadyPublished {});
-    }
-
-    // save the new_data to the pending_data[(slot, data_hash)] state
-    let new_pending_data = PendingData {
-        data: new_data.clone(),
-        oracle: info.sender.clone(),
-    };
-
-    pending_slots.push(new_pending_data);
-    PENDING_DATA.save(deps.storage, pending_slot_key, &pending_slots)?;
-
-    let mut response = Response::new()
-        .add_attribute("action", "publish_data")
-        .add_attribute("slot", new_data.slot.to_string())
-        .add_attribute("oracle", info.sender.to_string())
-        .add_attribute("data_hash", new_data_hash);
-
-    // check that consensus is reached or not for the new_data.slot
-    let consensus_reached = pending_slots.len() as u32 >= config.threshold;
-    response = response.add_attribute("consensus_reached", consensus_reached.to_string());
-    if consensus_reached {
-        // if consensus is reached, rewrite last_published_data item in the State
-        LAST_PUBLISHED_DATA.save(
-            deps.storage,
-            &PublishedData {
-                data: new_data.clone(),
-                published_at: env.block.time,
-            },
-        )?;
-        response = response.add_attribute("published_at", env.block.time.to_string());
-
-        // clear obsolete pending data
-        let obsolete_data: Vec<((u64, String), _)> = PENDING_DATA
-            .prefix_range(
-                deps.as_ref().storage,
-                None,
-                Some(PrefixBound::inclusive(new_data.slot)),
-                Order::Ascending,
-            )
-            .collect::<StdResult<Vec<(_, _)>>>()?;
-        for (key, _) in obsolete_data {
-            PENDING_DATA.remove(deps.storage, key);
-        }
-    }
+    response = response.add_attributes([
+        attr(
+            "next_round",
+            CONSENSUS_STATE
+                .pending_round
+                .load(deps.storage)?
+                .next_round(config.round_length)
+                .round
+                .to_string(),
+        ),
+        attr(
+            "round",
+            CONSENSUS_STATE
+                .pending_round
+                .load(deps.storage)?
+                .round
+                .to_string(),
+        ),
+    ]);
 
     Ok(response)
 }
@@ -248,7 +178,7 @@ fn publish_data(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
         QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
-        QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps)?)?),
+        QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAUM {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
     }
 }
@@ -258,26 +188,22 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
         admin: config.admin.to_string(),
-        oracles: config.oracles.iter().map(|a| a.to_string()).collect(),
-        threshold: config.threshold,
-        extract_period: config.extract_period,
         valid_period: config.valid_period,
     })
 }
 
 /// Returns the last successfully published and finalized Solana data.
-fn query_get_data(deps: Deps) -> Result<GetDataResponse, ContractError> {
-    let last_published_data = LAST_PUBLISHED_DATA.may_load(deps.storage)?;
+fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError> {
     Ok(GetDataResponse {
-        data: last_published_data.map(|d| d.data),
+        last_published_data: CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?,
     })
 }
 
 /// Returns Jupiter AUM value represented in BTC.
 fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let data = LAST_PUBLISHED_DATA
-        .may_load(deps.storage)?
+    let data = CONSENSUS_STATE
+        .get_last_published_data(&env, deps.storage)?
         .ok_or(ContractError::NoDataPublished {})?
         .data;
 

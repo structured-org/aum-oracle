@@ -1,5 +1,6 @@
 use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdError, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -286,7 +287,7 @@ impl<T: ConsensusData> State<T> {
 }
 
 /// Data submitted by an oracle
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct OracleData<T> {
     /// The round number an oracle tries to submit data for
     pub round: u64,

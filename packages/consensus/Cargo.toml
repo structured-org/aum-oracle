@@ -17,3 +17,4 @@ library = []
 cosmwasm-std = { version = "2.2.0" }
 cw-storage-plus = "2.0.0"
 serde = { version = "1.0.219", features = ["derive"] }
+schemars = "0.8.8"

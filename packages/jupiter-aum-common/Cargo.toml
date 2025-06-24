@@ -14,3 +14,4 @@ serde = { version = "1.0.175", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0" }
 hex = "0.4.3"
 sha2 = "0.10.8"
+consensus = { path = "../consensus" }

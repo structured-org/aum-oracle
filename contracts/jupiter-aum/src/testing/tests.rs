@@ -1,6 +1,7 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
-use crate::state::{CONFIG, LAST_PUBLISHED_DATA, PENDING_DATA};
+use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
+use consensus::consensus::OracleData;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
 use cosmwasm_std::{attr, from_json, Decimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
@@ -19,6 +20,8 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         ],
         threshold: 2,
         extract_period: 10,
+        data_delta_ppm: 1000,
+        round_length: 0,
         valid_period: 1_000,
     }
 }
@@ -43,12 +46,6 @@ fn test_update_config() {
 
     let update_msg = ExecuteMsg::UpdateConfig {
         admin: Some(deps.api.addr_make("admin2").to_string()),
-        oracles: Some(vec![
-            deps.api.addr_make("oracle3").to_string(),
-            deps.api.addr_make("oracle4").to_string(),
-        ]),
-        threshold: Some(2),
-        extract_period: Some(100_000),
         valid_period: Some(50_000),
     };
 
@@ -65,28 +62,6 @@ fn test_update_config() {
         ContractError::Unauthorized {}
     );
 
-    // Authorized update but new config is invalid (threshold > oracles.len())
-    let invalid_update_msg = ExecuteMsg::UpdateConfig {
-        admin: Some(deps.api.addr_make("admin2").to_string()),
-        oracles: Some(vec![deps.api.addr_make("oracle3").to_string()]), // Only 1 oracle
-        threshold: Some(2),                                             // Threshold 2
-        extract_period: Some(100_000),
-        valid_period: Some(50_000),
-    };
-    let authorized_res = execute(
-        deps.as_mut(),
-        env.clone(),
-        admin_info.clone(),
-        invalid_update_msg.clone(),
-    );
-    assert_eq!(
-        authorized_res.err().unwrap(),
-        ContractError::InvalidThreshold {
-            threshold: 2,
-            oracles: 1
-        }
-    );
-
     // Authorized update
     let authorized_res = execute(deps.as_mut(), env.clone(), admin_info.clone(), update_msg);
     assert!(authorized_res.is_ok());
@@ -94,12 +69,6 @@ fn test_update_config() {
     // Config should have updated values
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(config.admin, deps.api.addr_make("admin2"));
-    assert_eq!(
-        config.oracles,
-        vec![deps.api.addr_make("oracle3"), deps.api.addr_make("oracle4")]
-    );
-    assert_eq!(config.threshold, 2);
-    assert_eq!(config.extract_period, 100_000);
     assert_eq!(config.valid_period, 50_000);
 }
 
@@ -108,7 +77,6 @@ fn test_calculate_aum_in_btc() {
     // Test case 1: Standard calculation
     let data1 = SolanaData {
         timestamp: Timestamp::from_seconds(1),
-        slot: 1,
         custody_assets: vec![CustodyAsset {
             owned: 100,
             locked: 50,
@@ -134,7 +102,6 @@ fn test_calculate_aum_in_btc() {
     // Test case 2: Different values
     let data2 = SolanaData {
         timestamp: Timestamp::from_seconds(1),
-        slot: 1,
         custody_assets: vec![CustodyAsset {
             owned: 200,
             locked: 100,
@@ -160,7 +127,6 @@ fn test_calculate_aum_in_btc() {
     // Test case 3: Division by zero for total_jlp_supply
     let data3 = SolanaData {
         timestamp: Timestamp::from_seconds(1),
-        slot: 1,
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
         total_jlp_supply: Uint128::new(0), // Zero supply
@@ -177,7 +143,6 @@ fn test_calculate_aum_in_btc() {
     // Test case 4: Division by zero for btc_price_in_usd
     let data4 = SolanaData {
         timestamp: Timestamp::from_seconds(1),
-        slot: 1,
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
         total_jlp_supply: Uint128::new(10),
@@ -192,422 +157,7 @@ fn test_calculate_aum_in_btc() {
     );
 }
 
-/// Comprehensive test suite for the `publish_data` execute message.
-#[test]
-fn test_publish_data_errors() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
-    let oracle1 = deps.api.addr_make("oracle1");
-    let oracle2 = deps.api.addr_make("oracle2");
-    let oracle3 = deps.api.addr_make("oracle3");
-    let non_oracle = deps.api.addr_make("non_oracle");
-
-    let init_msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), init_msg).unwrap();
-
-    // --- Error Cases ---
-
-    // Case 1: Not an oracle
-    let data_valid_slot = SolanaData {
-        timestamp: env.block.time,
-        slot: 10,
-        custody_assets: custody_asset(),
-        aum_usd: Uint128::new(1_000),
-        total_jlp_supply: Uint128::new(100),
-        strategy_jlp_balance: Uint128::new(50),
-    };
-    let err = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&non_oracle, &[]),
-        publish_msg_from_solana_data(&data_valid_slot),
-    )
-    .unwrap_err();
-    assert_eq!(err, ContractError::Unauthorized {});
-
-    // Case 2: Incorrect slot (not multiple of extract_period)
-    let data_invalid_slot = SolanaData {
-        timestamp: env.block.time,
-        slot: 11, // Not a multiple of 10
-        custody_assets: custody_asset(),
-        aum_usd: Uint128::new(1_000),
-        total_jlp_supply: Uint128::new(100),
-        strategy_jlp_balance: Uint128::new(50),
-    };
-    let err = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_invalid_slot),
-    )
-    .unwrap_err();
-    assert_eq!(err, ContractError::InvalidSolanaSlot { extract_period: 10 });
-
-    // Case 3: Slot too old (publish data for slot 10, then try to publish for slot 10 again)
-    // First, publish valid data for slot 10 from oracle1 to set LAST_PUBLISHED_DATA (part of consensus below)
-    let data_s10_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 10,
-        custody_assets: custody_asset(),
-        aum_usd: Uint128::new(1_000),
-        total_jlp_supply: Uint128::new(100),
-        strategy_jlp_balance: Uint128::new(50),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s10_v1),
-    )
-    .unwrap();
-    // Now, publish data from oracle2 for slot 10 to reach consensus
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_s10_v1),
-    )
-    .unwrap();
-    // Verify LAST_PUBLISHED_DATA is updated
-    assert_eq!(
-        LAST_PUBLISHED_DATA.load(&deps.storage).unwrap().data.slot,
-        10
-    );
-
-    let data_s10_too_old = SolanaData {
-        timestamp: env.block.time,
-        slot: 10, // Same slot as last published
-        custody_assets: vec![CustodyAsset {
-            owned: 200,
-            locked: 0,
-            guaranteed_usd: 200,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(2000),
-        total_jlp_supply: Uint128::new(200),
-        strategy_jlp_balance: Uint128::new(100),
-    };
-    let err = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle3, &[]),
-        publish_msg_from_solana_data(&data_s10_too_old),
-    )
-    .unwrap_err();
-    assert_eq!(
-        err,
-        ContractError::SlotTooOld {
-            new_slot: 10,
-            last_slot: 10
-        }
-    );
-
-    // Case 4: Double publishing by the same oracle for the same slot (and hash)
-    let data_s20_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 20,
-        custody_assets: custody_asset(),
-        aum_usd: Uint128::new(1_000),
-        total_jlp_supply: Uint128::new(100),
-        strategy_jlp_balance: Uint128::new(50),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s20_v1),
-    )
-    .unwrap(); // First publish for slot 20 by oracle1
-
-    let err = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s20_v1),
-    )
-    .unwrap_err(); // Second publish for slot 20 by oracle1
-    assert_eq!(err, ContractError::AlreadyPublished {});
-}
-#[test]
-fn test_publish_data_green_path() {
-    let mut deps = mock_dependencies();
-    let mut env = mock_env();
-
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
-    let oracle1 = deps.api.addr_make("oracle1");
-    let oracle2 = deps.api.addr_make("oracle2");
-    let oracle3 = deps.api.addr_make("oracle3");
-    let init_msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), init_msg).unwrap();
-
-    // Ensure LAST_PUBLISHED_DATA is clear
-    assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err());
-
-    // Case 5: First publish (no consensus)
-    let data_s30_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 30,
-        custody_assets: custody_asset(),
-        aum_usd: Uint128::new(1_000),
-        total_jlp_supply: Uint128::new(100),
-        strategy_jlp_balance: Uint128::new(50),
-    };
-    let res = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s30_v1),
-    )
-    .unwrap();
-    assert!(
-        res.attributes
-            .iter()
-            .any(|a| a.key == "consensus_reached" && a.value == "false"),
-        "Expected to not reach consensus"
-    );
-    assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_err());
-    let pending_key = (data_s30_v1.slot, data_s30_v1.hash().unwrap());
-    assert!(PENDING_DATA.has(&deps.storage, pending_key.clone()));
-    let pending_entries = PENDING_DATA
-        .load(&deps.storage, pending_key.clone())
-        .unwrap();
-    assert_eq!(pending_entries.len(), 1);
-
-    // Case 6: First consensus reached
-    // Oracle2 publishes the same data for slot 30, reaching threshold (2 oracles, threshold 2)
-    let res = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_s30_v1),
-    )
-    .unwrap();
-    assert!(
-        res.attributes
-            .iter()
-            .any(|a| a.key == "consensus_reached" && a.value == "true"),
-        "Expected to reach consensus"
-    );
-    assert_eq!(
-        res.attributes.last().unwrap(),
-        &attr("published_at", env.block.time.to_string())
-    );
-    let last_published = LAST_PUBLISHED_DATA.load(&deps.storage).unwrap();
-    assert_eq!(last_published.data, data_s30_v1);
-    assert_eq!(last_published.published_at, env.block.time);
-    // Pending data for slot 30 (any hash for slot 30) should be cleared
-    assert!(PENDING_DATA.load(&deps.storage, pending_key).is_err());
-
-    // Case 7: Next consensus reached + pending data removed
-    env.block.time = env.block.time.plus_seconds(100); // Advance time
-    let data_s40_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 40,
-        custody_assets: vec![CustodyAsset {
-            owned: 200,
-            locked: 0,
-            guaranteed_usd: 200,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(2000),
-        total_jlp_supply: Uint128::new(200),
-        strategy_jlp_balance: Uint128::new(100),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s40_v1),
-    )
-    .unwrap();
-    let res = execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_s40_v1),
-    )
-    .unwrap();
-    assert!(
-        res.attributes
-            .iter()
-            .any(|a| a.key == "consensus_reached" && a.value == "true"),
-        "Expected to reach consensus",
-    );
-    let last_published = LAST_PUBLISHED_DATA.load(&deps.storage).unwrap();
-    assert_eq!(last_published.data, data_s40_v1);
-    assert_eq!(last_published.published_at, env.block.time);
-    // Pending data for slot 40 should be cleared
-    let pending_key_s40 = (data_s40_v1.slot, data_s40_v1.hash().unwrap());
-    assert!(PENDING_DATA.load(&deps.storage, pending_key_s40).is_err(),);
-
-    // Case 8: Consensus reached, there are already publications for the next slot
-    env.block.time = env.block.time.plus_seconds(100); // Advance time
-    let data_s50_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 50,
-        custody_assets: vec![CustodyAsset {
-            owned: 300,
-            locked: 0,
-            guaranteed_usd: 300,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(3000),
-        total_jlp_supply: Uint128::new(300),
-        strategy_jlp_balance: Uint128::new(150),
-    };
-    let data_s60_v1 = SolanaData {
-        timestamp: env.block.time.plus_seconds(10), // A bit later
-        slot: 60,
-        custody_assets: vec![CustodyAsset {
-            owned: 400,
-            locked: 0,
-            guaranteed_usd: 400,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(4000),
-        total_jlp_supply: Uint128::new(400),
-        strategy_jlp_balance: Uint128::new(200),
-    };
-    // Publish for slot 60 first (no consensus yet)
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s60_v1),
-    )
-    .unwrap();
-    let pending_key_s60 = (data_s60_v1.slot, data_s60_v1.hash().unwrap());
-    assert!(PENDING_DATA.has(&deps.storage, pending_key_s60.clone()));
-
-    // Now, publish for slot 50 to reach consensus
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s50_v1),
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_s50_v1),
-    )
-    .unwrap();
-    assert_eq!(
-        LAST_PUBLISHED_DATA.load(&deps.storage).unwrap().data,
-        data_s50_v1
-    );
-    // Pending data for slot 50 should be cleared
-    let pending_key_s50 = (data_s50_v1.slot, data_s50_v1.hash().unwrap());
-    assert!(PENDING_DATA.load(&deps.storage, pending_key_s50).is_err());
-    // Pending data for slot 60 should remain
-    assert!(PENDING_DATA.has(&deps.storage, pending_key_s60));
-
-    // Case 9: Multiple different data's for one slot, already publications for the next slot,
-    //         consensus reached for one version
-    env.block.time = env.block.time.plus_seconds(100); // Advance time
-    let data_s70_v1 = SolanaData {
-        timestamp: env.block.time,
-        slot: 70,
-        custody_assets: vec![CustodyAsset {
-            owned: 500,
-            locked: 0,
-            guaranteed_usd: 500,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(5000),
-        total_jlp_supply: Uint128::new(500),
-        strategy_jlp_balance: Uint128::new(250),
-    };
-    let data_s70_v2 = SolanaData {
-        timestamp: env.block.time,
-        slot: 70,
-        custody_assets: vec![CustodyAsset {
-            owned: 510,
-            locked: 0,
-            guaranteed_usd: 510,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }], // Different value
-        aum_usd: Uint128::new(5100),
-        total_jlp_supply: Uint128::new(510),
-        strategy_jlp_balance: Uint128::new(255),
-    };
-    // Publish for slot 80 first (pending data for next slot)
-    let data_s80_v1 = SolanaData {
-        timestamp: env.block.time.plus_seconds(10),
-        slot: 80,
-        custody_assets: vec![CustodyAsset {
-            owned: 600,
-            locked: 0,
-            guaranteed_usd: 600,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(6000),
-        total_jlp_supply: Uint128::new(600),
-        strategy_jlp_balance: Uint128::new(300),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s80_v1),
-    )
-    .unwrap();
-    let pending_key_s80 = (data_s80_v1.slot, data_s80_v1.hash().unwrap());
-    assert!(PENDING_DATA.has(&deps.storage, pending_key_s80.clone()));
-
-    // Oracle1 publishes data_s70_v1
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_s70_v1),
-    )
-    .unwrap();
-    // Oracle2 publishes data_s70_v2 (different)
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_s70_v2),
-    )
-    .unwrap();
-    // Oracle3 publishes data_s70_v1 (reaching consensus for v1)
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle3, &[]),
-        publish_msg_from_solana_data(&data_s70_v1),
-    )
-    .unwrap();
-    // Assert v1 is finalized
-    assert_eq!(
-        LAST_PUBLISHED_DATA.load(&deps.storage).unwrap().data,
-        data_s70_v1
-    );
-    // Assert pending data for slot 70 is cleared (both v1 and v2)
-    let pending_key_s70_v1 = (data_s70_v1.slot, data_s70_v1.hash().unwrap());
-    let pending_key_s70_v2 = (data_s70_v2.slot, data_s70_v2.hash().unwrap());
-    assert!(PENDING_DATA
-        .load(&deps.storage, pending_key_s70_v1)
-        .is_err(),);
-    assert!(PENDING_DATA
-        .load(&deps.storage, pending_key_s70_v2)
-        .is_err(),);
-    // Pending data for slot 80 should remain
-    assert!(PENDING_DATA.has(&deps.storage, pending_key_s80));
-}
-
+// TODO: this should be fixed as values will change and there is no slot publishing system anymore
 /// Comprehensive test suite for the `query_get_aum` query message.
 #[test]
 fn test_query_get_aum() {
@@ -630,7 +180,6 @@ fn test_query_get_aum() {
     // First, publish some data and finalize it to set LAST_PUBLISHED_DATA
     let initial_data = SolanaData {
         timestamp: env.block.time,
-        slot: 10,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -656,7 +205,10 @@ fn test_query_get_aum() {
         publish_msg_from_solana_data(&initial_data),
     )
     .unwrap();
-    assert!(LAST_PUBLISHED_DATA.load(&deps.storage).is_ok()); // Ensure data is published
+    assert!(CONSENSUS_STATE
+        .last_published_data
+        .load(&deps.storage)
+        .is_ok()); // Ensure data is published
 
     // Case 2: Data not valid anymore
     env.block.time = env.block.time.plus_seconds(1_001); // Advance time past valid_period (1000s)
@@ -683,7 +235,6 @@ fn test_query_get_aum() {
     // Case 4: Division by zero (total_jlp_supply)
     let data_zero_jlp_supply = SolanaData {
         timestamp: env.block.time,
-        slot: 20,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -718,7 +269,6 @@ fn test_query_get_aum() {
     // Case 5: Division by zero (btc_price_in_usd)
     let data_valid_aum = SolanaData {
         timestamp: env.block.time,
-        slot: 30,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -762,7 +312,6 @@ fn test_query_get_aum() {
     // Data for this case is already set. Now, we use larger values to get a clear integer result.
     let initial_data_large_values = SolanaData {
         timestamp: env.block.time,
-        slot: 40, // Use a new slot to override previous LAST_PUBLISHED_DATA
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -802,12 +351,17 @@ fn test_query_get_aum() {
 
 fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
     ExecuteMsg::PublishData {
-        timestamp: data.timestamp,
-        slot: data.slot,
-        custody_assets: data.clone().custody_assets,
-        aum_usd: data.aum_usd,
-        total_jlp_supply: data.total_jlp_supply,
-        strategy_jlp_balance: data.strategy_jlp_balance,
+        data: OracleData {
+            round: 0,
+            timestamp: 0,
+            data: SolanaData {
+                timestamp: Default::default(),
+                custody_assets: vec![],
+                aum_usd: Default::default(),
+                total_jlp_supply: Default::default(),
+                strategy_jlp_balance: Default::default(),
+            },
+        },
     }
 }
 

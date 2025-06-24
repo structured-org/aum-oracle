@@ -27,9 +27,8 @@ pub enum ContractError {
     #[error("Invalid Solana slot: Data must be from an N-th slot ({extract_period})")]
     InvalidSolanaSlot { extract_period: u64 },
 
-    #[error("Invalid Solana slot: New data slot ({new_slot}) must be greater than last published slot ({last_slot})")]
-    SlotTooOld { new_slot: u64, last_slot: u64 },
-
+    // #[error("Invalid Solana slot: New data slot ({new_slot}) must be greater than last published slot ({last_slot})")]
+    // SlotTooOld { new_slot: u64, last_slot: u64 },
     #[error("Overflow: {error}")]
     DecimalError { error: String },
 
