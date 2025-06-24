@@ -432,6 +432,23 @@ fn test_consensus_on_items() {
         SignedDecimal::from_ratio(5025, 10000),
         "Median should be correct"
     );
+
+    // Test with values that are all within delta but with zero as corner value
+    let all_within_delta = vec![
+        SignedDecimal::from_ratio(-5, 10),
+        SignedDecimal::from_ratio(-4, 100),
+        SignedDecimal::from_ratio(0, 100),
+    ];
+    let result = consensus_on_items(&all_within_delta, 3, 10000); // 1% delta
+    assert!(
+        result.is_some(),
+        "Values within delta should reach consensus"
+    );
+    assert_eq!(
+        result.unwrap(),
+        SignedDecimal::from_ratio(-4, 100),
+        "Median should be correct"
+    );
 }
 
 // Helper function to setup storage with config and current round

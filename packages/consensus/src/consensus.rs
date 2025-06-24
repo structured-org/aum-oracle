@@ -316,7 +316,15 @@ pub fn consensus_on_items(
         for j in (i + threshold)..=sorted.len() {
             let low = sorted[i];
             let high = sorted[j - 1];
-            if high.abs_diff(low) <= high.abs_diff(SignedDecimal::zero()) * ppm && j - i > max_len {
+
+            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
+            if high.abs_diff(low)
+                <= low
+                    .abs_diff(SignedDecimal::zero())
+                    .max(high.abs_diff(SignedDecimal::zero()))
+                    * ppm
+                && j - i > max_len
+            {
                 max_len = j - i;
                 best_slice = (i, j);
             }
