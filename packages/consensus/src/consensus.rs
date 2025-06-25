@@ -127,7 +127,12 @@ impl<T: ConsensusData> State<T> {
         Ok(v)
     }
 
-    /// Returns the last currently data oracles agreed on
+    /// Returns the current pending round
+    pub fn get_pending_round(&self, storage: &dyn Storage) -> StdResult<Round> {
+        self.pending_round.load(storage)
+    }
+
+    /// Returns the last current data oracles agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(

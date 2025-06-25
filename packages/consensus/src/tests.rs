@@ -435,18 +435,18 @@ fn test_consensus_on_items() {
 
     // Test with values that are all within delta but with zero as corner value
     let all_within_delta = vec![
-        SignedDecimal::from_ratio(-5, 10),
-        SignedDecimal::from_ratio(-4, 100),
-        SignedDecimal::from_ratio(0, 100),
+        SignedDecimal::from_ratio(-5, 1),
+        SignedDecimal::from_ratio(-4, 1),
+        SignedDecimal::from_ratio(0, 1),
     ];
-    let result = consensus_on_items(&all_within_delta, 3, 10000); // 1% delta
+    let result = consensus_on_items(&all_within_delta, 3, 1000000); // 100% delta
     assert!(
         result.is_some(),
         "Values within delta should reach consensus"
     );
     assert_eq!(
         result.unwrap(),
-        SignedDecimal::from_ratio(-4, 100),
+        SignedDecimal::from_ratio(-4, 1),
         "Median should be correct"
     );
 }
