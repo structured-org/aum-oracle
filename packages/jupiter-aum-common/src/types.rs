@@ -1,7 +1,8 @@
 use crate::error::ContractError;
 use consensus::consensus::{consensus_on_items, ConsensusData};
-use cosmwasm_std::{Addr, SignedDecimal, Timestamp, Uint128};
+use cosmwasm_std::{Addr, SignedDecimal, SignedDecimalRangeExceeded, Timestamp, Uint128, Uint64};
 use schemars::JsonSchema;
+use serde::de::Unexpected::Signed;
 use serde::{Deserialize, Serialize};
 
 /// Config defines the contract's configuration parameters.
@@ -45,7 +46,7 @@ impl ConsensusData for SolanaData {
         }
 
         let consensus_timestamp =
-            consensus_on_timestamp_field(data, |d| d.timestamp, threshold, delta_ppm)?;
+            consensus_on_timestamp_field(data, |d| d.timestamp, threshold, delta_ppm).ok()??;
         let consensus_aum_usd = consensus_on_field(data, |d| d.aum_usd, threshold, delta_ppm)?;
         let consensus_total_jlp_supply =
             consensus_on_field(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
@@ -64,15 +65,21 @@ impl ConsensusData for SolanaData {
 }
 
 fn consensus_on_timestamp_field<F>(
-    solana_data: &[SolanaData],
+    data: &[SolanaData],
     extract: F,
     threshold: usize,
     delta_ppm: u64,
-) -> Option<Timestamp>
+) -> Result<Option<Timestamp>, SignedDecimalRangeExceeded>
 where
     F: Fn(&SolanaData) -> Timestamp,
 {
-    todo!()
+    let items: Vec<SignedDecimal> = data
+        .iter()
+        .map(&extract)
+        .map(|t| SignedDecimal::from_atomics(t.seconds(), 0))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(consensus_on_items(&items, threshold, delta_ppm)
+        .map(|t| Timestamp::from_seconds(t.to_int_floor().i128() as u64)))
 }
 
 // Single field consensus
