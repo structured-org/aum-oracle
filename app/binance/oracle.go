@@ -20,14 +20,14 @@ type Oracle struct {
 	binanceClient BinanceClient
 	neutronClient NeutronClient
 
-	log *zap.Logger
+	logger *zap.Logger
 }
 
-func NewOracle(binanceClient BinanceClient, neutronClient NeutronClient, log *zap.Logger) *Oracle {
+func NewOracle(binanceClient BinanceClient, neutronClient NeutronClient, logger *zap.Logger) *Oracle {
 	return &Oracle{
 		binanceClient: binanceClient,
 		neutronClient: neutronClient,
-		log:           log.With(zap.String("context", "binance_aum_oracle")),
+		logger:        logger,
 	}
 }
 
@@ -36,13 +36,13 @@ func (o *Oracle) Run(ctx context.Context) {
 	// then the value is reassigned from submission response in the loop
 	nextRound, err := o.neutronClient.GetBinanceAumContractNextRound(ctx)
 	if err != nil {
-		o.log.Error("failed to get next round", zap.Error(err))
+		o.logger.Error("failed to get next round", zap.Error(err))
 		return
 	}
 
 	for {
 		timeTillNextRound := time.Duration(nextRound.Timestamp-time.Now().Unix()) * time.Second
-		o.log.Info("waiting for next round",
+		o.logger.Info("waiting for next round",
 			zap.Int64("round", nextRound.Round),
 			zap.Int64("round_timestamp", nextRound.Timestamp),
 			zap.Duration("time_till_next_round", timeTillNextRound),
@@ -50,31 +50,31 @@ func (o *Oracle) Run(ctx context.Context) {
 
 		select {
 		case <-time.NewTimer(timeTillNextRound).C:
-			o.log.Info("new round started",
+			o.logger.Info("new round started",
 				zap.Int64("round", nextRound.Round),
 				zap.Int64("round_timestamp", nextRound.Timestamp),
 			)
 
 			data, err := o.fetchBinanceData(ctx)
 			if err != nil {
-				o.log.Error("failed to fetch AUM data", zap.Error(err))
+				o.logger.Error("failed to fetch AUM data", zap.Error(err))
 				return
 			}
 			data.Round = nextRound.Round
 
 			nextRound, err = o.neutronClient.SubmitBinanceAumData(ctx, data)
 			if err != nil {
-				o.log.Error("failed to submit AUM data", zap.Error(err))
+				o.logger.Error("failed to submit AUM data", zap.Error(err))
 				return
 			}
 
-			o.log.Info("submitted AUM data",
+			o.logger.Info("submitted AUM data",
 				zap.Int64("round", data.Round),
 				zap.Any("data", *data),
 			)
 
 		case <-ctx.Done():
-			o.log.Info("oracle stopped by context")
+			o.logger.Info("oracle stopped by context")
 			return
 		}
 	}
@@ -90,7 +90,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 
 		positions, err := o.getUmPositions(ctx)
 		if err != nil {
-			o.log.Error("failed to get UM positions", zap.Error(err))
+			o.logger.Error("failed to get UM positions", zap.Error(err))
 			return
 		}
 		data.Positions = positions
@@ -102,7 +102,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 
 		balances, err := o.getSpotBalances(ctx)
 		if err != nil {
-			o.log.Error("failed to get spot balances", zap.Error(err))
+			o.logger.Error("failed to get spot balances", zap.Error(err))
 			return
 		}
 		data.SpotBalances = balances
@@ -114,7 +114,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 
 		pmAccount, err := o.binanceClient.GetPMAccountInfo(ctx)
 		if err != nil {
-			o.log.Error("failed to get PM account info", zap.Error(err))
+			o.logger.Error("failed to get PM account info", zap.Error(err))
 			return
 		}
 		data.PmAccountActualEquity = math.LegacyMustNewDecFromStr(pmAccount.ActualEquity)
@@ -128,7 +128,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 
 		pmAccountBalances, err := o.binanceClient.GetPMAccountBalance(ctx)
 		if err != nil {
-			o.log.Error("failed to get PM account balances", zap.Error(err))
+			o.logger.Error("failed to get PM account balances", zap.Error(err))
 			return
 		}
 		for _, balance := range pmAccountBalances {

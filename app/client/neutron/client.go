@@ -5,12 +5,17 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"go.uber.org/zap"
 )
 
-type Client struct{}
+type Client struct {
+	logger *zap.Logger
+}
 
-func NewClient() (*Client, error) {
-	return &Client{}, nil
+func NewClient(logger *zap.Logger) (*Client, error) {
+	return &Client{
+		logger: logger,
+	}, nil
 }
 
 // TODO: use actual values when the client is implemented
