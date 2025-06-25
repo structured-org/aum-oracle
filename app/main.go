@@ -36,12 +36,6 @@ func main() {
 	for token, programId := range conf.JupiterCustodies {
 		jupiterCustodies[token] = solana.MustPublicKeyFromBase58(programId)
 	}
-	jupiterConfig := solanaoracle.JupiterConfig{
-		Custodies: jupiterCustodies,
-		Token:     solana.MustPublicKeyFromBase58(conf.JupiterJlpToken),
-		Pool:      solana.MustPublicKeyFromBase58(conf.JupiterPool),
-		Strategy:  solana.MustPublicKeyFromBase58(conf.JupiterStrategyAddress),
-	}
 
 	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
 	neutronClient, err := neutronclient.NewClient(logRegistry.Get(neutronClientContext))
@@ -50,8 +44,29 @@ func main() {
 	}
 	binanceClient := binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
 
-	binanceOracle := binanceoracle.NewOracle(binanceClient, neutronClient, logRegistry.Get(binanceAumOracleContext))
-	solanaOracle := solanaoracle.NewOracle(solanaClient, neutronClient, jupiterConfig, logRegistry.Get(solanaAumOracleContext))
+	binanceOracleConfig := binanceoracle.Config{
+		UmPositionsList: conf.BinanceUmPositionsList,
+		SpotAssetsList:  conf.BinanceSpotAssetsList,
+	}
+	binanceOracle := binanceoracle.NewOracle(
+		binanceClient,
+		neutronClient,
+		binanceOracleConfig,
+		logRegistry.Get(binanceAumOracleContext),
+	)
+
+	jupiterConfig := solanaoracle.JupiterConfig{
+		Custodies: jupiterCustodies,
+		Token:     solana.MustPublicKeyFromBase58(conf.JupiterJlpToken),
+		Pool:      solana.MustPublicKeyFromBase58(conf.JupiterPool),
+		Strategy:  solana.MustPublicKeyFromBase58(conf.JupiterStrategyAddress),
+	}
+	solanaOracle := solanaoracle.NewOracle(
+		solanaClient,
+		neutronClient,
+		jupiterConfig,
+		logRegistry.Get(solanaAumOracleContext),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}

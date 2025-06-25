@@ -28,8 +28,10 @@ func readConfig() *config {
 type config struct {
 	SolanaRpcEndpoint string `yaml:"solana_rpc_endpoint"`
 
-	BinanceApiKey    string `yaml:"binance_api_key"`
-	BinanceApiSecret string `yaml:"binance_api_secret"`
+	BinanceApiKey          string   `yaml:"binance_api_key"`
+	BinanceApiSecret       string   `yaml:"binance_api_secret"`
+	BinanceUmPositionsList []string `yaml:"binance_um_positions_list"`
+	BinanceSpotAssetsList  []string `yaml:"binance_spot_assets_list"`
 
 	JupiterCustodies       map[string]string `yaml:"jupiter_custodies"`
 	JupiterJlpToken        string            `yaml:"jupiter_jlp_token"`

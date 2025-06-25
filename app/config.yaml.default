@@ -2,6 +2,15 @@ solana_rpc_endpoint: "https://api.mainnet-beta.solana.com"
 
 binance_api_key: ""
 binance_api_secret: ""
+binance_um_positions_list:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+binance_spot_assets_list:
+  - USDT
+  - BTC
+  - ETH
+  - SOL
 
 jupiter_custodies:
   SOL: "7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz"

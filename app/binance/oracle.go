@@ -11,22 +11,29 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	umPositionsList = []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
-	spotAssetsList  = []string{"USDT", "BTC", "ETH", "SOL"}
-)
+type Config struct {
+	UmPositionsList []string
+	SpotAssetsList  []string
+}
 
 type Oracle struct {
 	binanceClient BinanceClient
 	neutronClient NeutronClient
+	config        Config
 
 	logger *zap.Logger
 }
 
-func NewOracle(binanceClient BinanceClient, neutronClient NeutronClient, logger *zap.Logger) *Oracle {
+func NewOracle(
+	binanceClient BinanceClient,
+	neutronClient NeutronClient,
+	config Config,
+	logger *zap.Logger,
+) *Oracle {
 	return &Oracle{
 		binanceClient: binanceClient,
 		neutronClient: neutronClient,
+		config:        config,
 		logger:        logger,
 	}
 }
@@ -150,7 +157,7 @@ func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePos
 
 	positions := make([]neutronclient.BinancePosition, 0)
 	for _, position := range umPositions {
-		if !slices.Contains(umPositionsList, position.Symbol) {
+		if !slices.Contains(o.config.UmPositionsList, position.Symbol) {
 			continue
 		}
 
@@ -172,7 +179,7 @@ func (o *Oracle) getSpotBalances(ctx context.Context) ([]neutronclient.BinanceBa
 
 	balances := make([]neutronclient.BinanceBalance, 0)
 	for _, balance := range spotBalances.Balances {
-		if !slices.Contains(spotAssetsList, balance.Asset) {
+		if !slices.Contains(o.config.SpotAssetsList, balance.Asset) {
 			continue
 		}
 
