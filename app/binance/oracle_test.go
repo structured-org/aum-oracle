@@ -7,7 +7,6 @@ import (
 
 	"cosmossdk.io/math"
 	binance "github.com/adshao/go-binance/v2"
-	binancefutures "github.com/adshao/go-binance/v2/futures"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	"github.com/golang/mock/gomock"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
@@ -27,8 +26,8 @@ func TestOracleRun(t *testing.T) {
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
-	binanceClient.EXPECT().GetUmPositions(gomock.Any()).Return([]*binancefutures.PositionRisk{
-		{Symbol: "BTCUSDT", PositionAmt: "0.148", UnRealizedProfit: "1985.41474317"},
+	binanceClient.EXPECT().GetUmPositions(gomock.Any()).Return([]*binanceportfolio.UMPosition{
+		{Symbol: "BTCUSDT", PositionAmt: "0.148", UnrealizedProfit: "1985.41474317"},
 	}, nil)
 	binanceClient.EXPECT().GetSpotAccountInfo(gomock.Any()).Return(&binance.Account{
 		Balances: []binance.Balance{
@@ -63,7 +62,11 @@ func TestOracleRun(t *testing.T) {
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 
-	oracle := NewOracle(binanceClient, neutronClient, zap.NewExample())
+	config := Config{
+		UmPositionsList: []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"},
+		SpotAssetsList:  []string{"USDT", "BTC", "ETH", "SOL"},
+	}
+	oracle := NewOracle(binanceClient, neutronClient, config, zap.NewExample())
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go oracle.Run(ctx)
