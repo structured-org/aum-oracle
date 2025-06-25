@@ -8,6 +8,7 @@ import (
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 )
 
+// NewClient creates a new Binance client.
 func NewClient(apiKey, apiSecret string) *Client {
 	return &Client{
 		binance:          binance.NewClient(apiKey, apiSecret),
@@ -15,6 +16,7 @@ func NewClient(apiKey, apiSecret string) *Client {
 	}
 }
 
+// Client is the Binance client.
 type Client struct {
 	binance          *binance.Client
 	binanceportfolio *binanceportfolio.Client

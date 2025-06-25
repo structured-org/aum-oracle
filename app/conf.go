@@ -26,17 +26,27 @@ func readConfig() *config {
 }
 
 type config struct {
+	// SolanaRpcEndpoint is the endpoint of the Solana RPC.
 	SolanaRpcEndpoint string `yaml:"solana_rpc_endpoint"`
 
-	BinanceApiKey          string   `yaml:"binance_api_key"`
-	BinanceApiSecret       string   `yaml:"binance_api_secret"`
+	// BinanceApiKey is the API key for the Binance API.
+	BinanceApiKey string `yaml:"binance_api_key"`
+	// BinanceApiSecret is the API secret for the Binance API.
+	BinanceApiSecret string `yaml:"binance_api_secret"`
+	// BinanceUmPositionsList is the list of UM-positions to fetch from Binance.
 	BinanceUmPositionsList []string `yaml:"binance_um_positions_list"`
-	BinanceSpotAssetsList  []string `yaml:"binance_spot_assets_list"`
+	// BinanceSpotAssetsList is the list of spot assets to fetch from Binance.
+	BinanceSpotAssetsList []string `yaml:"binance_spot_assets_list"`
 
-	JupiterCustodies       map[string]string `yaml:"jupiter_custodies"`
-	JupiterJlpToken        string            `yaml:"jupiter_jlp_token"`
-	JupiterPool            string            `yaml:"jupiter_jlp_pool"`
-	JupiterStrategyAddress string            `yaml:"jupiter_strategy_address"`
+	// JupiterCustodies is the token->programId mapping of Jupiter custodies.
+	JupiterCustodies map[string]string `yaml:"jupiter_custodies"`
+	// JupiterJlpToken is the Jupiter JLP token pubkey.
+	JupiterJlpToken string `yaml:"jupiter_jlp_token"`
+	// JupiterPool is the Jupiter pool pubkey.
+	JupiterPool string `yaml:"jupiter_jlp_pool"`
+	// JupiterStrategyAddress is the Jupiter strategy address pubkey.
+	JupiterStrategyAddress string `yaml:"jupiter_strategy_address"`
 
+	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
 }

@@ -8,6 +8,7 @@ import (
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
 )
 
+// BinanceClient is the definition of the expected Binance client interface.
 type BinanceClient interface {
 	GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error)
 	GetCmPositions(ctx context.Context) ([]*binanceportfolio.CMPosition, error)
@@ -16,6 +17,7 @@ type BinanceClient interface {
 	GetSpotAccountInfo(ctx context.Context) (*binance.Account, error)
 }
 
+// NeutronClient is the definition of the expected Neutron client interface.
 type NeutronClient interface {
 	GetBinanceAumContractNextRound(ctx context.Context) (*neutronclient.NextRound, error)
 	SubmitBinanceAumData(ctx context.Context, data *neutronclient.BinanceData) (*neutronclient.NextRound, error)

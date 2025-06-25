@@ -5,6 +5,7 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 )
 
+// JupiterPerpsCustodyAccount is the model for Jupiter perps custody account data.
 type JupiterPerpsCustodyAccount struct {
 	Discriminator       [8]byte
 	Pool                solana.PublicKey
@@ -86,6 +87,7 @@ type JupiterPerpsCustodyPriceImpactBuffer struct {
 	MaxFeeBps               uint64
 }
 
+// JupiterPoolAccount is the model for Jupiter pool account data.
 type JupiterPoolAccount struct {
 	Discriminator          [8]byte
 	Name                   string
@@ -93,9 +95,6 @@ type JupiterPoolAccount struct {
 	AumUsd                 solanabin.Uint128
 	Limit                  JupiterPoolLimit
 	Fees                   JupiterPoolFees
-	StableSwapTaxBps       uint64
-	LiquidationRewardBps   uint64
-	ProtocolShareBps       uint64
 	PoolApr                JupiterPoolApr
 	MaxRequestExecutionSec int64
 	Bump                   uint8
@@ -106,7 +105,7 @@ type JupiterPoolAccount struct {
 
 type JupiterPoolLimit struct {
 	MaxAumUsd               solanabin.Uint128
-	TokenWeightageBufferBps uint64
+	TokenWeightageBufferBps solanabin.Uint128
 	Buffer                  uint64
 }
 
@@ -125,10 +124,10 @@ type JupiterPoolFees struct {
 type JupiterPoolApr struct {
 	LastUpdated    int64
 	FeeAprBps      uint64
-	RealizedFeeUsd solanabin.Uint128
+	RealizedFeeUsd uint64
 }
 
 type Secp256k1Pubkey struct {
-	Discriminator [8]byte
-	Key           [32]byte
+	Prefix uint8
+	Key    [32]uint8
 }

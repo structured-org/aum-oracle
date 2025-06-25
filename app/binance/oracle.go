@@ -11,11 +11,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// Config is the configuration for the Binance oracle.
 type Config struct {
+	// UmPositionsList is the list of USD-margined portfolio perpetual futures positions to query
+	// information about.
 	UmPositionsList []string
-	SpotAssetsList  []string
+	// SpotAssetsList is the list of spot assets to query information about.
+	SpotAssetsList []string
 }
 
+// Oracle is the Binance oracle. It is responsible for fetching data from Binance and submitting it
+// to the Neutron client.
 type Oracle struct {
 	binanceClient BinanceClient
 	neutronClient NeutronClient
@@ -24,6 +30,7 @@ type Oracle struct {
 	logger *zap.Logger
 }
 
+// NewOracle creates a new Binance oracle.
 func NewOracle(
 	binanceClient BinanceClient,
 	neutronClient NeutronClient,
@@ -38,6 +45,8 @@ func NewOracle(
 	}
 }
 
+// Run runs the Binance oracle. It starts query-submission loop that periodically fetches data from
+// Binance and submits it using the Neutron client.
 func (o *Oracle) Run(ctx context.Context) {
 	// query the next round once at initialisation
 	// then the value is reassigned from submission response in the loop
@@ -87,6 +96,7 @@ func (o *Oracle) Run(ctx context.Context) {
 	}
 }
 
+// fetchBinanceData concurrently fetches all required data from Binance using the Binance client.
 func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceData, error) {
 	data := &neutronclient.BinanceData{}
 	wg := sync.WaitGroup{}
@@ -149,6 +159,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 	return data, nil
 }
 
+// getUmPositions gets the USD-margined portfolio perpetual futures positions.
 func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePosition, error) {
 	umPositions, err := o.binanceClient.GetUmPositions(ctx)
 	if err != nil {
@@ -171,6 +182,7 @@ func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePos
 	return positions, nil
 }
 
+// getSpotBalances gets the spot balances.
 func (o *Oracle) getSpotBalances(ctx context.Context) ([]neutronclient.BinanceBalance, error) {
 	spotBalances, err := o.binanceClient.GetSpotAccountInfo(ctx)
 	if err != nil {

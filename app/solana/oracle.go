@@ -11,13 +11,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// JupiterConfig is the configuration for the Jupiter oracle.
 type JupiterConfig struct {
-	Custodies map[string]solana.PublicKey // token -> program id
-	Token     solana.PublicKey
-	Pool      solana.PublicKey
-	Strategy  solana.PublicKey
+	// Custodies is the map of Jupiter custodies represented as token->programId.
+	Custodies map[string]solana.PublicKey
+	// Token is the Jupiter JLP token address.
+	Token solana.PublicKey
+	// Pool is the Jupiter JLP pool address.
+	Pool solana.PublicKey
+	// Strategy is the Jupiter JLP strategy address.
+	Strategy solana.PublicKey
 }
 
+// Oracle is the Solana oracle. It is responsible for fetching data from the Solana blockchain and
+// submitting it to the Neutron client.
 type Oracle struct {
 	solanaClient  SolanaClient
 	neutronClient NeutronClient
@@ -26,6 +33,7 @@ type Oracle struct {
 	logger *zap.Logger
 }
 
+// NewOracle creates a new Solana oracle.
 func NewOracle(
 	solanaClient SolanaClient,
 	neutronClient NeutronClient,
@@ -40,6 +48,8 @@ func NewOracle(
 	}
 }
 
+// Run runs the Solana oracle. It starts query-submission loop that periodically fetches data from
+// the Solana blockchain and submits it using the Neutron client.
 func (o *Oracle) Run(ctx context.Context) {
 	// query the next round once at initialisation
 	// then the value is reassigned from submission response in the loop
@@ -89,6 +99,7 @@ func (o *Oracle) Run(ctx context.Context) {
 	}
 }
 
+// fetchSolanaData concurrently fetches all required data from the Solana blockchain.
 func (o *Oracle) fetchSolanaData(ctx context.Context) (*neutronclient.SolanaData, error) {
 	data := &neutronclient.SolanaData{}
 	wg := sync.WaitGroup{}

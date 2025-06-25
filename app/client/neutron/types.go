@@ -7,51 +7,88 @@ import (
 	"cosmossdk.io/math"
 )
 
+// NextRound contains AUM contract's next consensus round information.
 type NextRound struct {
-	Round     int64 `json:"round"`
+	// Round is the next consensus round number.
+	Round int64 `json:"round"`
+	// Timestamp is the timestamp of the next consensus round beginning.
 	Timestamp int64 `json:"timestamp"`
 }
 
+// BinanceData contains all Binance data that is a matter of consensus for the Binance AUM contract.
 type BinanceData struct {
-	Round                 int64             `json:"round"`
-	Unimmr                math.LegacyDec    `json:"unimmr"`
-	Positions             []BinancePosition `json:"positions"`
-	UmBalanceUsdt         math.LegacyDec    `json:"um_balance_usdt"`
-	SpotBalances          []BinanceBalance  `json:"spot_balances"`
-	PmAccountActualEquity math.LegacyDec    `json:"pm_account_actual_equity"`
-	WithdrawableUsdt      math.LegacyDec    `json:"withdrawable_usdt"`
+	// Round is the consensus round number.
+	Round int64 `json:"round"`
+	// Unimmr is the Unified Account Maintenance Margin Ratio. It is the overall risk measure of
+	// the entire portfolio.
+	Unimmr math.LegacyDec `json:"unimmr"`
+	// Positions is the list of positions in the Binance Portfolio Margin account.
+	Positions []BinancePosition `json:"positions"`
+	// UmBalanceUsdt is the USDT balance on Portfolio Margin account. Used for perpetual futures
+	// funding payments.
+	UmBalanceUsdt math.LegacyDec `json:"um_balance_usdt"`
+	// SpotBalances is the list of balances on the Binance spot account.
+	SpotBalances []BinanceBalance `json:"spot_balances"`
+	// PmAccountActualEquity is the actual equity of the Portfolio Margin account that also
+	// represents the total collateral on the account.
+	PmAccountActualEquity math.LegacyDec `json:"pm_account_actual_equity"`
+	// WithdrawableUsdt is the max withdrawable amount in USDT allowed without making UniMMR
+	// going under 1.05 which is when liquidation happens.
+	WithdrawableUsdt math.LegacyDec `json:"withdrawable_usdt"`
 }
 
+// BinancePosition is a perpetual futures position on Binance.
 type BinancePosition struct {
-	Symbol string         `json:"symbol"`
+	// Symbol is the symbol of the position.
+	Symbol string `json:"symbol"`
+	// Amount is the amount of the position. Negative for shorts, positive for longs.
 	Amount math.LegacyDec `json:"amount"`
-	Pnl    math.LegacyDec `json:"pnl"`
+	// Pnl is the profits and losses of the position. Negative for losses, positive for profits.
+	Pnl math.LegacyDec `json:"pnl"`
 }
 
+// BinanceBalance is some asset balance on an account on Binance.
 type BinanceBalance struct {
-	Asset  string         `json:"asset"`
+	// Asset is the asset name.
+	Asset string `json:"asset"`
+	// Amount is the asset amount on the account balance.
 	Amount math.LegacyDec `json:"amount"`
 }
 
+// SolanaData contains all Solana data that is a matter of consensus for the Solana AUM contract.
 type SolanaData struct {
-	Round              int64                 `json:"round"`
-	CustodyAssets      []JupiterCustodyAsset `json:"custody_assets"`
-	AumUsd             math.Uint             `json:"aum_usd"`
-	JlpTokenDecimals   uint8                 `json:"jlp_token_decimals"`
-	TotalJlpSupply     math.Uint             `json:"total_jlp_supply"`
-	StrategyJlpBalance math.Uint             `json:"strategy_jlp_balance"`
+	// Round is the consensus round number.
+	Round int64 `json:"round"`
+	// CustodyAssets contains information about Jupiter custodies.
+	CustodyAssets []JupiterCustodyAsset `json:"custody_assets"`
+	// AumUsd is the total Jupiter protocol AUM in USD.
+	AumUsd math.Uint `json:"aum_usd"`
+	// JlpTokenDecimals is the number of decimals of the JLP token.
+	JlpTokenDecimals uint8 `json:"jlp_token_decimals"`
+	// TotalJlpSupply is the total supply of the JLP token.
+	TotalJlpSupply math.Uint `json:"total_jlp_supply"`
+	// StrategyJlpBalance is the amount of the JLP token that is held by the Jupiter strategy
+	// address.
+	StrategyJlpBalance math.Uint `json:"strategy_jlp_balance"`
 }
 
+// SortCustodyAssets sorts the custody assets by their denomination.
 func (s *SolanaData) SortCustodyAssets() {
 	slices.SortFunc(s.CustodyAssets, func(a, b JupiterCustodyAsset) int {
 		return cmp.Compare(a.Denom, b.Denom)
 	})
 }
 
+// JupiterCustodyAsset contains information about a custody asset on a Jupiter custody.
 type JupiterCustodyAsset struct {
-	Owned         uint64 `json:"owned"`
-	Locked        uint64 `json:"locked"`
+	// Owned is the amount of the asset owned by the Jupiter custody.
+	Owned uint64 `json:"owned"`
+	// Locked is the amount of the asset locked in the Jupiter custody.
+	Locked uint64 `json:"locked"`
+	// GuaranteedUsd is an estimate of the total size of all long positions.
 	GuaranteedUsd uint64 `json:"guaranteed_usd"`
-	Decimals      uint8  `json:"decimals"`
-	Denom         string `json:"denom"`
+	// Decimals is the number of decimals of the custody asset.
+	Decimals uint8 `json:"decimals"`
+	// Denom is the custody asset denomination.
+	Denom string `json:"denom"`
 }
