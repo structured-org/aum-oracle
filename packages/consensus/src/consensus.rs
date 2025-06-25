@@ -128,7 +128,12 @@ impl<T: ConsensusData> State<T> {
         Ok(v)
     }
 
-    /// Returns the last currently data oracles agreed on
+    /// Returns the current pending round
+    pub fn get_pending_round(&self, storage: &dyn Storage) -> StdResult<Round> {
+        self.pending_round.load(storage)
+    }
+
+    /// Returns the last current data oracles agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(
@@ -317,7 +322,15 @@ pub fn consensus_on_items(
         for j in (i + threshold)..=sorted.len() {
             let low = sorted[i];
             let high = sorted[j - 1];
-            if high.abs_diff(low) <= high.abs_diff(SignedDecimal::zero()) * ppm && j - i > max_len {
+
+            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
+            if high.abs_diff(low)
+                <= low
+                    .abs_diff(SignedDecimal::zero())
+                    .max(high.abs_diff(SignedDecimal::zero()))
+                    * ppm
+                && j - i > max_len
+            {
                 max_len = j - i;
                 best_slice = (i, j);
             }

@@ -1,5 +1,5 @@
 use crate::state::BinanceData;
-use consensus::consensus::OracleData;
+use consensus::consensus::{OracleData, Round};
 use cosmwasm_std::SignedDecimal;
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +24,13 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     GetData {},
     GetAum {},
+    GetRoundInfo {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct RoundInfoResponse {
+    pub pending_round: Round,
+    pub next_round: Round,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -1,4 +1,6 @@
-use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg};
+use crate::msg::{
+    ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
+};
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
 use consensus::consensus::{Config as ConsensusConfig, OracleData};
 use cosmwasm_std::{
@@ -103,7 +105,18 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetData {} => to_json_binary(&query_get_data(deps, env)?),
         QueryMsg::GetAum {} => to_json_binary(&query_get_aum(deps, env)?),
+        QueryMsg::GetRoundInfo {} => to_json_binary(&query_round_info(deps, env)?),
     }
+}
+
+fn query_round_info(deps: Deps, _env: Env) -> StdResult<RoundInfoResponse> {
+    let pending_round = CONSENSUS_STATE.get_pending_round(deps.storage)?;
+
+    Ok(RoundInfoResponse {
+        pending_round,
+        next_round: pending_round
+            .next_round(CONSENSUS_STATE.config.load(deps.storage)?.round_length),
+    })
 }
 
 fn query_get_data(deps: Deps, env: Env) -> StdResult<GetDataResponse> {
