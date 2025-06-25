@@ -373,82 +373,132 @@ fn test_round_operations() {
 
 #[test]
 fn test_consensus_on_items() {
-    // Test with empty array
-    let empty: Vec<SignedDecimal> = vec![];
-    assert!(
-        consensus_on_items(&empty, 1, 10000).is_none(),
-        "Empty array should return None"
-    );
+    struct TestCase {
+        name: &'static str,
+        items: Vec<SignedDecimal>,
+        threshold: usize,
+        delta: u64,
+        expected: Option<SignedDecimal>,
+    }
 
-    // Test with array smaller than threshold
-    let small = vec![SignedDecimal::from_ratio(5, 10)];
-    assert!(
-        consensus_on_items(&small, 2, 10000).is_none(),
-        "Array smaller than threshold should return None"
-    );
-
-    // Test with values within delta
-    let within_delta = vec![
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(51, 100),
+    let test_cases = vec![
+        TestCase {
+            name: "Empty array should return None",
+            items: vec![],
+            threshold: 1,
+            delta: 10000,
+            expected: None,
+        },
+        TestCase {
+            name: "Array smaller than threshold should return None",
+            items: vec![SignedDecimal::from_ratio(5, 10)],
+            threshold: 2,
+            delta: 0,
+            expected: None,
+        },
+        TestCase {
+            name: "Values within delta should reach consensus",
+            items: vec![
+                SignedDecimal::from_ratio(5, 10),
+                SignedDecimal::from_ratio(505, 1000),
+                SignedDecimal::from_ratio(51, 100),
+            ],
+            threshold: 2,
+            delta: 10000,
+            expected: Some(SignedDecimal::from_ratio(5025, 10000)),
+        },
+        TestCase {
+            name: "Values outside delta should not reach consensus",
+            items: vec![
+                SignedDecimal::from_ratio(5, 10),
+                SignedDecimal::from_ratio(6, 10), // 20% difference
+                SignedDecimal::from_ratio(45, 100),
+            ],
+            threshold: 2,
+            delta: 10000,
+            expected: None,
+        },
+        TestCase {
+            name: "Values that are all within delta but with zero as corner value",
+            items: vec![
+                SignedDecimal::from_ratio(0, 1),
+                SignedDecimal::from_ratio(-9, 1),
+                SignedDecimal::from_ratio(-8, 1),
+                SignedDecimal::from_ratio(-7, 1),
+                SignedDecimal::from_ratio(-6, 1),
+                SignedDecimal::from_ratio(-5, 1),
+                SignedDecimal::from_ratio(-4, 1),
+                SignedDecimal::from_ratio(-3, 1),
+                SignedDecimal::from_ratio(-2, 1),
+                SignedDecimal::from_ratio(-1, 1),
+            ],
+            threshold: 7,
+            delta: 1000000,
+            expected: Some(SignedDecimal::from_ratio(-45, 10)),
+        },
+        TestCase {
+            name: "No consensus with 10% delta and incremented numbers",
+            items: vec![
+                SignedDecimal::from_ratio(1, 1),
+                SignedDecimal::from_ratio(2, 1),
+                SignedDecimal::from_ratio(3, 1),
+                SignedDecimal::from_ratio(4, 1),
+                SignedDecimal::from_ratio(5, 1),
+                SignedDecimal::from_ratio(6, 1),
+                SignedDecimal::from_ratio(7, 1),
+                SignedDecimal::from_ratio(8, 1),
+                SignedDecimal::from_ratio(9, 1),
+                SignedDecimal::from_ratio(10, 1),
+            ],
+            threshold: 7,
+            delta: 100000,
+            expected: None,
+        },
+        TestCase {
+            name: "Consensus with a couple of large wrong numbers (threshold is reached)",
+            items: vec![
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(1, 1),
+                SignedDecimal::from_ratio(101, 100),
+                SignedDecimal::from_ratio(102, 100),
+                SignedDecimal::from_ratio(103, 100),
+                SignedDecimal::from_ratio(104, 100),
+                SignedDecimal::from_ratio(105, 100),
+                SignedDecimal::from_ratio(106, 100),
+            ],
+            threshold: 7,
+            delta: 100000,
+            expected: Some(SignedDecimal::from_ratio(103, 100)),
+        },
+        TestCase {
+            name: "No consensus with a couple of large wrong numbers (threshold is reached not)",
+            items: vec![
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(100000, 1),
+                SignedDecimal::from_ratio(1, 1),
+                SignedDecimal::from_ratio(101, 100),
+                SignedDecimal::from_ratio(102, 100),
+                SignedDecimal::from_ratio(103, 100),
+                SignedDecimal::from_ratio(104, 100),
+                SignedDecimal::from_ratio(105, 100),
+            ],
+            threshold: 7,
+            delta: 100000,
+            expected: None,
+        },
     ];
-    let result = consensus_on_items(&within_delta, 2, 10000); // 1% delta
-    assert!(
-        result.is_some(),
-        "Values within delta should reach consensus"
-    );
-    assert_eq!(
-        result.unwrap(),
-        SignedDecimal::from_ratio(5025, 10000),
-        "Median should be correct"
-    );
 
-    // Test with values outside delta
-    let outside_delta = vec![
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(6, 10), // 20% difference
-        SignedDecimal::from_ratio(45, 100),
-    ];
-    let result = consensus_on_items(&outside_delta, 2, 1000); // 0.1% delta
-    assert!(
-        result.is_none(),
-        "Values outside delta should not reach consensus"
-    );
-
-    // Test with values that are all within delta
-    let all_within_delta = vec![
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(51, 100),
-    ];
-    let result = consensus_on_items(&all_within_delta, 2, 10000); // 1% delta
-    assert!(
-        result.is_some(),
-        "Values within delta should reach consensus"
-    );
-    assert_eq!(
-        result.unwrap(),
-        SignedDecimal::from_ratio(5025, 10000),
-        "Median should be correct"
-    );
-
-    // Test with values that are all within delta but with zero as corner value
-    let all_within_delta = vec![
-        SignedDecimal::from_ratio(-5, 1),
-        SignedDecimal::from_ratio(-4, 1),
-        SignedDecimal::from_ratio(0, 1),
-    ];
-    let result = consensus_on_items(&all_within_delta, 3, 1000000); // 100% delta
-    assert!(
-        result.is_some(),
-        "Values within delta should reach consensus"
-    );
-    assert_eq!(
-        result.unwrap(),
-        SignedDecimal::from_ratio(-4, 1),
-        "Median should be correct"
-    );
+    for tc in test_cases {
+        println!("Running test case: {}", tc.name);
+        assert_eq!(
+            consensus_on_items(&tc.items, tc.threshold, tc.delta),
+            tc.expected,
+        )
+    }
 }
 
 // Helper function to setup storage with config and current round
