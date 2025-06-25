@@ -4,6 +4,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -50,15 +53,35 @@ func main() {
 	binanceOracle := binanceoracle.NewOracle(binanceClient, neutronClient, logRegistry.Get(binanceAumOracleContext))
 	solanaOracle := solanaoracle.NewOracle(solanaClient, neutronClient, jupiterConfig, logRegistry.Get(solanaAumOracleContext))
 
-	ctx := context.Background()
-	go binanceOracle.Run(ctx)
-	// shift oracles in time to avoid simultaneous prints to stdout at debug submission
-	// TODO: remove when neutron client is implemented
-	time.Sleep(10 * time.Second)
-	go solanaOracle.Run(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := sync.WaitGroup{}
 
-	// run for 1 hour. TODO: add SIGINT SIGTERM handling
-	time.Sleep(time.Minute * 60)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		binanceOracle.Run(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// shift oracles in time to avoid simultaneous prints to stdout at debug submission
+		// TODO: remove when neutron client is implemented
+		time.Sleep(10 * time.Second)
+		go solanaOracle.Run(ctx)
+	}()
+
+	go func() {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+		s := <-sigs
+		logger.Info("Received termination signal, gracefully shutting down...",
+			zap.String("signal", s.String()))
+		cancel()
+	}()
+
+	wg.Wait()
 }
 
 // initLogRegistry initializes loggers registry.
