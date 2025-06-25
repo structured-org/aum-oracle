@@ -68,7 +68,7 @@ fn create_test_data(
 
 // Helper function to setup storage with config and current round
 fn setup_test_state(deps: &mut DepsMut, config: &Config, round: u64, start_time: u64) {
-    let state: State<BinanceData> = State::new();
+    let state: State<BinanceData> = State::default();
     state.config.save(deps.storage, config).unwrap();
     state
         .pending_round

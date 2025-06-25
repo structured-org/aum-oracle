@@ -21,6 +21,7 @@ pub enum ExecuteMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::enum_variant_names)]
 pub enum QueryMsg {
     GetData {},
     GetAum {},

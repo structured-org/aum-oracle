@@ -2,7 +2,7 @@ use crate::msg::{
     ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
-use consensus::consensus::{Config as ConsensusConfig, OracleData};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusResult, OracleData};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     SignedDecimal, StdError, StdResult,
@@ -56,45 +56,25 @@ fn execute_publish_data(
         return Err(StdError::generic_err("Unauthorized oracle"));
     }
 
-    // Check if there's published data for this round before the update
-    let last_published_before = CONSENSUS_STATE.last_published_data.may_load(deps.storage)?;
-    let current_round = CONSENSUS_STATE.pending_round.load(deps.storage)?.round;
-
-    CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
+    let (result, pending_round) =
+        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
 
     let mut res = Response::new();
 
-    // Check if there's published data for this round after the update
-    let last_published_after = CONSENSUS_STATE.last_published_data.may_load(deps.storage)?;
-
     // If we have new published data for the current round, consensus was reached
-    if let Some(published_data) = last_published_after {
-        if published_data.round == current_round
-            && (last_published_before.is_none()
-                || last_published_before.unwrap().round != current_round)
-        {
-            res = res.add_attribute("action", "publish_consensus");
-        }
+    if let ConsensusResult::ConsensusReached(_) = result {
+        res = res.add_attribute("action", "publish_consensus");
     }
 
     res = res.add_attributes([
         attr(
             "next_round",
-            CONSENSUS_STATE
-                .pending_round
-                .load(deps.storage)?
+            pending_round
                 .next_round(config.round_length)
                 .round
                 .to_string(),
         ),
-        attr(
-            "round",
-            CONSENSUS_STATE
-                .pending_round
-                .load(deps.storage)?
-                .round
-                .to_string(),
-        ),
+        attr("round", pending_round.round.to_string()),
     ]);
 
     Ok(res)

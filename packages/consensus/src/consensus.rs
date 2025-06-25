@@ -1,3 +1,4 @@
+use crate::consensus::ConsensusResult::ConsensusReached;
 use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdError, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
@@ -85,7 +86,7 @@ const LAST_PUBLISHED_DATA_KEY: &str = "last_published_data";
 
 impl<T: ConsensusData> State<T> {
     /// State constructor
-    pub const fn new() -> Self {
+    pub const fn default() -> Self {
         State {
             pending_round: Item::new(PENDING_ROUND_KEY),
             pending_data: Map::new(PENDING_DATA_KEY),
@@ -172,22 +173,28 @@ impl<T: ConsensusData> State<T> {
     }
 
     /// Publishes data for consensus.
-    /// * If the pending round is passed, tries to form consensus for the current pending data and move to the next round;
+    /// * If the pending round is passed, try to form a consensus for the current pending data and move to the next round;
     /// * If all oracles have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
     ///
     /// An error is returned in the following cases:
     /// * an oracle tries to publish data for the same round more than ones;
     /// * an oracle tries to publish data for the past or future round;
+    ///
+    /// The method returns `ConsensusResult::ConsensusReached(OracleData<T>)` if the call
+    /// and `ConsensusResult::ConsensusNotReached` in case it did not as the first argument
+    /// and the current pending round as the second
     pub fn publish_data(
         &self,
         storage: &mut dyn Storage,
         env: &Env,
         oracle: Addr,
         new_data: OracleData<T>,
-    ) -> StdResult<()> {
+    ) -> StdResult<(ConsensusResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
         let config = self.config.load(storage)?;
+
+        let mut consensus_data = ConsensusResult::ConsensusNotReached;
 
         // if pending round is passed:
         // * process pending data for the passed round
@@ -206,14 +213,13 @@ impl<T: ConsensusData> State<T> {
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                self.last_published_data.save(
-                    storage,
-                    &OracleData {
-                        round: pending_round.round,
-                        timestamp: env.block.time.seconds(),
-                        data: consensus,
-                    },
-                )?;
+                let oracle_data = OracleData {
+                    round: pending_round.round,
+                    timestamp: env.block.time.seconds(),
+                    data: consensus,
+                };
+                self.last_published_data.save(storage, &oracle_data)?;
+                consensus_data = ConsensusReached(oracle_data);
             }
 
             pending_round = pending_round.add_rounds(
@@ -274,21 +280,28 @@ impl<T: ConsensusData> State<T> {
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                self.last_published_data.save(
-                    storage,
-                    &OracleData {
-                        round: new_data.round,
-                        timestamp: env.block.time.seconds(),
-                        data: consensus,
-                    },
-                )?;
+                let oracle_data = OracleData {
+                    round: new_data.round,
+                    timestamp: env.block.time.seconds(),
+                    data: consensus,
+                };
+                self.last_published_data.save(storage, &oracle_data)?;
+                consensus_data = ConsensusReached(oracle_data);
             }
 
             self.pending_data.clear(storage);
         }
 
-        Ok(())
+        Ok((consensus_data, pending_round))
     }
+}
+
+/// Result of the `publish_data` method
+pub enum ConsensusResult<T> {
+    /// The consensus was reached, the first element is the data
+    ConsensusReached(OracleData<T>),
+    /// The consensus was not reached
+    ConsensusNotReached,
 }
 
 /// Data submitted by an oracle
