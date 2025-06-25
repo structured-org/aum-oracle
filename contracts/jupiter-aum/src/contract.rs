@@ -2,8 +2,8 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::OracleData;
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, Uint128,
+    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int128, MessageInfo,
+    Response, SignedDecimal,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;
@@ -23,9 +23,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const BTC_DENOM: &str = "BTC";
 const USD_DENOM: &str = "USD";
 
-// Solana data precision constants
-const DECIMAL_PRECISION: u32 = 6;
-const DECIMAL_MULTIPLIER: u128 = 1_000_000; // 6 points
+const DECIMAL_MULTIPLIER: i128 = 1_000_000; // 6 points
 
 #[entry_point]
 pub fn instantiate(
@@ -72,12 +70,10 @@ pub fn execute(
             admin,
             valid_period,
         } => update_config(deps, info, admin, valid_period),
+        // TODO: ExecuteMsg::UpdateConsensusConfig {}
         ExecuteMsg::PublishData { data } => publish_data(deps, env, info, data),
     }
 }
-
-// TODO: update_consensus_config
-// oracles: Option<Vec<String>>,
 
 /// Updates configuration parameters for the contract.
 /// Only admin can call this method.
@@ -180,6 +176,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAUM {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
+        // TODO: QueryMsg::Round {} => { pending_round(), if voted -> next_round() }
     }
 }
 
@@ -217,7 +214,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
     Ok(GetAUMResponse { aum_in_btc })
 }
 
-fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
+fn query_btc_price_in_usd(deps: Deps) -> Result<SignedDecimal, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
         base: BTC_DENOM.to_string(),
@@ -227,7 +224,7 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?
         .price;
-    let btc_price_in_usd = Uint128::from_str(&btc_usd_price_string).map_err(|e| {
+    let btc_price_in_usd = Int128::from_str(&btc_usd_price_string).map_err(|e| {
         ContractError::SlinkyBTCPriceIncorrect {
             price: btc_usd_price_string,
             error: e.to_string(),
@@ -235,39 +232,25 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
     })?;
 
     let btc_price_in_usd =
-        Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
-            |e| ContractError::DecimalError {
+        SignedDecimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32)
+            .map_err(|e| ContractError::DecimalError {
                 error: e.to_string(),
-            },
-        )?;
+            })?;
     Ok(btc_price_in_usd)
 }
 
 pub fn calculate_aum_in_btc(
     data: SolanaData,
-    btc_price_in_usd: Decimal,
-) -> Result<Uint128, ContractError> {
-    let strategy_jlp_balance = Decimal::from_atomics(data.strategy_jlp_balance, DECIMAL_PRECISION)
+    btc_price_in_usd: SignedDecimal,
+) -> Result<Int128, ContractError> {
+    let jlp_virtual_price = data
+        .aum_usd
+        .checked_div(data.total_jlp_supply)
         .map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
         })?;
-    let aum_usd = Decimal::from_atomics(data.aum_usd, DECIMAL_PRECISION).map_err(|e| {
-        ContractError::DecimalError {
-            error: e.to_string(),
-        }
-    })?;
-    let total_jlp_supply = Decimal::from_atomics(data.total_jlp_supply, DECIMAL_PRECISION)
-        .map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
-        })?;
-    let jlp_virtual_price =
-        aum_usd
-            .checked_div(total_jlp_supply)
-            .map_err(|e| ContractError::DecimalError {
-                error: e.to_string(),
-            })?;
     let jlp_balance_in_usd = jlp_virtual_price
-        .checked_mul(strategy_jlp_balance)
+        .checked_mul(data.strategy_jlp_balance)
         .map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
         })?;
@@ -277,11 +260,12 @@ pub fn calculate_aum_in_btc(
             error: e.to_string(),
         })?;
     // convert to multiplier to make it integer with decimal places
-    let multiplier =
-        Decimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| ContractError::DecimalError {
+    let multiplier = SignedDecimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| {
+        ContractError::DecimalError {
             error: e.to_string(),
-        })?;
-    let result = (aum_in_btc * multiplier).to_uint_floor();
+        }
+    })?;
+    let result = (aum_in_btc * multiplier).to_int_floor();
     Ok(result)
 }
 

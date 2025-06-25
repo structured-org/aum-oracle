@@ -721,7 +721,6 @@ dependencies = [
  "cw2",
  "jupiter-aum-common",
  "neutron-std",
- "schemars",
 ]
 
 [[package]]

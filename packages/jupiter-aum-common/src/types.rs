@@ -27,15 +27,15 @@ pub struct SolanaData {
     /// Timestamp when the data has been published
     pub timestamp: Timestamp,
     /// The Solana slot number from which this data was extracted.
-    // pub slot: u64,
+    pub slot: u64,
     /// Slice of CustodyAssets from each Custody
     pub custody_assets: Vec<CustodyAsset>,
     /// Jupiter's Assets Under Management value in USD.
-    pub aum_usd: Uint128,
+    pub aum_usd: SignedDecimal,
     /// The total supply of JLP (Jupiter Liquidity Provider) tokens.
-    pub total_jlp_supply: Uint128,
+    pub total_jlp_supply: SignedDecimal,
     /// The balance of JLP tokens held by the strategy.
-    pub strategy_jlp_balance: Uint128,
+    pub strategy_jlp_balance: SignedDecimal,
 }
 
 impl ConsensusData for SolanaData {
@@ -43,19 +43,36 @@ impl ConsensusData for SolanaData {
         if data.len() < threshold {
             return None;
         }
-        // Will fill with consensus values
-        // For each field (flattened below)
-        // let consensus_aum_usd = consensus_on_field(data, |d| d.aum_usd, threshold, delta_ppm)?;
-        // TODO: consensus on all fields
+
+        let consensus_timestamp =
+            consensus_on_timestamp_field(data, |d| d.timestamp, threshold, delta_ppm)?;
+        let consensus_aum_usd = consensus_on_field(data, |d| d.aum_usd, threshold, delta_ppm)?;
+        let consensus_total_jlp_supply =
+            consensus_on_field(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
+        let consensus_strategy_jlp_balance =
+            consensus_on_field(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
 
         Some(SolanaData {
-            timestamp: Default::default(), // TODO
-            custody_assets: vec![],        // TODO
-            aum_usd: Default::default(),
-            total_jlp_supply: Default::default(),
-            strategy_jlp_balance: Default::default(),
+            slot: Default::default(),           // Ignore unused field
+            custody_assets: Default::default(), // Ignore unused field
+            timestamp: consensus_timestamp,
+            aum_usd: consensus_aum_usd,
+            total_jlp_supply: consensus_total_jlp_supply,
+            strategy_jlp_balance: consensus_strategy_jlp_balance,
         })
     }
+}
+
+fn consensus_on_timestamp_field<F>(
+    solana_data: &[SolanaData],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<Timestamp>
+where
+    F: Fn(&SolanaData) -> Timestamp,
+{
+    todo!()
 }
 
 // Single field consensus
