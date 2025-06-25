@@ -1,0 +1,107 @@
+package solana
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"cosmossdk.io/math"
+	solanabin "github.com/gagliardetto/binary"
+	solana "github.com/gagliardetto/solana-go"
+	solanarpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/golang/mock/gomock"
+	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
+	solanaclient "github.com/structured-org/aum-oracle/client/solana"
+	mock_solana "github.com/structured-org/aum-oracle/testutil/mocks/solana"
+	"go.uber.org/zap"
+)
+
+var (
+	testPubKey1 = solana.MustPublicKeyFromBase58("wczmirTBMa3tGisAeecZcGbzvgi6VAG4Gu8uamtHBf3")
+	testPubKey2 = solana.MustPublicKeyFromBase58("3csuXZKah5rgpb8RiwX9XfjrMxcp3u1K9mBdCwL51spj")
+	testPubKey3 = solana.MustPublicKeyFromBase58("F6ZjiBm1WgVXzez5vxHeBDgaVPQRfLyFb7GFwXvyZVxD")
+	testPubKey4 = solana.MustPublicKeyFromBase58("E1bQJ8eMMn3zmeSewW3HQ8zmJr7KR75JonbwAtWx2bux")
+	testPubKey5 = solana.MustPublicKeyFromBase58("92q4Y2xGE39Bm2JgNZLZWuafoBiBR4gCj4igfpwvpgcD")
+)
+
+func TestOracleRun(t *testing.T) {
+	start := time.Now().UTC().Unix()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	solanaClient := mock_solana.NewMockSolanaClient(ctrl)
+	neutronClient := mock_solana.NewMockNeutronClient(ctrl)
+
+	usdtPubKey := testPubKey1
+	usdcPubKey := testPubKey2
+	btcPubKey := testPubKey3
+	ethPubKey := testPubKey4
+	solPubKey := testPubKey5
+	jupCfg := JupiterConfig{
+		Custodies: map[string]solana.PublicKey{
+			"USDT": usdtPubKey,
+			"USDC": usdcPubKey,
+			"BTC":  btcPubKey,
+			"ETH":  ethPubKey,
+			"SOL":  solPubKey,
+		},
+	}
+
+	neutronClient.EXPECT().GetSolanaAumContractNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+		Round: 1, Timestamp: start + 2,
+	}, nil)
+
+	solanaClient.EXPECT().GetJupiterPoolInfo(gomock.Any(), gomock.Any()).Return(&solanaclient.JupiterPoolAccount{
+		AumUsd: solanabin.Uint128{
+			Lo: 5000000 * 1000000,
+		},
+	}, nil)
+	solanaClient.EXPECT().GetTokenSupply(gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
+		Amount: "10000000", Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetTokenAccountBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
+		Amount: "2000000",
+	}, nil)
+	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
+		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdcPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
+		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), btcPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
+		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 10000, Locked: 20000, GuaranteedUsd: 3000000}, Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), ethPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
+		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000}, Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), solPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
+		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000}, Decimals: 6,
+	}, nil)
+
+	expectedData := &neutronclient.SolanaData{
+		Round: 1,
+		CustodyAssets: []neutronclient.JupiterCustodyAsset{
+			{Denom: "USDT", Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000, Decimals: 6},
+			{Denom: "USDC", Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000, Decimals: 6},
+			{Denom: "BTC", Owned: 10000, Locked: 20000, GuaranteedUsd: 3000000, Decimals: 6},
+			{Denom: "ETH", Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000, Decimals: 6},
+			{Denom: "SOL", Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000, Decimals: 6},
+		},
+		AumUsd:             math.NewUintFromString("5000000"),
+		TotalJlpSupply:     math.NewUintFromString("10000000"),
+		StrategyJlpBalance: math.NewUintFromString("2000000"),
+		JlpTokenDecimals:   6,
+	}
+	expectedData.SortCustodyAssets()
+	neutronClient.EXPECT().SubmitSolanaAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
+		Round: 2, Timestamp: start + 12,
+	}, nil)
+
+	oracle := NewOracle(solanaClient, neutronClient, jupCfg, zap.NewExample())
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go oracle.Run(ctx)
+
+	time.Sleep(5 * time.Second)
+	cancel()
+}

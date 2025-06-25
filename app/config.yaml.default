@@ -1,0 +1,14 @@
+solana_rpc_endpoint: "https://api.mainnet-beta.solana.com"
+
+binance_api_key: ""
+binance_api_secret: ""
+
+jupiter_custodies:
+  SOL: "7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz"
+  WETH: "AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn"
+  WBTC: "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm"
+  USDC: "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa"
+  USDT: "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
+jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
+jupiter_strategy_address: ""
