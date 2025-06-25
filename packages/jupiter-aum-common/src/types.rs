@@ -1,8 +1,7 @@
 use crate::error::ContractError;
 use consensus::consensus::{consensus_on_items, ConsensusData};
-use cosmwasm_std::{Addr, SignedDecimal, SignedDecimalRangeExceeded, Timestamp, Uint128, Uint64};
+use cosmwasm_std::{Addr, SignedDecimal, SignedDecimalRangeExceeded, Timestamp};
 use schemars::JsonSchema;
-use serde::de::Unexpected::Signed;
 use serde::{Deserialize, Serialize};
 
 /// Config defines the contract's configuration parameters.
