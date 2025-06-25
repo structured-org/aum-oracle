@@ -34,7 +34,7 @@ pub struct BinanceData {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
-pub const CONSENSUS_STATE: State<BinanceData> = State::new();
+pub const CONSENSUS_STATE: State<BinanceData> = State::default();
 
 impl ConsensusData for BinanceData {
     fn try_consensus(

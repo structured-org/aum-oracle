@@ -508,7 +508,7 @@ fn setup_test_state(
     round: u64,
     start_time: u64,
 ) -> State<MockData> {
-    let state = State::new();
+    let state = State::default();
     state.config.save(deps, config).unwrap();
     state
         .pending_round
@@ -862,7 +862,7 @@ fn test_state_init() {
     let env = mock_env();
 
     // Create a new state
-    let state = State::<MockData>::new();
+    let state = State::<MockData>::default();
 
     // Initialize the state
     let config = create_test_config();
