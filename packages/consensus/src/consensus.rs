@@ -71,7 +71,7 @@ pub trait ConsensusData: Serialize + DeserializeOwned + Clone {
 pub struct State<T: ConsensusData> {
     /// the current pending round we are waiting data for
     pub pending_round: Item<Round>,
-    /// the configration of the consensus
+    /// the configuration of the consensus
     pub config: Item<Config>,
     /// the pending data for the current round
     pub pending_data: Map<Addr, OracleData<T>>,
