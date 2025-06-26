@@ -30,6 +30,12 @@ pub struct Round {
 impl Round {
     /// is round passed?
     pub fn is_passed(&self, env: &Env, round_length: u64) -> bool {
+        println!(
+            "is_passed: round_length: {}, self.start={}, env.block.time={}",
+            round_length,
+            self.start,
+            env.block.time.seconds()
+        );
         self.start + round_length <= env.block.time.seconds()
     }
 
@@ -79,10 +85,10 @@ pub struct State<T: ConsensusData> {
     pub last_published_data: Item<OracleData<T>>,
 }
 
-const PENDING_ROUND_KEY: &str = "pending_round";
-const CONFIG_KEY: &str = "config";
-const PENDING_DATA_KEY: &str = "pending_data";
-const LAST_PUBLISHED_DATA_KEY: &str = "last_published_data";
+const PENDING_ROUND_KEY: &str = "consensus__pending_round";
+const CONFIG_KEY: &str = "consensus__config";
+const PENDING_DATA_KEY: &str = "consensus__pending_data";
+const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
 
 impl<T: ConsensusData> State<T> {
     /// State constructor
@@ -431,26 +437,6 @@ pub fn consensus_on_items_uint128(
     let slice = &sorted[best_slice.0..best_slice.1];
     Some(median_u128(slice))
 }
-
-// TODO: tests
-// Utility function that returns item only if all items are the same
-// pub fn exact_consensus_on_items(
-//     items: &[u8],
-//     threshold: usize, // TODO: probably we dont need threshold here?
-// ) -> Option<u8> {
-//     if items.len() < threshold {
-//         return None;
-//     }
-//     let item = items.first()?;
-//
-//     for a in items.iter() {
-//         if a != item {
-//             return None;
-//         }
-//     }
-//
-//     Some(*item)
-// }
 
 // TODO: tests
 // Utility function that returns item only if all items are the same

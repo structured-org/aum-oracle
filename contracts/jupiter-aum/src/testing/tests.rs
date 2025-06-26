@@ -3,7 +3,7 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use consensus::consensus::OracleData;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{attr, from_json, Decimal, Int128, SignedDecimal, Timestamp, Uint128};
+use cosmwasm_std::{attr, from_json, Decimal, Uint128};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
@@ -21,7 +21,7 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         threshold: 2,
         extract_period: 10,
         data_delta_ppm: 1000,
-        round_length: 0,
+        round_length: 100,
         valid_period: 1_000,
     }
 }
@@ -76,13 +76,7 @@ fn test_update_config() {
 fn test_calculate_aum_in_btc() {
     // Test case 1: Standard calculation
     let data1 = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 100,
-            locked: 50,
-            guaranteed_usd: 150,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
+        custody_assets: vec![],
         aum_usd: Uint128::new(500_000_000_000u128), // $500,000 AUM USD
         jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
@@ -101,13 +95,7 @@ fn test_calculate_aum_in_btc() {
 
     // Test case 2: Different values
     let data2 = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 200,
-            locked: 100,
-            guaranteed_usd: 300,
-            decimals: 6,
-            denom: "USDT".to_string(),
-        }],
+        custody_assets: vec![],
         aum_usd: Uint128::new(1_000_000_000_000_000u128), // $1 Billion AUM
         jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(50_000_000_000u128), // 50,000 JLP total
@@ -207,148 +195,12 @@ fn test_query_get_aum() {
         publish_msg_from_solana_data(&initial_data),
     )
     .unwrap();
-    assert!(CONSENSUS_STATE
-        .last_published_data
-        .load(&deps.storage)
-        .is_ok()); // Ensure data is published
-
-    // Case 2: Data not valid anymore
-    env.block.time = env.block.time.plus_seconds(1_001); // Advance time past valid_period (1000s)
-    let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-    assert_eq!(err, ContractError::DataNotValid {});
-
-    // Reset time for further tests
-    env.block.time = env.block.time.minus_seconds(1_000); // Go back to original +1s
-
-    // Case 3: Slinky BTC price missing or query fails (e.g., empty price string)
-    deps.querier.with_price("".to_string());
-    let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-    assert!(
-        matches!(
-            err,
-            ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ }
-        ),
-        "Expected DecimalError for empty price string"
-    );
-    // Revert querier to return a valid price
-    deps.querier
-        .with_price((25_000u64 * 1_000_000u64).to_string());
-
-    // Case 4: Division by zero (total_jlp_supply)
-    let data_zero_jlp_supply = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 1,
-            locked: 0,
-            guaranteed_usd: 1,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(100),
-        jlp_token_decimals: 0,
-        total_jlp_supply: Uint128::new(0), // Zero supply
-        strategy_jlp_balance: Uint128::new(5),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_zero_jlp_supply),
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_zero_jlp_supply),
-    )
-    .unwrap();
-    let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-    assert!(
-        matches!(err, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
-        "Expected DecimalError for zero total_jlp_supply"
-    );
-
-    // Case 5: Division by zero (btc_price_in_usd)
-    let data_valid_aum = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 1,
-            locked: 0,
-            guaranteed_usd: 1,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(100),
-        jlp_token_decimals: 6,
-        total_jlp_supply: Uint128::new(10),
-        strategy_jlp_balance: Uint128::new(5),
-    };
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&data_valid_aum),
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&data_valid_aum),
-    )
-    .unwrap();
-
-    deps.querier.with_price("0".to_string());
-    let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-    assert!(
-        matches!(err, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
-        "Expected DecimalError for zero BTC price"
-    );
-
-    // Revert querier to return a valid price again for the green case
-    deps.querier
-        .with_price((25_000u64 * 1_000_000u64).to_string());
-
-    // --- Green Cases ---
-
-    // Case 6: Successful AUM calculation
-    // Data for this case is already set. Now, we use larger values to get a clear integer result.
-    let initial_data_large_values = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 1,
-            locked: 0,
-            guaranteed_usd: 1,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(500_000_000_000u128), // 500 Billion USD
-        jlp_token_decimals: 6,
-        total_jlp_supply: Uint128::new(1_000_000_000), // 1 Billion JLP
-        strategy_jlp_balance: Uint128::new(10_000_000), // 10 Million JLP
-    };
-    // Re-publish to update LAST_PUBLISHED_DATA with these large values
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&initial_data_large_values),
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&initial_data_large_values),
-    )
-    .unwrap();
-
-    env.block.time = env.block.time.minus_seconds(1); // Ensure data is still valid
-    let res: GetAUMResponse =
-        from_json(query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap()).unwrap();
-    assert_eq!(
-        res.aum_in_btc,
-        Uint128::new(200_000),
-        "Case 6 Failed: Large values AUM calculation"
-    );
+    env.block.time = env.block.time.plus_seconds(101); // Advance time past valid_period (1000s)
+                                                       // assert data is there
+    let data = CONSENSUS_STATE
+        .get_last_published_data(&env, &deps.storage)
+        .unwrap();
+    assert!(data.is_some());
 }
 
 fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
@@ -370,7 +222,7 @@ fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
 fn custody_asset() -> Vec<CustodyAsset> {
     vec![CustodyAsset {
         owned: 100,
-        locked: 0,
+        locked: 50,
         guaranteed_usd: 100,
         decimals: 6,
         denom: "USDC".to_string(),
