@@ -134,9 +134,34 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 			o.logger.Error("failed to get PM account info", zap.Error(err))
 			return
 		}
-		data.PmAccountActualEquity = math.LegacyMustNewDecFromStr(pmAccount.ActualEquity)
-		data.WithdrawableUsdt = math.LegacyMustNewDecFromStr(pmAccount.VirtualMaxWithdrawAmount)
-		data.Unimmr = math.LegacyMustNewDecFromStr(pmAccount.UniMMR)
+
+		pmAccountActualEquity, err := math.LegacyNewDecFromStr(pmAccount.ActualEquity)
+		if err != nil {
+			o.logger.Error("failed to parse PM account actual equity",
+				zap.String("actual_equity", pmAccount.ActualEquity),
+				zap.Error(err),
+			)
+		}
+		withdrawableUsdt, err := math.LegacyNewDecFromStr(pmAccount.VirtualMaxWithdrawAmount)
+		if err != nil {
+			o.logger.Error("failed to parse PM account withdrawable amount",
+				zap.String("withdrawable_amount", pmAccount.VirtualMaxWithdrawAmount),
+				zap.Error(err),
+			)
+			return
+		}
+		unimmr, err := math.LegacyNewDecFromStr(pmAccount.UniMMR)
+		if err != nil {
+			o.logger.Error("failed to parse PM account UniMMR",
+				zap.String("uni_mmr", pmAccount.UniMMR),
+				zap.Error(err),
+			)
+			return
+		}
+
+		data.PmAccountActualEquity = pmAccountActualEquity
+		data.WithdrawableUsdt = withdrawableUsdt
+		data.Unimmr = unimmr
 	}()
 
 	wg.Add(1)
@@ -150,7 +175,16 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 		}
 		for _, balance := range pmAccountBalances {
 			if balance.Asset == "USDT" {
-				data.UmBalanceUsdt = math.LegacyMustNewDecFromStr(balance.UMWalletBalance)
+				umBalanceUsdt, err := math.LegacyNewDecFromStr(balance.UMWalletBalance)
+				if err != nil {
+					o.logger.Error("failed to parse PM account USDT balance",
+						zap.String("usdt_balance", balance.UMWalletBalance),
+						zap.Error(err),
+					)
+					return
+				}
+
+				data.UmBalanceUsdt = umBalanceUsdt
 			}
 		}
 	}()
@@ -172,10 +206,30 @@ func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePos
 			continue
 		}
 
+		amount, err := math.LegacyNewDecFromStr(position.PositionAmt)
+		if err != nil {
+			o.logger.Error("failed to parse UM position amount",
+				zap.String("symbol", position.Symbol),
+				zap.String("amount", position.PositionAmt),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		pnl, err := math.LegacyNewDecFromStr(position.UnrealizedProfit)
+		if err != nil {
+			o.logger.Error("failed to parse UM position PNL",
+				zap.String("symbol", position.Symbol),
+				zap.String("pnl", position.UnrealizedProfit),
+				zap.Error(err),
+			)
+			continue
+		}
+
 		positions = append(positions, neutronclient.BinancePosition{
 			Symbol: position.Symbol,
-			Amount: math.LegacyMustNewDecFromStr(position.PositionAmt),
-			Pnl:    math.LegacyMustNewDecFromStr(position.UnrealizedProfit),
+			Amount: amount,
+			Pnl:    pnl,
 		})
 	}
 
@@ -195,9 +249,29 @@ func (o *Oracle) getSpotBalances(ctx context.Context) ([]neutronclient.BinanceBa
 			continue
 		}
 
+		free, err := math.LegacyNewDecFromStr(balance.Free)
+		if err != nil {
+			o.logger.Error("failed to parse spot balance free amount",
+				zap.String("asset", balance.Asset),
+				zap.String("free", balance.Free),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		locked, err := math.LegacyNewDecFromStr(balance.Locked)
+		if err != nil {
+			o.logger.Error("failed to parse spot balance locked amount",
+				zap.String("asset", balance.Asset),
+				zap.String("locked", balance.Locked),
+				zap.Error(err),
+			)
+			continue
+		}
+
 		balances = append(balances, neutronclient.BinanceBalance{
 			Asset:  balance.Asset,
-			Amount: math.LegacyMustNewDecFromStr(balance.Free).Add(math.LegacyMustNewDecFromStr(balance.Locked)),
+			Amount: free.Add(locked),
 		})
 	}
 
