@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -197,7 +198,7 @@ func (o *Oracle) fetchBinanceData(ctx context.Context) (*neutronclient.BinanceDa
 func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePosition, error) {
 	umPositions, err := o.binanceClient.GetUmPositions(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get UM positions: %w", err)
 	}
 
 	positions := make([]neutronclient.BinancePosition, 0)
@@ -240,7 +241,7 @@ func (o *Oracle) getUmPositions(ctx context.Context) ([]neutronclient.BinancePos
 func (o *Oracle) getSpotBalances(ctx context.Context) ([]neutronclient.BinanceBalance, error) {
 	spotBalances, err := o.binanceClient.GetSpotAccountInfo(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get spot balances: %w", err)
 	}
 
 	balances := make([]neutronclient.BinanceBalance, 0)

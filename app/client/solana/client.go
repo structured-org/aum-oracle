@@ -2,6 +2,7 @@ package solana
 
 import (
 	"context"
+	"fmt"
 
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
@@ -53,7 +54,7 @@ func (c *Client) GetTokenSupply(ctx context.Context, token solana.PublicKey) (*s
 func (c *Client) GetTokenAccountBalance(ctx context.Context, token solana.PublicKey, account solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
 	tokenAccount, _, err := solana.FindAssociatedTokenAddress(account, token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find associated token address: %w", err)
 	}
 
 	balance, err := c.client.GetTokenAccountBalance(ctx, tokenAccount, solanarpc.CommitmentFinalized)
