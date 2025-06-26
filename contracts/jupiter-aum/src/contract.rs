@@ -2,8 +2,8 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use consensus::consensus::OracleData;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusResult};
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int128, MessageInfo,
-    Response, SignedDecimal,
+    attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int128,
+    MessageInfo, Response, SignedDecimal, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;
@@ -23,7 +23,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const BTC_DENOM: &str = "BTC";
 const USD_DENOM: &str = "USD";
 
-const DECIMAL_MULTIPLIER: i128 = 1_000_000; // 6 points
+const DECIMAL_MULTIPLIER: u128 = 1_000_000; // 6 points
 
 #[entry_point]
 pub fn instantiate(
@@ -178,22 +178,21 @@ fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError
 /// Returns Jupiter AUM value represented in BTC.
 fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let data = CONSENSUS_STATE
+    let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
-        .ok_or(ContractError::NoDataPublished {})?
-        .data;
+        .ok_or(ContractError::NoDataPublished {})?;
 
-    if env.block.time.seconds() > data.timestamp.seconds() + config.valid_period {
+    if env.block.time.seconds() > published_state.timestamp + config.valid_period {
         return Err(ContractError::DataNotValid {});
     }
 
     let btc_price_in_usd = query_btc_price_in_usd(deps)?;
-    let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
+    let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
     Ok(GetAUMResponse { aum_in_btc })
 }
 
-fn query_btc_price_in_usd(deps: Deps) -> Result<SignedDecimal, ContractError> {
+fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
         base: BTC_DENOM.to_string(),
@@ -203,7 +202,7 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<SignedDecimal, ContractError> {
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?
         .price;
-    let btc_price_in_usd = Int128::from_str(&btc_usd_price_string).map_err(|e| {
+    let btc_price_in_usd = Uint128::from_str(&btc_usd_price_string).map_err(|e| {
         ContractError::SlinkyBTCPriceIncorrect {
             price: btc_usd_price_string,
             error: e.to_string(),
@@ -211,25 +210,45 @@ fn query_btc_price_in_usd(deps: Deps) -> Result<SignedDecimal, ContractError> {
     })?;
 
     let btc_price_in_usd =
-        SignedDecimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32)
-            .map_err(|e| ContractError::DecimalError {
+        Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
+            |e| ContractError::DecimalError {
                 error: e.to_string(),
-            })?;
+            },
+        )?;
     Ok(btc_price_in_usd)
 }
 
 pub fn calculate_aum_in_btc(
     data: SolanaData,
-    btc_price_in_usd: SignedDecimal,
-) -> Result<Int128, ContractError> {
-    let jlp_virtual_price = data
-        .aum_usd
-        .checked_div(data.total_jlp_supply)
-        .map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
+    btc_price_in_usd: Decimal,
+) -> Result<Uint128, ContractError> {
+    let aum_usd =
+        Decimal::from_atomics(data.aum_usd, data.jlp_token_decimals as u32).map_err(|e| {
+            ContractError::DecimalError {
+                error: e.to_string(),
+            }
         })?;
+    let total_jlp_supply =
+        Decimal::from_atomics(data.total_jlp_supply, data.jlp_token_decimals as u32).map_err(
+            |e| ContractError::DecimalError {
+                error: e.to_string(),
+            },
+        )?;
+    let strategy_jlp_balance =
+        Decimal::from_atomics(data.strategy_jlp_balance, data.jlp_token_decimals as u32).map_err(
+            |e| ContractError::DecimalError {
+                error: e.to_string(),
+            },
+        )?;
+
+    let jlp_virtual_price =
+        aum_usd
+            .checked_div(total_jlp_supply)
+            .map_err(|e| ContractError::DecimalError {
+                error: e.to_string(),
+            })?;
     let jlp_balance_in_usd = jlp_virtual_price
-        .checked_mul(data.strategy_jlp_balance)
+        .checked_mul(strategy_jlp_balance)
         .map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
         })?;
@@ -239,12 +258,11 @@ pub fn calculate_aum_in_btc(
             error: e.to_string(),
         })?;
     // convert to multiplier to make it integer with decimal places
-    let multiplier = SignedDecimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| {
-        ContractError::DecimalError {
+    let multiplier =
+        Decimal::from_atomics(DECIMAL_MULTIPLIER, 0).map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
-        }
-    })?;
-    let result = (aum_in_btc * multiplier).to_int_floor();
+        })?;
+    let result = (aum_in_btc * multiplier).to_uint_floor();
     Ok(result)
 }
 

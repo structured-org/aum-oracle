@@ -1,6 +1,6 @@
 use crate::types::SolanaData;
 use consensus::consensus::OracleData;
-use cosmwasm_std::Int128;
+use cosmwasm_std::{Int128, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -76,7 +76,7 @@ pub struct GetDataResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct GetAUMResponse {
     /// The calculated AUM value in BTC, represented as a Uint128 with `U128_PRECISION`.
-    pub aum_in_btc: Int128,
+    pub aum_in_btc: Uint128,
 }
 
 /// MigrateMsg is used for contract migration.

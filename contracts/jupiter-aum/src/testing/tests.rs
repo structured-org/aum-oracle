@@ -3,7 +3,7 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use consensus::consensus::OracleData;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{attr, from_json, Decimal, Timestamp, Uint128};
+use cosmwasm_std::{attr, from_json, Decimal, Int128, SignedDecimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
@@ -76,7 +76,6 @@ fn test_update_config() {
 fn test_calculate_aum_in_btc() {
     // Test case 1: Standard calculation
     let data1 = SolanaData {
-        timestamp: Timestamp::from_seconds(1),
         custody_assets: vec![CustodyAsset {
             owned: 100,
             locked: 50,
@@ -84,9 +83,10 @@ fn test_calculate_aum_in_btc() {
             decimals: 6,
             denom: "USDC".to_string(),
         }],
-        aum_usd: Uint128::new(500_000_000_000), // $500,000 AUM USD
+        aum_usd: Uint128::new(500_000_000_000u128), // $500,000 AUM USD
+        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
-        strategy_jlp_balance: Uint128::new(10_000_000_000), // 10,000 JLP balance
+        strategy_jlp_balance: Uint128::new(10_000_000_000u128), // 10,000 JLP balance
     };
     let btc_price_in_usd1 = Decimal::from_str("25000.0").unwrap(); // $25,000 per BTC
                                                                    // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
@@ -101,7 +101,6 @@ fn test_calculate_aum_in_btc() {
 
     // Test case 2: Different values
     let data2 = SolanaData {
-        timestamp: Timestamp::from_seconds(1),
         custody_assets: vec![CustodyAsset {
             owned: 200,
             locked: 100,
@@ -109,9 +108,10 @@ fn test_calculate_aum_in_btc() {
             decimals: 6,
             denom: "USDT".to_string(),
         }],
-        aum_usd: Uint128::new(1_000_000_000_000_000), // $1 Billion AUM
-        total_jlp_supply: Uint128::new(50_000_000_000), // 50,000 JLP total
-        strategy_jlp_balance: Uint128::new(20_000_000_000), // 20,000 JLP balance
+        aum_usd: Uint128::new(1_000_000_000_000_000u128), // $1 Billion AUM
+        jlp_token_decimals: 6,
+        total_jlp_supply: Uint128::new(50_000_000_000u128), // 50,000 JLP total
+        strategy_jlp_balance: Uint128::new(20_000_000_000u128), // 20,000 JLP balance
     };
     let btc_price_in_usd2 = Decimal::from_str("50000.0").unwrap(); // $50,000 per BTC
                                                                    // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
@@ -126,10 +126,10 @@ fn test_calculate_aum_in_btc() {
 
     // Test case 3: Division by zero for total_jlp_supply
     let data3 = SolanaData {
-        timestamp: Timestamp::from_seconds(1),
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
-        total_jlp_supply: Uint128::new(0), // Zero supply
+        jlp_token_decimals: 6,
+        total_jlp_supply: Uint128::zero(), // Zero supply
         strategy_jlp_balance: Uint128::new(10),
     };
     let btc_price_in_usd3 = Decimal::from_str("1.0").unwrap();
@@ -142,9 +142,9 @@ fn test_calculate_aum_in_btc() {
 
     // Test case 4: Division by zero for btc_price_in_usd
     let data4 = SolanaData {
-        timestamp: Timestamp::from_seconds(1),
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
+        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(10),
         strategy_jlp_balance: Uint128::new(5),
     };
@@ -155,6 +155,8 @@ fn test_calculate_aum_in_btc() {
         "Test Case 4 Failed: {:?}",
         err4
     );
+
+    // TODO: different decimal value for test
 }
 
 // TODO: this should be fixed as values will change and there is no slot publishing system anymore
@@ -179,7 +181,6 @@ fn test_query_get_aum() {
 
     // First, publish some data and finalize it to set LAST_PUBLISHED_DATA
     let initial_data = SolanaData {
-        timestamp: env.block.time,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -188,6 +189,7 @@ fn test_query_get_aum() {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(500_000),
+        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(1_000),
         strategy_jlp_balance: Uint128::new(10_000),
     };
@@ -234,7 +236,6 @@ fn test_query_get_aum() {
 
     // Case 4: Division by zero (total_jlp_supply)
     let data_zero_jlp_supply = SolanaData {
-        timestamp: env.block.time,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -243,6 +244,7 @@ fn test_query_get_aum() {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(100),
+        jlp_token_decimals: 0,
         total_jlp_supply: Uint128::new(0), // Zero supply
         strategy_jlp_balance: Uint128::new(5),
     };
@@ -268,7 +270,6 @@ fn test_query_get_aum() {
 
     // Case 5: Division by zero (btc_price_in_usd)
     let data_valid_aum = SolanaData {
-        timestamp: env.block.time,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -277,6 +278,7 @@ fn test_query_get_aum() {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(100),
+        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(10),
         strategy_jlp_balance: Uint128::new(5),
     };
@@ -311,7 +313,6 @@ fn test_query_get_aum() {
     // Case 6: Successful AUM calculation
     // Data for this case is already set. Now, we use larger values to get a clear integer result.
     let initial_data_large_values = SolanaData {
-        timestamp: env.block.time,
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -320,8 +321,9 @@ fn test_query_get_aum() {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(500_000_000_000u128), // 500 Billion USD
-        total_jlp_supply: Uint128::new(1_000_000_000u128), // 1 Billion JLP
-        strategy_jlp_balance: Uint128::new(10_000_000u128), // 10 Million JLP
+        jlp_token_decimals: 6,
+        total_jlp_supply: Uint128::new(1_000_000_000), // 1 Billion JLP
+        strategy_jlp_balance: Uint128::new(10_000_000), // 10 Million JLP
     };
     // Re-publish to update LAST_PUBLISHED_DATA with these large values
     execute(
@@ -355,9 +357,9 @@ fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
             round: 0,
             timestamp: 0,
             data: SolanaData {
-                timestamp: Default::default(),
                 custody_assets: vec![],
                 aum_usd: Default::default(),
+                jlp_token_decimals: data.jlp_token_decimals,
                 total_jlp_supply: Default::default(),
                 strategy_jlp_balance: Default::default(),
             },

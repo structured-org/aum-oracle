@@ -1,5 +1,5 @@
 use crate::consensus::ConsensusResult::ConsensusReached;
-use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdError, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -356,6 +356,122 @@ pub fn consensus_on_items(
     Some(median(slice))
 }
 
+pub fn consensus_on_items_u64(items: &[u64], threshold: usize, delta_ppm: u64) -> Option<u64> {
+    if items.len() < threshold {
+        return None;
+    }
+    let mut sorted = items.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
+    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    let mut max_len = 0;
+    let mut best_slice = (0, 0);
+    for i in 0..sorted.len() {
+        for j in (i + threshold)..=sorted.len() {
+            let low = sorted[i];
+            let high = sorted[j - 1];
+
+            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
+            let low_high_abs_diff = low.abs_diff(0).max(high.abs_diff(0));
+            if Uint128::new(high.abs_diff(low) as u128)
+                <= (Decimal::from_ratio(low_high_abs_diff, delta_ppm)
+                    / Decimal::from_atomics(Uint128::new(1_000_000), 0).ok()?)
+                .to_uint_floor()
+                && j - i > max_len
+            {
+                max_len = j - i;
+                best_slice = (i, j);
+            }
+        }
+    }
+    if max_len < threshold {
+        return None;
+    }
+    let slice = &sorted[best_slice.0..best_slice.1];
+    Some(median_u64(slice))
+}
+
+pub fn consensus_on_items_uint128(
+    items: &[Uint128],
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<Uint128> {
+    if items.len() < threshold {
+        return None;
+    }
+    let mut sorted = items.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
+    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    let mut max_len = 0;
+    let mut best_slice = (0, 0);
+    for i in 0..sorted.len() {
+        for j in (i + threshold)..=sorted.len() {
+            let low = sorted[i];
+            let high = sorted[j - 1];
+
+            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
+            let low_high_abs_diff = low
+                .abs_diff(Uint128::zero())
+                .max(high.abs_diff(Uint128::zero()));
+            if high.abs_diff(low)
+                <= (Decimal::from_ratio(low_high_abs_diff, delta_ppm)
+                    / Decimal::from_atomics(Uint128::new(1_000_000), 0).ok()?)
+                .to_uint_floor()
+                && j - i > max_len
+            {
+                max_len = j - i;
+                best_slice = (i, j);
+            }
+        }
+    }
+    if max_len < threshold {
+        return None;
+    }
+    let slice = &sorted[best_slice.0..best_slice.1];
+    Some(median_u128(slice))
+}
+
+// TODO: tests
+// Utility function that returns item only if all items are the same
+// pub fn exact_consensus_on_items(
+//     items: &[u8],
+//     threshold: usize, // TODO: probably we dont need threshold here?
+// ) -> Option<u8> {
+//     if items.len() < threshold {
+//         return None;
+//     }
+//     let item = items.first()?;
+//
+//     for a in items.iter() {
+//         if a != item {
+//             return None;
+//         }
+//     }
+//
+//     Some(*item)
+// }
+
+// TODO: tests
+// Utility function that returns item only if all items are the same
+pub fn exact_consensus_on_items<T: Eq + Clone>(
+    items: &[T],
+    threshold: usize, // TODO: probably we dont need threshold here?
+) -> Option<T> {
+    if items.len() < threshold {
+        return None;
+    }
+    let item = items.first()?;
+
+    for a in items.iter() {
+        if a != item {
+            return None;
+        }
+    }
+
+    Some(item.clone())
+}
+
 /// Utility function that calculates the median value of a slice of SignedDecimals
 fn median(slice: &[SignedDecimal]) -> SignedDecimal {
     let n = slice.len();
@@ -366,5 +482,29 @@ fn median(slice: &[SignedDecimal]) -> SignedDecimal {
         slice[n / 2]
     } else {
         (slice[n / 2 - 1] + slice[n / 2]) / SignedDecimal::from_ratio(2, 1)
+    }
+}
+
+fn median_u64(slice: &[u64]) -> u64 {
+    let n = slice.len();
+    if n == 0 {
+        return 0;
+    }
+    if n % 2 == 1 {
+        slice[n / 2]
+    } else {
+        (slice[n / 2 - 1] + slice[n / 2]) / 2
+    }
+}
+
+fn median_u128(slice: &[Uint128]) -> Uint128 {
+    let n = slice.len();
+    if n == 0 {
+        return Uint128::zero();
+    }
+    if n % 2 == 1 {
+        slice[n / 2]
+    } else {
+        (slice[n / 2 - 1] + slice[n / 2]) / Uint128::new(2)
     }
 }

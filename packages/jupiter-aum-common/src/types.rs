@@ -1,6 +1,9 @@
 use crate::error::ContractError;
-use consensus::consensus::{consensus_on_items, ConsensusData};
-use cosmwasm_std::{Addr, SignedDecimal, SignedDecimalRangeExceeded, Timestamp};
+use consensus::consensus::{
+    consensus_on_items, consensus_on_items_u64, consensus_on_items_uint128,
+    exact_consensus_on_items, ConsensusData,
+};
+use cosmwasm_std::{Addr, SignedDecimal, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -24,18 +27,16 @@ impl Config {
 /// specifically for Jupiter AUM (Assets Under Management) calculation.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct SolanaData {
-    /// Timestamp when the data has been published
-    pub timestamp: Timestamp,
-    /// The Solana slot number from which this data was extracted.
-    pub slot: u64,
     /// Slice of CustodyAssets from each Custody
     pub custody_assets: Vec<CustodyAsset>,
     /// Jupiter's Assets Under Management value in USD.
-    pub aum_usd: SignedDecimal,
+    pub aum_usd: Uint128,
+    /// JLP token decimal precision
+    pub jlp_token_decimals: u8,
     /// The total supply of JLP (Jupiter Liquidity Provider) tokens.
-    pub total_jlp_supply: SignedDecimal,
+    pub total_jlp_supply: Uint128,
     /// The balance of JLP tokens held by the strategy.
-    pub strategy_jlp_balance: SignedDecimal,
+    pub strategy_jlp_balance: Uint128,
 }
 
 impl ConsensusData for SolanaData {
@@ -44,41 +45,72 @@ impl ConsensusData for SolanaData {
             return None;
         }
 
-        let consensus_timestamp =
-            consensus_on_timestamp_field(data, |d| d.timestamp, threshold, delta_ppm).ok()??;
-        let consensus_aum_usd = consensus_on_field(data, |d| d.aum_usd, threshold, delta_ppm)?;
+        let consensus_aum_usd = consensus_on_field_u128(data, |d| d.aum_usd, threshold, delta_ppm)?;
         let consensus_total_jlp_supply =
-            consensus_on_field(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
+            consensus_on_field_u128(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
         let consensus_strategy_jlp_balance =
-            consensus_on_field(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
+            consensus_on_field_u128(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
+        let consensus_jlp_token_decimals =
+            exact_consensus_on_field(data, |d| d.jlp_token_decimals, threshold)?;
+
+        // TODO: can also check exact consensus on custody_assets.length()
+
+        let mut consensus_custody_assets = Vec::new();
+        for (i, _) in data[0].custody_assets.iter().enumerate() {
+            let guaranteed_usd_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].guaranteed_usd)
+                .collect::<Vec<u64>>();
+            let owned_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].owned)
+                .collect::<Vec<u64>>();
+            let locked_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].locked)
+                .collect::<Vec<u64>>();
+            let decimals_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].decimals)
+                .collect::<Vec<u8>>();
+            let denom_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].denom.clone())
+                .collect::<Vec<String>>();
+
+            let consensus_guaranteed_usd =
+                consensus_on_items_u64(&guaranteed_usd_items, threshold, delta_ppm)?;
+            let consensus_owned = consensus_on_items_u64(&owned_items, threshold, delta_ppm)?;
+            let consensus_locked = consensus_on_items_u64(&locked_items, threshold, delta_ppm)?;
+            let consensus_decimals = exact_consensus_on_items(&decimals_items, threshold)?;
+            let consensus_denom = exact_consensus_on_items(&denom_items, threshold)?;
+
+            consensus_custody_assets.push(CustodyAsset {
+                owned: consensus_owned,
+                locked: consensus_locked,
+                guaranteed_usd: consensus_guaranteed_usd,
+                decimals: consensus_decimals,
+                denom: consensus_denom,
+            });
+        }
 
         Some(SolanaData {
-            slot: Default::default(),           // Ignore unused field
-            custody_assets: Default::default(), // Ignore unused field
-            timestamp: consensus_timestamp,
+            custody_assets: consensus_custody_assets,
             aum_usd: consensus_aum_usd,
+            jlp_token_decimals: consensus_jlp_token_decimals,
             total_jlp_supply: consensus_total_jlp_supply,
             strategy_jlp_balance: consensus_strategy_jlp_balance,
         })
     }
 }
 
-fn consensus_on_timestamp_field<F>(
-    data: &[SolanaData],
-    extract: F,
-    threshold: usize,
-    delta_ppm: u64,
-) -> Result<Option<Timestamp>, SignedDecimalRangeExceeded>
+// Single field exact consensus
+fn exact_consensus_on_field<F>(data: &[SolanaData], extract: F, threshold: usize) -> Option<u8>
 where
-    F: Fn(&SolanaData) -> Timestamp,
+    F: Fn(&SolanaData) -> u8,
 {
-    let items: Vec<SignedDecimal> = data
-        .iter()
-        .map(&extract)
-        .map(|t| SignedDecimal::from_atomics(t.seconds(), 0))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(consensus_on_items(&items, threshold, delta_ppm)
-        .map(|t| Timestamp::from_seconds(t.to_int_floor().i128() as u64)))
+    let items: Vec<u8> = data.iter().map(&extract).collect();
+    exact_consensus_on_items(&items, threshold)
 }
 
 // Single field consensus
@@ -93,6 +125,20 @@ where
 {
     let items: Vec<SignedDecimal> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
+}
+
+// Single field consensus
+pub fn consensus_on_field_u128<F>(
+    data: &[SolanaData],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<Uint128>
+where
+    F: Fn(&SolanaData) -> Uint128,
+{
+    let items: Vec<Uint128> = data.iter().map(&extract).collect();
+    consensus_on_items_uint128(&items, threshold, delta_ppm)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
