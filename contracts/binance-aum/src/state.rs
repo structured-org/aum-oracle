@@ -44,10 +44,8 @@ impl BinanceData {
     ) -> StdResult<()> {
         // positions must contain only required binance positions
         self.positions
-            .iter()
-            .filter(|p| required_binance_positions.contains(&p.symbol))
-            .collect::<Vec<&Position>>()
-            .sort_by(|a, b| a.symbol.cmp(&b.symbol));
+            .retain(|p| required_binance_positions.contains(&p.symbol));
+        self.positions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
         if self.positions.len() != required_binance_positions.len() {
             return Err(StdError::generic_err(
@@ -57,10 +55,8 @@ impl BinanceData {
 
         // spot_balances must contain only required binance spot assets
         self.spot_balances
-            .iter()
-            .filter(|p| required_binance_spot_assets.contains(&p.asset))
-            .collect::<Vec<&SpotBalance>>()
-            .sort_by(|a, b| a.asset.cmp(&b.asset));
+            .retain(|p| required_binance_spot_assets.contains(&p.asset));
+        self.spot_balances.sort_by(|a, b| a.asset.cmp(&b.asset));
 
         if self.spot_balances.len() != required_binance_spot_assets.len() {
             return Err(StdError::generic_err(
