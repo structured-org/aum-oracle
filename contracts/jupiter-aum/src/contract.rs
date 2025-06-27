@@ -35,6 +35,7 @@ pub fn instantiate(
     let config = Config {
         admin: deps.api.addr_validate(&msg.admin)?,
         valid_period: msg.valid_period,
+        required_custody_assets: msg.required_custody_assets,
     };
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
@@ -67,7 +68,8 @@ pub fn execute(
         ExecuteMsg::UpdateConfig {
             admin,
             valid_period,
-        } => update_config(deps, info, admin, valid_period),
+            required_custody_assets,
+        } => update_config(deps, info, admin, valid_period, required_custody_assets),
         // TODO: ExecuteMsg::UpdateConsensusConfig {}
         ExecuteMsg::PublishData { data } => publish_data(deps, env, info, data),
     }
@@ -81,6 +83,7 @@ fn update_config(
     info: MessageInfo,
     admin: Option<String>,
     valid_period: Option<u64>,
+    required_custody_assets: Option<Vec<String>>,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
@@ -95,6 +98,10 @@ fn update_config(
 
     if let Some(new_valid_period) = valid_period {
         config.valid_period = new_valid_period;
+    }
+
+    if let Some(new_required_custody_assets) = required_custody_assets {
+        config.required_custody_assets = new_required_custody_assets;
     }
 
     config.validate()?;

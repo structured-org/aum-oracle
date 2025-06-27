@@ -14,6 +14,8 @@ pub struct Config {
     pub admin: Addr,
     /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
     pub valid_period: u64,
+    /// List of custody asset denoms required for consensus
+    pub required_custody_assets: Vec<String>,
 }
 
 impl Config {
@@ -37,6 +39,15 @@ pub struct SolanaData {
     pub total_jlp_supply: Uint128,
     /// The balance of JLP tokens held by the strategy.
     pub strategy_jlp_balance: Uint128,
+}
+
+impl SolanaData {
+    pub fn clean(&mut self, required_custody_assets: Vec<String>) {
+        self.custody_assets
+            .retain(|c| required_custody_assets.contains(&c.denom.to_string()));
+        self.custody_assets
+            .sort_by(|c1, c2| c1.denom.cmp(&c2.denom));
+    }
 }
 
 impl ConsensusData for SolanaData {

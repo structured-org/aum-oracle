@@ -21,6 +21,8 @@ pub struct InstantiateMsg {
     pub round_length: u64,
     /// Initial valid period for data in seconds.
     pub valid_period: u64,
+    /// List of custody asset denoms required for consensus
+    pub required_custody_assets: Vec<String>,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -34,6 +36,8 @@ pub enum ExecuteMsg {
         admin: Option<String>,
         /// New valid period for data in seconds.
         valid_period: Option<u64>,
+        /// New required custody asset denoms.
+        required_custody_assets: Option<Vec<String>>,
     },
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.

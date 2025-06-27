@@ -23,6 +23,7 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         data_delta_ppm: 1000,
         round_length: 100,
         valid_period: 1_000,
+        required_custody_assets: vec!["USDC".to_string()],
     }
 }
 
@@ -47,6 +48,7 @@ fn test_update_config() {
     let update_msg = ExecuteMsg::UpdateConfig {
         admin: Some(deps.api.addr_make("admin2").to_string()),
         valid_period: Some(50_000),
+        required_custody_assets: Some(vec!["BTC".to_string()]),
     };
 
     // Unauthorized update
@@ -70,6 +72,7 @@ fn test_update_config() {
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(config.admin, deps.api.addr_make("admin2"));
     assert_eq!(config.valid_period, 50_000);
+    assert_eq!(config.required_custody_assets, vec!["BTC".to_string()]);
 }
 
 #[test]
