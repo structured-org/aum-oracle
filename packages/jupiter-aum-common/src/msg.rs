@@ -1,6 +1,6 @@
 use crate::types::SolanaData;
-use consensus::consensus::OracleData;
-use cosmwasm_std::{Int128, Uint128};
+use consensus::consensus::{OracleData, Round};
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +42,16 @@ pub enum ExecuteMsg {
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { data: OracleData<SolanaData> },
+    UpdateConsensusConfig {
+        /// List of allowed oracle addresses.
+        oracles: Option<Vec<String>>,
+        /// Threshold for consensus.
+        threshold: Option<u32>,
+        // TODO
+        data_delta_ppm: Option<u64>,
+        /// Round length in seconds
+        round_length: Option<u64>,
+    },
 }
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.
@@ -56,6 +66,8 @@ pub enum QueryMsg {
     /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
     /// Returns error if data is not valid.
     GetAUM {},
+    /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
+    GetRoundInfo {},
 }
 
 // --- Query Responses ---
@@ -81,6 +93,12 @@ pub struct GetDataResponse {
 pub struct GetAUMResponse {
     /// The calculated AUM value in BTC, represented as a Uint128 with `U128_PRECISION`.
     pub aum_in_btc: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct RoundInfoResponse {
+    pub pending_round: Round,
+    pub next_round: Round,
 }
 
 /// MigrateMsg is used for contract migration.

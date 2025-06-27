@@ -3,13 +3,13 @@ use consensus::consensus::OracleData;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, Uint128,
+    Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg,
+    QueryMsg, RoundInfoResponse,
 };
 use jupiter_aum_common::types::{Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
@@ -70,9 +70,60 @@ pub fn execute(
             valid_period,
             required_custody_assets,
         } => update_config(deps, info, admin, valid_period, required_custody_assets),
-        // TODO: ExecuteMsg::UpdateConsensusConfig {}
+        ExecuteMsg::UpdateConsensusConfig {
+            oracles,
+            threshold,
+            data_delta_ppm,
+            round_length,
+        } => update_consensus_config(deps, info, oracles, threshold, data_delta_ppm, round_length),
         ExecuteMsg::PublishData { data } => publish_data(deps, env, info, data),
     }
+}
+
+/// Updates consensus configuration for the contract.
+/// Only admin can call this method.
+fn update_consensus_config(
+    deps: DepsMut,
+    info: MessageInfo,
+    oracles: Option<Vec<String>>,
+    threshold: Option<u32>,
+    data_delta_ppm: Option<u64>,
+    round_length: Option<u64>,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+
+    // ensure only the contract admin can update the configuration
+    if info.sender != config.admin {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+
+    if let Some(oracles) = oracles {
+        consensus_config.oracles = oracles
+            .into_iter()
+            .map(|addr| deps.api.addr_validate(&addr))
+            .collect::<Result<Vec<Addr>, _>>()?;
+    }
+
+    if let Some(threshold) = threshold {
+        consensus_config.threshold = threshold;
+    }
+
+    if let Some(data_delta_ppm) = data_delta_ppm {
+        consensus_config.data_delta_ppm = data_delta_ppm;
+    }
+
+    if let Some(round_length) = round_length {
+        consensus_config.round_length = round_length;
+    }
+
+    // consensus_config.validate()?; // TODO: maybe implement later
+    CONSENSUS_STATE
+        .config
+        .save(deps.storage, &consensus_config)?;
+
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 /// Updates configuration parameters for the contract.
@@ -119,14 +170,20 @@ fn publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    new_data: OracleData<SolanaData>,
+    mut new_data: OracleData<SolanaData>,
 ) -> Result<Response, ContractError> {
-    let config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let contract_config = CONFIG.load(deps.storage)?;
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     // permission check: only registered oracles can publish data
-    if !config.oracles.contains(&info.sender) {
+    if !consensus_config.oracles.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
+
+    new_data
+        .data
+        .clean_and_validate(contract_config.required_custody_assets)?;
+
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
 
@@ -141,7 +198,7 @@ fn publish_data(
         attr(
             "next_round",
             pending_round
-                .next_round(config.round_length)
+                .next_round(consensus_config.round_length)
                 .round
                 .to_string(),
         ),
@@ -160,7 +217,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAUM {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
-        // TODO: QueryMsg::Round {} => { pending_round(), if voted -> next_round() }
+        QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
     }
 }
 
@@ -195,6 +252,16 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
     Ok(GetAUMResponse { aum_in_btc })
+}
+
+fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, ContractError> {
+    let pending_round = CONSENSUS_STATE.get_pending_round(deps.storage)?;
+
+    Ok(RoundInfoResponse {
+        pending_round,
+        next_round: pending_round
+            .next_round(CONSENSUS_STATE.config.load(deps.storage)?.round_length),
+    })
 }
 
 fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
@@ -233,40 +300,34 @@ pub fn calculate_aum_in_btc(
                 error: e.to_string(),
             }
         })?;
-    println!("aum_usd: {}", aum_usd);
     let total_jlp_supply =
         Decimal::from_atomics(data.total_jlp_supply, data.jlp_token_decimals as u32).map_err(
             |e| ContractError::DecimalError {
                 error: e.to_string(),
             },
         )?;
-    println!("total_jlp_supply: {}", total_jlp_supply);
     let strategy_jlp_balance =
         Decimal::from_atomics(data.strategy_jlp_balance, data.jlp_token_decimals as u32).map_err(
             |e| ContractError::DecimalError {
                 error: e.to_string(),
             },
         )?;
-    println!("strategy_jlp_balance: {}", strategy_jlp_balance);
     let jlp_virtual_price =
         aum_usd
             .checked_div(total_jlp_supply)
             .map_err(|e| ContractError::DecimalError {
                 error: e.to_string(),
             })?;
-    println!("jlp_virtual_price: {}", jlp_virtual_price);
     let jlp_balance_in_usd = jlp_virtual_price
         .checked_mul(strategy_jlp_balance)
         .map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
         })?;
-    println!("jlp_balance_in_usd: {}", jlp_balance_in_usd);
     let aum_in_btc = jlp_balance_in_usd
         .checked_div(btc_price_in_usd)
         .map_err(|e| ContractError::DecimalError {
             error: e.to_string(),
         })?;
-    println!("aum_in_btc: {}", aum_in_btc);
     // convert to multiplier to make it integer with decimal places
     let multiplier = Decimal::pow(
         Decimal::from_atomics(Uint128::new(10), 0).map_err(|e| ContractError::DecimalError {
@@ -274,9 +335,7 @@ pub fn calculate_aum_in_btc(
         })?,
         data.jlp_token_decimals as u32,
     );
-    println!("multiplier: {}", multiplier);
     let result = (aum_in_btc * multiplier).to_uint_floor();
-    println!("result: {}", result);
     Ok(result)
 }
 

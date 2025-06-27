@@ -12,7 +12,7 @@ pub struct Config {
     pub oracles: Vec<Addr>,
     /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
     pub threshold: u32,
-    /// delta in percent per million (ppm) for which two values are considered equal
+    /// delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
     /// length of a round in seconds
     pub round_length: u64,
@@ -30,12 +30,6 @@ pub struct Round {
 impl Round {
     /// is round passed?
     pub fn is_passed(&self, env: &Env, round_length: u64) -> bool {
-        println!(
-            "is_passed: round_length: {}, self.start={}, env.block.time={}",
-            round_length,
-            self.start,
-            env.block.time.seconds()
-        );
         self.start + round_length <= env.block.time.seconds()
     }
 
@@ -174,7 +168,7 @@ impl<T: ConsensusData> State<T> {
             }
         }
 
-        // otherwise we just return the last published data
+        // otherwise, we just return the last published data
         self.last_published_data.may_load(storage)
     }
 

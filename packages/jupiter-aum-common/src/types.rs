@@ -3,7 +3,7 @@ use consensus::consensus::{
     consensus_on_items, consensus_on_items_u64, consensus_on_items_uint128,
     exact_consensus_on_items, ConsensusData,
 };
-use cosmwasm_std::{Addr, SignedDecimal, Uint128};
+use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -42,11 +42,20 @@ pub struct SolanaData {
 }
 
 impl SolanaData {
-    pub fn clean(&mut self, required_custody_assets: Vec<String>) {
+    pub fn clean_and_validate(&mut self, required_custody_assets: Vec<String>) -> StdResult<()> {
         self.custody_assets
             .retain(|c| required_custody_assets.contains(&c.denom.to_string()));
         self.custody_assets
             .sort_by(|c1, c2| c1.denom.cmp(&c2.denom));
+        self.custody_assets.dedup_by(|a, b| a.denom.eq(&b.denom));
+
+        if self.custody_assets.len() != required_custody_assets.len() {
+            return Err(StdError::generic_err(
+                "Solana custody assets have some required custody assets missing",
+            ));
+        }
+
+        Ok(())
     }
 }
 

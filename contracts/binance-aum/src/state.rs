@@ -1,5 +1,5 @@
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
-use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult, Uint128};
+use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult};
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
 

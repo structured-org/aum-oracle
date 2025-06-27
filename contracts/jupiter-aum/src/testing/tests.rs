@@ -171,7 +171,7 @@ fn test_query_get_aum() {
     assert_eq!(err, ContractError::NoDataPublished {});
 
     // First, publish some data and finalize it to set LAST_PUBLISHED_DATA
-    let initial_data = SolanaData {
+    let solana_data = SolanaData {
         custody_assets: vec![CustodyAsset {
             owned: 1,
             locked: 0,
@@ -188,14 +188,14 @@ fn test_query_get_aum() {
         deps.as_mut(),
         env.clone(),
         message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&initial_data),
+        publish_msg_from_solana_data(&solana_data),
     )
     .unwrap();
     execute(
         deps.as_mut(),
         env.clone(),
         message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&initial_data),
+        publish_msg_from_solana_data(&solana_data),
     )
     .unwrap();
     env.block.time = env.block.time.plus_seconds(101); // Advance time past valid_period (1000s)
@@ -212,11 +212,11 @@ fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
             round: 0,
             timestamp: 0,
             data: SolanaData {
-                custody_assets: vec![],
-                aum_usd: Default::default(),
+                custody_assets: data.custody_assets.clone(),
+                aum_usd: data.aum_usd,
                 jlp_token_decimals: data.jlp_token_decimals,
-                total_jlp_supply: Default::default(),
-                strategy_jlp_balance: Default::default(),
+                total_jlp_supply: data.total_jlp_supply,
+                strategy_jlp_balance: data.strategy_jlp_balance,
             },
         },
     }
