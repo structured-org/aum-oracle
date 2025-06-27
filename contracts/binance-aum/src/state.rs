@@ -38,7 +38,7 @@ impl BinanceData {
     /// Cleans the data to only contain the required binance positions and spot assets
     /// Validates the data to contain required positions and spot assets. Returns an error if it does not.
     pub fn clean_and_validate(
-        &self,
+        &mut self,
         required_binance_positions: Vec<String>,
         required_binance_spot_assets: Vec<String>,
     ) -> StdResult<()> {

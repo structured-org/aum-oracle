@@ -50,7 +50,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    new_data: OracleData<BinanceData>,
+    mut new_data: OracleData<BinanceData>,
 ) -> StdResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
