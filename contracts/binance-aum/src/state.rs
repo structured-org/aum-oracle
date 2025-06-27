@@ -1,5 +1,5 @@
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
-use cosmwasm_std::{Addr, SignedDecimal, Uint128};
+use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult, Uint128};
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub admin: Addr,
     pub valid_period: u64,
+    pub required_binance_positions: Vec<String>,
+    pub required_binance_spot_assets: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -32,9 +34,43 @@ pub struct BinanceData {
     pub withdrawable_usdt: SignedDecimal,
 }
 
-pub const CONFIG: Item<Config> = Item::new("config");
+impl BinanceData {
+    /// Cleans the data to only contain the required binance positions and spot assets
+    /// Validates the data to contain required positions and spot assets. Returns an error if it does not.
+    pub fn clean_and_validate(
+        &mut self,
+        required_binance_positions: Vec<String>,
+        required_binance_spot_assets: Vec<String>,
+    ) -> StdResult<()> {
+        // positions must contain only required binance positions
+        self.positions
+            .iter()
+            .filter(|p| required_binance_positions.contains(&p.symbol))
+            .collect::<Vec<&Position>>()
+            .sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
-pub const CONSENSUS_STATE: State<BinanceData> = State::default();
+        if self.positions.len() != required_binance_positions.len() {
+            return Err(StdError::generic_err(
+                "Binance positions do not match required positions",
+            ));
+        }
+
+        // spot_balances must contain only required binance spot assets
+        self.spot_balances
+            .iter()
+            .filter(|p| required_binance_spot_assets.contains(&p.asset))
+            .collect::<Vec<&SpotBalance>>()
+            .sort_by(|a, b| a.asset.cmp(&b.asset));
+
+        if self.spot_balances.len() != required_binance_spot_assets.len() {
+            return Err(StdError::generic_err(
+                "Binance spot assets do not match required spot assets",
+            ));
+        }
+
+        Ok(())
+    }
+}
 
 impl ConsensusData for BinanceData {
     fn try_consensus(
@@ -42,11 +78,36 @@ impl ConsensusData for BinanceData {
         threshold: usize,
         delta_ppm: u64,
     ) -> Option<BinanceData> {
+        // Early-exit if not enough reports
         if data.len() < threshold {
             return None;
         }
-        // Will fill with consensus values
-        // For each field (flattened below)
+
+        // Consistency checks on vector lengths
+        let positions_len = data[0].positions.len();
+        let spot_len = data[0].spot_balances.len();
+        if data
+            .iter()
+            .any(|d| d.positions.len() != positions_len || d.spot_balances.len() != spot_len)
+        {
+            return None; // length mismatch
+        }
+
+        // Consistency checks on string fields
+        for i in 0..positions_len {
+            let ref_symbol = &data[0].positions[i].symbol;
+            if data.iter().any(|d| d.positions[i].symbol != *ref_symbol) {
+                return None; // differing position symbol
+            }
+        }
+        for i in 0..spot_len {
+            let ref_asset = &data[0].spot_balances[i].asset;
+            if data.iter().any(|d| d.spot_balances[i].asset != *ref_asset) {
+                return None; // differing spot-balance asset
+            }
+        }
+
+        // Scalar-field consensus
         let consensus_unimmr = consensus_on_field(data, |d| d.unimmr, threshold, delta_ppm)?;
         let consensus_um_balance_usdt =
             consensus_on_field(data, |d| d.um_balance_usdt, threshold, delta_ppm)?;
@@ -55,37 +116,31 @@ impl ConsensusData for BinanceData {
         let consensus_withdrawable_usdt =
             consensus_on_field(data, |d| d.withdrawable_usdt, threshold, delta_ppm)?;
 
-        // Positions (by symbol): consensus on all positions by symbol (must match number/order of symbols)
-        let symbols: Vec<String> = data[0].positions.iter().map(|p| p.symbol.clone()).collect();
-        let mut consensus_positions = Vec::new();
-        for (i, symbol) in symbols.iter().enumerate() {
+        // Vec<Position> consensus (safe because of checks above)
+        let mut consensus_positions = Vec::with_capacity(positions_len);
+        for i in 0..positions_len {
             let amounts: Vec<SignedDecimal> = data.iter().map(|d| d.positions[i].amount).collect();
             let pnls: Vec<SignedDecimal> = data.iter().map(|d| d.positions[i].pnl).collect();
-            let amount = consensus_on_items(&amounts, threshold, delta_ppm)?;
-            let pnl = consensus_on_items(&pnls, threshold, delta_ppm)?;
+
             consensus_positions.push(Position {
-                symbol: symbol.clone(),
-                amount,
-                pnl,
-            });
-        }
-        // Spot balances (by asset)
-        let assets: Vec<String> = data[0]
-            .spot_balances
-            .iter()
-            .map(|b| b.asset.clone())
-            .collect();
-        let mut consensus_spot = Vec::new();
-        for (i, asset) in assets.iter().enumerate() {
-            let amounts: Vec<SignedDecimal> =
-                data.iter().map(|d| d.spot_balances[i].amount).collect();
-            let amount = consensus_on_items(&amounts, threshold, delta_ppm)?;
-            consensus_spot.push(SpotBalance {
-                asset: asset.clone(),
-                amount,
+                symbol: data[0].positions[i].symbol.clone(), // all equal
+                amount: consensus_on_items(&amounts, threshold, delta_ppm)?,
+                pnl: consensus_on_items(&pnls, threshold, delta_ppm)?,
             });
         }
 
+        // Vec<SpotBalance> consensus
+        let mut consensus_spot = Vec::with_capacity(spot_len);
+        for i in 0..spot_len {
+            let amounts: Vec<SignedDecimal> =
+                data.iter().map(|d| d.spot_balances[i].amount).collect();
+            consensus_spot.push(SpotBalance {
+                asset: data[0].spot_balances[i].asset.clone(), // all equal
+                amount: consensus_on_items(&amounts, threshold, delta_ppm)?,
+            });
+        }
+
+        // Assemble final object
         Some(BinanceData {
             unimmr: consensus_unimmr,
             positions: consensus_positions,
@@ -110,3 +165,7 @@ where
     let items: Vec<SignedDecimal> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
 }
+
+pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const CONSENSUS_STATE: State<BinanceData> = State::default();

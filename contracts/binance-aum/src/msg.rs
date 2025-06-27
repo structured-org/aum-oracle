@@ -11,6 +11,8 @@ pub struct InstantiateMsg {
     pub data_delta_ppm: u64,
     pub round_length: u64,
     pub valid_period: u64,
+    pub required_binance_positions: Vec<String>,
+    pub required_binance_spot_assets: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
