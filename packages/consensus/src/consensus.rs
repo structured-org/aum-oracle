@@ -79,7 +79,7 @@ pub struct State<T: ConsensusData> {
 }
 
 const PENDING_ROUND_KEY: &str = "pending_round";
-const CONFIG_KEY: &str = "config";
+const CONFIG_KEY: &str = "consensus_config";
 const PENDING_DATA_KEY: &str = "pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "last_published_data";
 

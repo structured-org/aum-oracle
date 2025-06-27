@@ -1,7 +1,7 @@
 use crate::contract::*;
 use crate::msg::{ExecuteMsg, GetDataResponse, QueryMsg};
-use crate::state::{BinanceData, Position, SpotBalance};
-use consensus::consensus::{Config, ConsensusData, OracleData, Round, State};
+use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
 use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env},
@@ -16,9 +16,9 @@ fn message_info(sender: &str, funds: &[Coin]) -> MessageInfo {
     }
 }
 
-// Helper function to create a test config
-fn create_test_config() -> Config {
-    Config {
+// Helper function to create a test consensus config
+fn create_test_consensus_config() -> ConsensusConfig {
+    ConsensusConfig {
         oracles: vec![
             Addr::unchecked("oracle1"),
             Addr::unchecked("oracle2"),
@@ -27,6 +27,16 @@ fn create_test_config() -> Config {
         threshold: 2,
         data_delta_ppm: 10000, // 1%
         round_length: 3600,    // 1 hour
+    }
+}
+
+// Helper function to create a test contract config
+fn create_test_contract_config() -> Config {
+    Config {
+        admin: Addr::unchecked("admin"),
+        valid_period: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
     }
 }
 
@@ -67,9 +77,15 @@ fn create_test_data(
 }
 
 // Helper function to setup storage with config and current round
-fn setup_test_state(deps: &mut DepsMut, config: &Config, round: u64, start_time: u64) {
+fn setup_test_state(
+    deps: &mut DepsMut,
+    config: &Config,
+    consensus_config: &ConsensusConfig,
+    round: u64,
+    start_time: u64,
+) {
     let state: State<BinanceData> = State::default();
-    state.config.save(deps.storage, config).unwrap();
+    state.config.save(deps.storage, consensus_config).unwrap();
     state
         .pending_round
         .save(
@@ -80,6 +96,8 @@ fn setup_test_state(deps: &mut DepsMut, config: &Config, round: u64, start_time:
             },
         )
         .unwrap();
+
+    CONFIG.save(deps.storage, config).unwrap();
 }
 
 fn query_last_published_data(deps: Deps, env: Env) -> GetDataResponse {
@@ -94,14 +112,21 @@ fn test_execute_publish_data() {
     env.block.time = Timestamp::from_seconds(1000);
 
     // Set up initial state
-    let mut config = create_test_config();
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
     // Modify the config to use threshold instead of all oracles for consensus
-    config.threshold = 2;
+    consensus_config.threshold = 2;
     let round = Round {
         round: 1,
         start: 1000,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Create test data
     let test_data = create_test_data(
@@ -217,13 +242,13 @@ fn test_execute_publish_data() {
 
     // Test 6: Advance the round by time expiration
     // Update the block time to after the round expiration
-    env.block.time = Timestamp::from_seconds(1000 + config.round_length + 1);
+    env.block.time = Timestamp::from_seconds(1000 + consensus_config.round_length + 1);
 
     // Submit data for the new round (which should be 2 now)
     let oracle2_info = message_info("oracle2", &[]);
     let new_round_data = create_test_data(
         2, // New round
-        1000 + config.round_length + 1,
+        1000 + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -251,14 +276,21 @@ fn test_execute_publish_data_time_based_consensus() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with a custom config
-    let mut config = create_test_config();
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
     // Modify the config to use threshold instead of all oracles for consensus
-    config.threshold = 2;
+    consensus_config.threshold = 2;
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Create test data
     let test_data1 = create_test_data(
@@ -342,7 +374,7 @@ fn test_execute_publish_data_time_based_consensus() {
 fn test_try_consensus() {
     // Test 1: Empty data array should return None
     {
-        let config = create_test_config();
+        let config = create_test_consensus_config();
         let empty_data: Vec<BinanceData> = vec![];
         assert!(BinanceData::try_consensus(
             &empty_data,
@@ -354,7 +386,7 @@ fn test_try_consensus() {
 
     // Test 2: Data array with fewer elements than threshold should return None
     {
-        let config = create_test_config();
+        let config = create_test_consensus_config();
         let single_data = vec![
             create_test_data(
                 1,
@@ -376,7 +408,7 @@ fn test_try_consensus() {
 
     // Test 3: Data within acceptable delta should reach consensus
     {
-        let config = create_test_config();
+        let config = create_test_consensus_config();
         let data = vec![
             create_test_data(
                 1,
@@ -416,7 +448,7 @@ fn test_try_consensus() {
 
     // Test 4: Data outside acceptable delta should not reach consensus
     {
-        let mut config = create_test_config();
+        let mut config = create_test_consensus_config();
         config.data_delta_ppm = 1000; // 0.1% delta
 
         let data_divergent = vec![
@@ -450,7 +482,7 @@ fn test_try_consensus() {
 
     // Test 5: Consensus with more than threshold oracles
     {
-        let config = create_test_config();
+        let config = create_test_consensus_config();
         let data_multiple = vec![
             create_test_data(
                 1,
@@ -500,7 +532,7 @@ fn test_try_consensus() {
 
     // Test 6: Consensus with some outliers
     {
-        let config = create_test_config();
+        let config = create_test_consensus_config();
         let data_with_outliers = vec![
             create_test_data(
                 1,
@@ -542,6 +574,48 @@ fn test_try_consensus() {
         let result = consensus.unwrap();
         assert_eq!(result.unimmr, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
     }
+
+    // Test 7: Consensus with multiple positions
+    {
+        let config = create_test_consensus_config();
+        let mut data1 = create_test_data(
+            1,
+            1000,
+            SignedDecimal::from_ratio(5, 10),
+            SignedDecimal::from_ratio(1000, 1),
+            SignedDecimal::from_ratio(2000, 1),
+            SignedDecimal::from_ratio(500, 1),
+        );
+        let mut data2 = create_test_data(
+            1,
+            1001,
+            SignedDecimal::from_ratio(505, 1000),
+            SignedDecimal::from_ratio(1005, 1),
+            SignedDecimal::from_ratio(2010, 1),
+            SignedDecimal::from_ratio(505, 1),
+        );
+        //outlier
+        let mut data3 = create_test_data(
+            1,
+            1002,
+            SignedDecimal::from_ratio(6, 10),
+            SignedDecimal::from_ratio(1200, 1),
+            SignedDecimal::from_ratio(2500, 1),
+            SignedDecimal::from_ratio(600, 1),
+        );
+        let data_with_outliers = vec![data1.data, data2.data, data3.data];
+
+        let consensus = BinanceData::try_consensus(
+            &data_with_outliers,
+            config.threshold as usize,
+            config.data_delta_ppm,
+        );
+        assert!(consensus.is_some());
+
+        // The outlier should be excluded from the consensus
+        let result = consensus.unwrap();
+        assert_eq!(result.unimmr, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
+    }
 }
 
 #[test]
@@ -553,12 +627,19 @@ fn test_all_oracles_consensus_round_not_increased() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state
-    let config = create_test_config();
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Submit data from all oracles
     let oracle1_info = message_info("oracle1", &[]);
@@ -648,13 +729,20 @@ fn test_partial_oracles_consensus_round_not_increased() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with threshold = 2 (out of 3 oracles)
-    let mut config = create_test_config();
-    config.threshold = 2; // Only need 2 out of 3 oracles for consensus
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    consensus_config.threshold = 2; // Only need 2 out of 3 oracles for consensus
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Submit data from first oracle
     let oracle1_info = message_info("oracle1", &[]);
@@ -765,13 +853,20 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with threshold = 2 (out of 3 oracles)
-    let mut config = create_test_config();
-    config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Submit data from only one oracle (below threshold)
     let oracle1_info = message_info("oracle1", &[]);
@@ -801,13 +896,13 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     );
 
     // Advance time past round length to trigger round change
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
     // Last oracle tries to submit data for the previous round (which is now passed)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
         1, // Still trying to submit for round 1, which is now passed
-        start_time + config.round_length + 1,
+        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -835,7 +930,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Submit data for the new round (round 2)
     let test_data3 = create_test_data(
         2, // New round
-        start_time + config.round_length + 1,
+        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -881,13 +976,20 @@ fn test_multiple_rounds_passing() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with threshold = 2 (out of 3 oracles)
-    let mut config = create_test_config();
-    config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Submit data from one oracle for round 1
     let oracle1_info = message_info("oracle1", &[]);
@@ -906,13 +1008,13 @@ fn test_multiple_rounds_passing() {
     assert!(result.is_ok());
 
     // Advance time by 3 rounds (skipping rounds 2 and 3, landing in round 4)
-    env.block.time = Timestamp::from_seconds(start_time + (3 * config.round_length) + 1);
+    env.block.time = Timestamp::from_seconds(start_time + (3 * consensus_config.round_length) + 1);
 
     // Oracle tries to submit data for round 2 (which is now passed)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
         2, // Trying to submit for round 2, which is now passed
-        start_time + (3 * config.round_length) + 1,
+        start_time + (3 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -940,7 +1042,7 @@ fn test_multiple_rounds_passing() {
     // Submit data for the current round (round 4)
     let test_data4 = create_test_data(
         4, // Current round after 3 rounds passed
-        start_time + (3 * config.round_length) + 1,
+        start_time + (3 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -984,13 +1086,20 @@ fn test_oracles_submitting_across_multiple_rounds() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with threshold = 2 (out of 3 oracles)
-    let mut config = create_test_config();
-    config.threshold = 2;
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    consensus_config.threshold = 2;
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Get initial data - should be None since nothing is published yet
     let initial_data = query_last_published_data(deps.as_ref(), env.clone());
@@ -1075,12 +1184,12 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // Advance time to round 2
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
     // Oracle 2 submits data for round 2
     let test_data2 = create_test_data(
         2, // Round 2
-        start_time + config.round_length + 1,
+        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1099,12 +1208,12 @@ fn test_oracles_submitting_across_multiple_rounds() {
     assert_eq!(round_attr.unwrap().value, "2", "Round should be 2");
 
     // Advance time to round 3
-    env.block.time = Timestamp::from_seconds(start_time + (2 * config.round_length) + 1);
+    env.block.time = Timestamp::from_seconds(start_time + (2 * consensus_config.round_length) + 1);
 
     // Oracle 1 submits data for round 3
     let test_data3 = create_test_data(
         3, // Round 3
-        start_time + (2 * config.round_length) + 1,
+        start_time + (2 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(504, 1000),
         SignedDecimal::from_ratio(1004, 1),
         SignedDecimal::from_ratio(2008, 1),
@@ -1125,7 +1234,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 2 also submits data for round 3 (reaching threshold)
     let test_data3_2 = create_test_data(
         3, // Round 3
-        start_time + (2 * config.round_length) + 2,
+        start_time + (2 * consensus_config.round_length) + 2,
         SignedDecimal::from_ratio(504, 1000),
         SignedDecimal::from_ratio(1004, 1),
         SignedDecimal::from_ratio(2008, 1),
@@ -1154,7 +1263,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // Advance time to round 4 (passing round 3)
-    env.block.time = Timestamp::from_seconds(start_time + (3 * config.round_length) + 1);
+    env.block.time = Timestamp::from_seconds(start_time + (3 * consensus_config.round_length) + 1);
 
     // Scenario 2 (continued): Round is passed with threshold oracles having submitted
     // Check data after round passed with threshold met - should be updated to round 3 data
@@ -1172,7 +1281,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 3 submits data for round 4
     let test_data4 = create_test_data(
         4, // Round 4
-        start_time + (3 * config.round_length) + 1,
+        start_time + (3 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2020, 1),
@@ -1195,7 +1304,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // Advance time to round 5 (skipping round 4)
-    env.block.time = Timestamp::from_seconds(start_time + (4 * config.round_length) + 1);
+    env.block.time = Timestamp::from_seconds(start_time + (4 * consensus_config.round_length) + 1);
 
     // Scenario 3: Less than threshold oracles submitted data and round is passed
     // Check data after round passed with below threshold - should still show round 3 data
@@ -1219,7 +1328,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 3 submits data for round 5
     let test_data5 = create_test_data(
         5, // Round 5
-        start_time + (4 * config.round_length) + 1,
+        start_time + (4 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(50, 100),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1257,12 +1366,19 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state
-    let config = create_test_config();
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Oracle 1 submits data for round 1
     let oracle1_info = message_info("oracle1", &[]);
@@ -1306,12 +1422,12 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     }
 
     // Advance time to round 2
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
     // Oracle 1 submits data for round 2 (should succeed)
     let test_data2 = create_test_data(
         2,
-        start_time + config.round_length + 1,
+        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(52, 100),
         SignedDecimal::from_ratio(1020, 1),
         SignedDecimal::from_ratio(2020, 1),
@@ -1339,13 +1455,20 @@ fn test_delayed_oracle_submissions_within_round() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     // Set up initial state with threshold = 2 (out of 3 oracles)
-    let mut config = create_test_config();
-    config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    let mut consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
     let round = Round {
         round: 1,
         start: start_time,
     };
-    setup_test_state(&mut deps.as_mut(), &config, round.round, round.start);
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        round.round,
+        round.start,
+    );
 
     // Oracle 1 submits data at the beginning of round 1
     let oracle1_info = message_info("oracle1", &[]);
@@ -1375,13 +1498,13 @@ fn test_delayed_oracle_submissions_within_round() {
     );
 
     // Advance time within the same round (but not past round length)
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length / 2);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length / 2);
 
     // Oracle 2 submits data in the middle of round 1
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
         1, // Still round 1
-        start_time + config.round_length / 2,
+        start_time + consensus_config.round_length / 2,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1400,13 +1523,13 @@ fn test_delayed_oracle_submissions_within_round() {
     assert_eq!(round_attr.unwrap().value, "1", "Round should still be 1");
 
     // Advance time to just before the end of round 1
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length - 10);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length - 10);
 
     // Oracle 3 submits data near the end of round 1
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
         1, // Still round 1
-        start_time + config.round_length - 10,
+        start_time + consensus_config.round_length - 10,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -1435,12 +1558,12 @@ fn test_delayed_oracle_submissions_within_round() {
     assert_eq!(round_attr.unwrap().value, "1", "Round should still be 1");
 
     // Advance time to round 2
-    env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+    env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
     // Oracle 3 submits data for round 2
     let test_data4 = create_test_data(
         2, // Round 2
-        start_time + config.round_length + 1,
+        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2020, 1),

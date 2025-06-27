@@ -31,6 +31,8 @@ pub fn instantiate(
     let contract_config = Config {
         admin: deps.api.addr_validate(&msg.admin)?,
         valid_period: msg.valid_period,
+        required_binance_spot_assets: msg.required_binance_spot_assets,
+        required_binance_positions: msg.required_binance_positions,
     };
     CONFIG.save(deps.storage, &contract_config)?;
 
@@ -50,11 +52,19 @@ fn execute_publish_data(
     info: MessageInfo,
     new_data: OracleData<BinanceData>,
 ) -> StdResult<Response> {
-    let config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let contract_config = CONFIG.load(deps.storage)?;
+
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     // Only oracle can submit
-    if !config.oracles.contains(&info.sender) {
+    if !consensus_config.oracles.contains(&info.sender) {
         return Err(StdError::generic_err("Unauthorized oracle"));
     }
+
+    // clean and validate published data
+    new_data.data.clean_and_validate(
+        contract_config.required_binance_positions,
+        contract_config.required_binance_spot_assets,
+    )?;
 
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
@@ -70,7 +80,7 @@ fn execute_publish_data(
         attr(
             "next_round",
             pending_round
-                .next_round(config.round_length)
+                .next_round(consensus_config.round_length)
                 .round
                 .to_string(),
         ),
