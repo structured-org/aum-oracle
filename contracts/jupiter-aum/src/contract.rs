@@ -187,11 +187,14 @@ fn publish_data(
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
 
-    let mut res = Response::new();
+    let mut res = Response::new()
+        .add_attribute("action", "publish_consensus");
 
     // If we have new published data for the current round, consensus was reached
     if let ConsensusResult::ConsensusReached(_) = result {
-        res = res.add_attribute("action", "publish_consensus");
+        res = res.add_attribute("consensus_reached", "true");
+    } else {
+        res = res.add_attribute("consensus_reached", "false");
     }
 
     res = res.add_attributes([
