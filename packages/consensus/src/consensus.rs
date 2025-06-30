@@ -413,10 +413,6 @@ pub fn consensus_on_items_uint128(
             let low_high_abs_diff = low
                 .abs_diff(Uint128::zero())
                 .max(high.abs_diff(Uint128::zero()));
-            println!(
-                "high: {}, low: {}, low_high_abs_diff: {}",
-                high, low, low_high_abs_diff
-            );
             let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
             if high.abs_diff(low)
                 <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
@@ -436,13 +432,7 @@ pub fn consensus_on_items_uint128(
 
 // TODO: tests
 // Utility function that returns item only if all items are the same
-pub fn exact_consensus_on_items<T: Eq + Clone>(
-    items: &[T],
-    threshold: usize, // TODO: probably we dont need threshold here?
-) -> Option<T> {
-    if items.len() < threshold {
-        return None;
-    }
+pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
     let item = items.first()?;
 
     for a in items.iter() {

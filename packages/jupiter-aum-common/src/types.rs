@@ -42,6 +42,7 @@ pub struct SolanaData {
 }
 
 impl SolanaData {
+    // Leaves only required data, sorts it and checks that all required assets passed
     pub fn clean_and_validate(&mut self, required_custody_assets: Vec<String>) -> StdResult<()> {
         self.custody_assets
             .retain(|c| required_custody_assets.contains(&c.denom.to_string()));
@@ -74,9 +75,8 @@ impl ConsensusData for SolanaData {
             return None;
         }
 
-        println!("before aum consensus");
+        // check top level fields
         let consensus_aum_usd = consensus_on_field_u128(data, |d| d.aum_usd, threshold, delta_ppm)?;
-        println!("after aum consensus");
         let consensus_total_jlp_supply =
             consensus_on_field_u128(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
         let consensus_strategy_jlp_balance =
@@ -84,8 +84,14 @@ impl ConsensusData for SolanaData {
         let consensus_jlp_token_decimals =
             exact_consensus_on_field(data, |d| d.jlp_token_decimals, threshold)?;
 
-        // TODO: can also check exact consensus on custody_assets.length()
+        // check that all custody assets have the same length
+        let custody_assets_lengths = data
+            .iter()
+            .map(|d| d.custody_assets.len() as u32)
+            .collect::<Vec<_>>();
+        exact_consensus_on_items(&custody_assets_lengths)?;
 
+        // check custody assets properties
         let mut consensus_custody_assets = Vec::new();
         for (i, _) in data[0].custody_assets.iter().enumerate() {
             let guaranteed_usd_items = data
@@ -113,8 +119,8 @@ impl ConsensusData for SolanaData {
                 consensus_on_items_u64(&guaranteed_usd_items, threshold, delta_ppm)?;
             let consensus_owned = consensus_on_items_u64(&owned_items, threshold, delta_ppm)?;
             let consensus_locked = consensus_on_items_u64(&locked_items, threshold, delta_ppm)?;
-            let consensus_decimals = exact_consensus_on_items(&decimals_items, threshold)?;
-            let consensus_denom = exact_consensus_on_items(&denom_items, threshold)?;
+            let consensus_decimals = exact_consensus_on_items(&decimals_items)?;
+            let consensus_denom = exact_consensus_on_items(&denom_items)?;
 
             consensus_custody_assets.push(CustodyAsset {
                 owned: consensus_owned,
@@ -141,7 +147,7 @@ where
     F: Fn(&SolanaData) -> u8,
 {
     let items: Vec<u8> = data.iter().map(&extract).collect();
-    exact_consensus_on_items(&items, threshold)
+    exact_consensus_on_items(&items)
 }
 
 // Single field consensus
@@ -169,7 +175,6 @@ where
     F: Fn(&SolanaData) -> Uint128,
 {
     let items: Vec<Uint128> = data.iter().map(&extract).collect();
-    println!("consensus on items: {:?}", items);
     consensus_on_items_uint128(&items, threshold, delta_ppm)
 }
 
