@@ -59,13 +59,24 @@ impl SolanaData {
     }
 }
 
+// TODO: tests for different scenarios:
+// - NO data
+// - Consensus not reached
+// - Consensus reached
+// - Different scenarios tested for when consensus reached:
+//    - all oracles give exact data
+//    - almost all oracles exact data, one is not
+//    - all oracles with totally different values
+
 impl ConsensusData for SolanaData {
     fn try_consensus(data: &[SolanaData], threshold: usize, delta_ppm: u64) -> Option<SolanaData> {
         if data.len() < threshold {
             return None;
         }
 
+        println!("before aum consensus");
         let consensus_aum_usd = consensus_on_field_u128(data, |d| d.aum_usd, threshold, delta_ppm)?;
+        println!("after aum consensus");
         let consensus_total_jlp_supply =
             consensus_on_field_u128(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
         let consensus_strategy_jlp_balance =
@@ -158,6 +169,7 @@ where
     F: Fn(&SolanaData) -> Uint128,
 {
     let items: Vec<Uint128> = data.iter().map(&extract).collect();
+    println!("consensus on items: {:?}", items);
     consensus_on_items_uint128(&items, threshold, delta_ppm)
 }
 

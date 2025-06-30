@@ -15,9 +15,9 @@ pub struct InstantiateMsg {
     pub threshold: u32,
     /// Initial value for extract_period (data extraction from each N-th Solana slot).
     pub extract_period: u64,
-    // TODO
+    /// Delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
-    // TODO
+    /// Consensus round length in seconds
     pub round_length: u64,
     /// Initial valid period for data in seconds.
     pub valid_period: u64,

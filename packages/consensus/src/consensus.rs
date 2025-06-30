@@ -373,10 +373,9 @@ pub fn consensus_on_items_u64(items: &[u64], threshold: usize, delta_ppm: u64) -
 
             // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
             let low_high_abs_diff = low.abs_diff(0).max(high.abs_diff(0));
+            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
             if Uint128::new(high.abs_diff(low) as u128)
-                <= (Decimal::from_ratio(low_high_abs_diff, delta_ppm)
-                    / Decimal::from_atomics(Uint128::new(1_000_000), 0).ok()?)
-                .to_uint_floor()
+                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
                 && j - i > max_len
             {
                 max_len = j - i;
@@ -414,10 +413,13 @@ pub fn consensus_on_items_uint128(
             let low_high_abs_diff = low
                 .abs_diff(Uint128::zero())
                 .max(high.abs_diff(Uint128::zero()));
+            println!(
+                "high: {}, low: {}, low_high_abs_diff: {}",
+                high, low, low_high_abs_diff
+            );
+            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
             if high.abs_diff(low)
-                <= (Decimal::from_ratio(low_high_abs_diff, delta_ppm)
-                    / Decimal::from_atomics(Uint128::new(1_000_000), 0).ok()?)
-                .to_uint_floor()
+                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
                 && j - i > max_len
             {
                 max_len = j - i;
