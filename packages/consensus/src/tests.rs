@@ -1,4 +1,6 @@
-use crate::consensus::{consensus_on_items, Config, ConsensusData, OracleData, Round, State};
+use crate::consensus::{
+    consensus_on_items, exact_consensus_on_items, Config, ConsensusData, OracleData, Round, State,
+};
 use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -884,4 +886,51 @@ fn test_state_init() {
         env.block.time.seconds(),
         "Round start time should match env time"
     );
+}
+
+#[test]
+fn test_exact_consensus_on_items_various_cases() {
+    // empty input
+    {
+        let items: Vec<u64> = vec![];
+        assert_eq!(exact_consensus_on_items(&items), None);
+    }
+
+    // single item
+    {
+        let items = vec![42];
+        assert_eq!(exact_consensus_on_items(&items), Some(42));
+    }
+
+    // all equal
+    {
+        let items = vec![7, 7, 7, 7];
+        assert_eq!(exact_consensus_on_items(&items), Some(7));
+    }
+
+    // one different
+    {
+        let items = vec![1, 1, 2, 1];
+        assert_eq!(exact_consensus_on_items(&items), None);
+    }
+
+    // all equal strings
+    {
+        let items = vec!["a", "a", "a"];
+        assert_eq!(exact_consensus_on_items(&items), Some("a"));
+    }
+
+    // different strings
+    {
+        let items = vec!["a", "b", "a"];
+        assert_eq!(exact_consensus_on_items(&items), None);
+    }
+
+    // custom struct
+    {
+        #[derive(Clone, Eq, PartialEq, Debug)]
+        struct Foo(u8);
+        let items = vec![Foo(1), Foo(1), Foo(1)];
+        assert_eq!(exact_consensus_on_items(&items), Some(Foo(1)));
+    }
 }

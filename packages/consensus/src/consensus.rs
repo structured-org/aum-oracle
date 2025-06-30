@@ -430,7 +430,6 @@ pub fn consensus_on_items_uint128(
     Some(median_u128(slice))
 }
 
-// TODO: tests
 // Utility function that returns item only if all items are the same
 pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
     let item = items.first()?;

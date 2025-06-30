@@ -199,7 +199,7 @@ fn test_query_get_aum() {
     )
     .unwrap();
     env.block.time = env.block.time.plus_seconds(101); // Advance time past valid_period (1000s)
-                                                       // assert data is there
+    // asserts data is there
     let data = CONSENSUS_STATE
         .get_last_published_data(&env, &deps.storage)
         .unwrap();
