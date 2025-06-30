@@ -82,7 +82,7 @@ impl ConsensusData for SolanaData {
         let consensus_strategy_jlp_balance =
             consensus_on_field_u128(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
         let consensus_jlp_token_decimals =
-            exact_consensus_on_field(data, |d| d.jlp_token_decimals, threshold)?;
+            exact_consensus_on_field(data, |d| d.jlp_token_decimals)?;
 
         // check that all custody assets have the same length
         let custody_assets_lengths = data
@@ -142,7 +142,7 @@ impl ConsensusData for SolanaData {
 }
 
 // Single field exact consensus
-fn exact_consensus_on_field<F>(data: &[SolanaData], extract: F, threshold: usize) -> Option<u8>
+fn exact_consensus_on_field<F>(data: &[SolanaData], extract: F) -> Option<u8>
 where
     F: Fn(&SolanaData) -> u8,
 {

@@ -3,9 +3,9 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use consensus::consensus::OracleData;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{attr, from_json, Decimal, Uint128};
+use cosmwasm_std::{Decimal, Uint128};
 use jupiter_aum_common::error::ContractError;
-use jupiter_aum_common::msg::{ExecuteMsg, GetAUMResponse, InstantiateMsg, QueryMsg};
+use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
 use std::str::FromStr;
 
@@ -220,14 +220,4 @@ fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
             },
         },
     }
-}
-
-fn custody_asset() -> Vec<CustodyAsset> {
-    vec![CustodyAsset {
-        owned: 100,
-        locked: 50,
-        guaranteed_usd: 100,
-        decimals: 6,
-        denom: "USDC".to_string(),
-    }]
 }

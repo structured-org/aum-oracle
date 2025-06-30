@@ -3,7 +3,7 @@ use consensus::consensus::OracleData;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, StdResult, Uint128,
+    Response, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;

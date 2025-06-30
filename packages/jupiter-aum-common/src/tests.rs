@@ -97,9 +97,9 @@ fn no_consensus_due_to_variance() {
 
 #[test]
 fn custody_assets_mismatch_fails() {
-    let mut a = make_data(100, 100, 100, "usdc", 100);
+    let a = make_data(100, 100, 100, "usdc", 100);
     let mut b = make_data(100, 100, 100, "usdt", 100);
-    let mut c = make_data(100, 100, 100, "usdc", 100);
+    let c = make_data(100, 100, 100, "usdc", 100);
     // order matters so force align
     b.custody_assets.sort_by(|a, b| a.denom.cmp(&b.denom));
     let result = SolanaData::try_consensus(&[a, b, c], 3, 10_000);
