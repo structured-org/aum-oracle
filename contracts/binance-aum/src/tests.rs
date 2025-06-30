@@ -34,9 +34,11 @@ fn create_test_consensus_config() -> ConsensusConfig {
 fn create_test_contract_config() -> Config {
     Config {
         admin: Addr::unchecked("admin"),
-        valid_period: 100,
+        price_max_blocks_old: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
+        price_oracle_contract: Addr::unchecked("price_oracle_contract"),
+        consensus_data_valid_period: 100,
     }
 }
 
@@ -150,6 +152,74 @@ fn test_execute_publish_data() {
         _ => panic!("Unexpected error"),
     }
 
+    // Test 2: Invalid positions
+    let oracle_info = message_info("oracle1", &[]);
+    let mut invalid_positions_data = create_test_data(
+        2, // Wrong round
+        1000,
+        SignedDecimal::from_ratio(5, 10),
+        SignedDecimal::from_ratio(1000, 1),
+        SignedDecimal::from_ratio(2000, 1),
+        SignedDecimal::from_ratio(500, 1),
+    );
+    invalid_positions_data.data.positions = vec![
+        Position {
+            symbol: "WRONG_SYMBOL".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+            pnl: SignedDecimal::from_ratio(100, 1),
+        },
+        Position {
+            symbol: "ANOTHER_WRONG_SYMBOL".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+            pnl: SignedDecimal::from_ratio(100, 1),
+        },
+    ];
+
+    let msg = ExecuteMsg::PublishData {
+        new_data: invalid_positions_data,
+    };
+    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        StdError::GenericErr { msg, .. } => {
+            assert_eq!(msg, "Binance positions do not match required positions")
+        }
+        _ => panic!("Unexpected error"),
+    }
+
+    // Test 2: Invalid spot balances
+    let oracle_info = message_info("oracle1", &[]);
+    let mut invalid_spot_balances_data = create_test_data(
+        2, // Wrong round
+        1000,
+        SignedDecimal::from_ratio(5, 10),
+        SignedDecimal::from_ratio(1000, 1),
+        SignedDecimal::from_ratio(2000, 1),
+        SignedDecimal::from_ratio(500, 1),
+    );
+    invalid_spot_balances_data.data.spot_balances = vec![
+        SpotBalance {
+            asset: "WRONG_ASSET".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+        },
+        SpotBalance {
+            asset: "ANOTHER_WRONG_ASSET".to_string(),
+            amount: SignedDecimal::from_ratio(10000, 1),
+        },
+    ];
+
+    let msg = ExecuteMsg::PublishData {
+        new_data: invalid_spot_balances_data,
+    };
+    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        StdError::GenericErr { msg, .. } => {
+            assert_eq!(msg, "Binance spot assets do not match required spot assets")
+        }
+        _ => panic!("Unexpected error"),
+    }
+
     // Test 2: Invalid round rejection
     let oracle_info = message_info("oracle1", &[]);
     let invalid_round_data = create_test_data(
@@ -179,7 +249,7 @@ fn test_execute_publish_data() {
 
     // Test 4: Submit data from all oracles to reach consensus
     let oracle2_info = message_info("oracle2", &[]);
-    let test_data2 = create_test_data(
+    let mut test_data2 = create_test_data(
         1,
         1001,
         SignedDecimal::from_ratio(505, 1000),
@@ -187,6 +257,31 @@ fn test_execute_publish_data() {
         SignedDecimal::from_ratio(2010, 1),
         SignedDecimal::from_ratio(505, 1),
     );
+    // BinanceData with additional wrong positions and spot balances must be accepted anyway, since
+    // the data is being cleaned
+    test_data2.data.positions.append(&mut vec![
+        Position {
+            symbol: "WRONG_SYMBOL".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+            pnl: SignedDecimal::from_ratio(100, 1),
+        },
+        Position {
+            symbol: "ANOTHER_WRONG_SYMBOL".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+            pnl: SignedDecimal::from_ratio(100, 1),
+        },
+    ]);
+    test_data2.data.spot_balances.append(&mut vec![
+        SpotBalance {
+            asset: "WRONG_ASSET".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+        },
+        SpotBalance {
+            asset: "ANOTHER_WRONG_ASSET".to_string(),
+            amount: SignedDecimal::from_ratio(10000, 1),
+        },
+    ]);
+
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
@@ -578,7 +673,7 @@ fn test_try_consensus() {
     // Test 7: Consensus with multiple positions
     {
         let config = create_test_consensus_config();
-        let mut data1 = create_test_data(
+        let data1 = create_test_data(
             1,
             1000,
             SignedDecimal::from_ratio(5, 10),
@@ -586,7 +681,7 @@ fn test_try_consensus() {
             SignedDecimal::from_ratio(2000, 1),
             SignedDecimal::from_ratio(500, 1),
         );
-        let mut data2 = create_test_data(
+        let data2 = create_test_data(
             1,
             1001,
             SignedDecimal::from_ratio(505, 1000),
@@ -595,7 +690,7 @@ fn test_try_consensus() {
             SignedDecimal::from_ratio(505, 1),
         );
         //outlier
-        let mut data3 = create_test_data(
+        let data3 = create_test_data(
             1,
             1002,
             SignedDecimal::from_ratio(6, 10),

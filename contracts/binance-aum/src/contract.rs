@@ -1,7 +1,9 @@
+use crate::error::{ContractError, ContractResult};
 use crate::msg::{
     ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
+use crate::utils::{get_prices, spot_balance_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusResult, OracleData};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -30,9 +32,11 @@ pub fn instantiate(
 
     let contract_config = Config {
         admin: deps.api.addr_validate(&msg.admin)?,
-        valid_period: msg.valid_period,
+        consensus_data_valid_period: msg.consensus_data_valid_period,
         required_binance_spot_assets: msg.required_binance_spot_assets,
         required_binance_positions: msg.required_binance_positions,
+        price_max_blocks_old: msg.price_data_valid_period,
+        price_oracle_contract: deps.api.addr_validate(&msg.price_oracle_contract)?,
     };
     CONFIG.save(deps.storage, &contract_config)?;
 
@@ -91,11 +95,11 @@ fn execute_publish_data(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
     match msg {
-        QueryMsg::GetData {} => to_json_binary(&query_get_data(deps, env)?),
-        QueryMsg::GetAum {} => to_json_binary(&query_get_aum(deps, env)?),
-        QueryMsg::GetRoundInfo {} => to_json_binary(&query_round_info(deps, env)?),
+        QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
+        QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
+        QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
     }
 }
 
@@ -109,37 +113,48 @@ fn query_round_info(deps: Deps, _env: Env) -> StdResult<RoundInfoResponse> {
     })
 }
 
-fn query_get_data(deps: Deps, env: Env) -> StdResult<GetDataResponse> {
+fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
     Ok(GetDataResponse {
         last_published_data: CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?,
     })
 }
 
-fn query_get_aum(deps: Deps, env: Env) -> StdResult<GetAumResponse> {
+fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
     let d = CONSENSUS_STATE
         .last_published_data
         .may_load(deps.storage)?
         .ok_or_else(|| StdError::generic_err("No published data"))?;
-    if d.timestamp + config.valid_period < env.block.time.seconds() {
-        return Err(StdError::generic_err("Published data is outdated"));
+    if d.timestamp + config.price_max_blocks_old < env.block.time.seconds() {
+        return Err(ContractError::PublishedDataTooOld {});
     }
-    // TODO: Replace btc_price_in_usd and btc_price_in(asset) with real oracle lookups.
-    let btc_price_in_usd = SignedDecimal::from_ratio(65000, 1); // placeholder, in production query a real price
-    let spot_total_balance_btc: SignedDecimal = d
+
+    let spot_total_balance_btc = d
         .data
         .spot_balances
         .iter()
         .map(|b| {
-            if b.asset == "BTC" {
-                b.amount
-            } else if b.asset == "USDT" {
-                b.amount / btc_price_in_usd
-            } else {
-                SignedDecimal::zero() // extend for more assets
-            }
+            spot_balance_in_btc(
+                deps,
+                config.price_oracle_contract.to_string(),
+                config.price_max_blocks_old,
+                b,
+            )
         })
-        .sum();
+        .collect::<ContractResult<Vec<SignedDecimal>>>()?
+        .iter()
+        .try_fold(SignedDecimal::zero(), |total, b| total.checked_add(*b))?;
+
+    let btc_price_in_usd = get_prices(
+        deps,
+        config.price_oracle_contract.to_string(),
+        "BTC".to_string(),
+        "USD".to_string(),
+        config.price_max_blocks_old,
+    )?
+    .price_0_to_1;
+
     let aum_in_btc = (d.data.pm_account_actual_equity / btc_price_in_usd) + spot_total_balance_btc;
+
     Ok(GetAumResponse { aum_in_btc })
 }

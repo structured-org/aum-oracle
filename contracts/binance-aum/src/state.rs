@@ -5,8 +5,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {
+    /// owner of the contract
     pub admin: Addr,
-    pub valid_period: u64,
+    /// address of price oracle contract
+    pub price_oracle_contract: Addr,
+    /// how many seconds we consider the last published consensus as valid
+    pub consensus_data_valid_period: u64,
+    /// how many seconds we consider the last price from oracle as valid
+    pub price_max_blocks_old: u64,
+    /// required binance positions and spot assets that oracles must provide
     pub required_binance_positions: Vec<String>,
     pub required_binance_spot_assets: Vec<String>,
 }
@@ -44,10 +51,8 @@ impl BinanceData {
     ) -> StdResult<()> {
         // positions must contain only required binance positions
         self.positions
-            .iter()
-            .filter(|p| required_binance_positions.contains(&p.symbol))
-            .collect::<Vec<&Position>>()
-            .sort_by(|a, b| a.symbol.cmp(&b.symbol));
+            .retain(|p| required_binance_positions.contains(&p.symbol));
+        self.positions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
         if self.positions.len() != required_binance_positions.len() {
             return Err(StdError::generic_err(
@@ -57,10 +62,8 @@ impl BinanceData {
 
         // spot_balances must contain only required binance spot assets
         self.spot_balances
-            .iter()
-            .filter(|p| required_binance_spot_assets.contains(&p.asset))
-            .collect::<Vec<&SpotBalance>>()
-            .sort_by(|a, b| a.asset.cmp(&b.asset));
+            .retain(|p| required_binance_spot_assets.contains(&p.asset));
+        self.spot_balances.sort_by(|a, b| a.asset.cmp(&b.asset));
 
         if self.spot_balances.len() != required_binance_spot_assets.len() {
             return Err(StdError::generic_err(

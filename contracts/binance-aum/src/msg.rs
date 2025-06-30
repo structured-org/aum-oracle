@@ -10,9 +10,11 @@ pub struct InstantiateMsg {
     pub threshold: u32,
     pub data_delta_ppm: u64,
     pub round_length: u64,
-    pub valid_period: u64,
+    pub consensus_data_valid_period: u64,
+    pub price_data_valid_period: u64,
     pub required_binance_positions: Vec<String>,
     pub required_binance_spot_assets: Vec<String>,
+    pub price_oracle_contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
