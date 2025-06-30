@@ -50,10 +50,19 @@ pub enum ContractError {
 
     #[error("Overflow error")]
     Overflow(cosmwasm_std::OverflowError),
+
+    #[error("Division error")]
+    CheckedDiv(cosmwasm_std::CheckedFromRatioError),
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {
     fn from(err: cosmwasm_std::OverflowError) -> Self {
         ContractError::Overflow(err)
+    }
+}
+
+impl From<cosmwasm_std::CheckedFromRatioError> for ContractError {
+    fn from(err: cosmwasm_std::CheckedFromRatioError) -> Self {
+        ContractError::CheckedDiv(err)
     }
 }

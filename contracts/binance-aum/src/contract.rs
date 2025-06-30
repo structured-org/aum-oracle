@@ -3,7 +3,7 @@ use crate::msg::{
     ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
-use crate::utils::{get_prices, CombinedPriceResponse};
+use crate::utils::{get_prices, spot_balance_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusResult, OracleData};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -134,19 +134,16 @@ fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         .spot_balances
         .iter()
         .map(|b| {
-            get_prices(
+            spot_balance_in_btc(
                 deps,
                 config.price_oracle_contract.to_string(),
-                b.asset.clone(),
-                "BTC".to_string(),
                 config.price_max_blocks_old,
+                b,
             )
         })
-        .collect::<ContractResult<Vec<CombinedPriceResponse>>>()?
+        .collect::<ContractResult<Vec<SignedDecimal>>>()?
         .iter()
-        .try_fold(SignedDecimal::zero(), |total, b| {
-            total.checked_add(b.price_0_to_1)
-        })?;
+        .try_fold(SignedDecimal::zero(), |total, b| total.checked_add(*b))?;
 
     let btc_price_in_usd = get_prices(
         deps,

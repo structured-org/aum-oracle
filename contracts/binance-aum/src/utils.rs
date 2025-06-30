@@ -1,4 +1,5 @@
 use crate::error::{ContractError, ContractResult};
+use crate::state::SpotBalance;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{Deps, SignedDecimal};
@@ -9,6 +10,24 @@ pub struct CombinedPriceResponse {
     pub token_0_price: SignedDecimal,
     pub token_1_price: SignedDecimal,
     pub price_0_to_1: SignedDecimal,
+}
+
+// a helper to get spot balance in BTC using oracle contract
+pub fn spot_balance_in_btc(
+    deps: Deps,
+    price_oracle_contract: String,
+    max_blocks_old: u64,
+    sb: &SpotBalance,
+) -> ContractResult<SignedDecimal> {
+    let price_in_btc = get_prices(
+        deps,
+        price_oracle_contract,
+        sb.asset.clone(),
+        "BTC".to_string(),
+        max_blocks_old,
+    )?;
+
+    Ok(sb.amount.checked_div(price_in_btc.price_0_to_1)?)
 }
 
 // a helper to get prices from the price of token A in token B using oracle contract
