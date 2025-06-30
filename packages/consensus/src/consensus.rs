@@ -161,7 +161,7 @@ impl<T: ConsensusData> State<T> {
             ) {
                 return Ok(Some(OracleData {
                     round: pending_round.round,
-                    timestamp: env.block.time.seconds(),
+                    timestamp: pending_round.start + config.round_length,
                     data: consensus,
                 }));
             }

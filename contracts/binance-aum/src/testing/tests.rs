@@ -1,12 +1,16 @@
 use crate::contract::*;
-use crate::msg::{ExecuteMsg, GetDataResponse, QueryMsg};
-use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG};
+use crate::error::ContractError;
+use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
+use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS_STATE};
+use crate::testing::mock::custom_mock_dependencies;
+use crate::utils::CombinedPriceResponse;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
 use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env},
     Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal, StdError, Timestamp,
 };
+use std::str::FromStr;
 
 // Helper function to create a MessageInfo object for testing
 fn message_info(sender: &str, funds: &[Coin]) -> MessageInfo {
@@ -1675,4 +1679,387 @@ fn test_delayed_oracle_submissions_within_round() {
     let round_attr = response.attributes.iter().find(|attr| attr.key == "round");
     assert!(round_attr.is_some());
     assert_eq!(round_attr.unwrap().value, "2", "Round should now be 2");
+}
+
+#[test]
+fn test_query_get_aum_basic() {
+    // Set up mock dependencies with price oracle responses
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![
+        // BTC/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("1.0").unwrap(),
+            },
+        ), // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USD".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
+            },
+        ),
+        // USDT/USD price
+        (
+            price_oracle_addr.to_string(),
+            "USDT".to_string(),
+            "USD".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("1").unwrap(),
+                token_1_price: SignedDecimal::from_str("1").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("1").unwrap(),
+            },
+        ),
+        // ETH/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "ETH".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("2000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("0.02").unwrap(),
+            },
+        ),
+        // USDT/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "USDT".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("1.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("0.00001").unwrap(), // 1 USDT = 0.00001 BTC
+            },
+        ),
+    ];
+
+    let mut deps = custom_mock_dependencies(price_oracle_responses);
+
+    // Set up configuration
+    let config = Config {
+        admin: Addr::unchecked("admin"),
+        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        consensus_data_valid_period: 3600, // 1 hour
+        price_max_blocks_old: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec![
+            "BTC".to_string(),
+            "ETH".to_string(),
+            "USDT".to_string(),
+        ],
+    };
+
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up consensus state data
+    let binance_data = BinanceData {
+        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        positions: vec![Position {
+            symbol: "BTCUSDT".to_string(),
+            amount: SignedDecimal::from_str("1.5").unwrap(),
+            pnl: SignedDecimal::from_str("1000.0").unwrap(),
+        }],
+        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        spot_balances: vec![
+            SpotBalance {
+                asset: "BTC".to_string(),
+                amount: SignedDecimal::from_str("2.5").unwrap(),
+            },
+            SpotBalance {
+                asset: "ETH".to_string(),
+                amount: SignedDecimal::from_str("20.0").unwrap(),
+            },
+            SpotBalance {
+                asset: "USDT".to_string(),
+                amount: SignedDecimal::from_str("10000.0").unwrap(),
+            },
+        ],
+        pm_account_actual_equity: SignedDecimal::from_str("80000.0").unwrap(),
+        withdrawable_usdt: SignedDecimal::from_str("3000.0").unwrap(),
+    };
+
+    let current_time = 1700000000;
+    let oracle_data = OracleData {
+        round: 1,
+        timestamp: current_time,
+        data: binance_data,
+    };
+
+    CONSENSUS_STATE
+        .last_published_data
+        .save(deps.as_mut().storage, &oracle_data)
+        .unwrap();
+
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time + 1800); // 30 minutes after the data timestamp
+
+    // Calculate expected AUM manually
+    // 1. PM account equity in BTC: 80000 / 100000 = 0.8 BTC
+    // 2. Spot balances in BTC:
+    //    - 2.5 BTC = 2.5 BTC
+    //    - 20 ETH = 20 * 0.02 = 0.4 BTC
+    //    - 10000 USDT = 10000 * 0.00001 = 0.1 BTC
+    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
+    let expected_aum = SignedDecimal::from_str("3.8").unwrap();
+
+    // Execute query
+    let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
+
+    // Verify results
+    assert_eq!(response.aum_in_btc, expected_aum);
+}
+
+#[test]
+fn test_query_get_aum_with_expired_data() {
+    // Set up mock dependencies
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![];
+    let mut deps = custom_mock_dependencies(price_oracle_responses);
+
+    // Set up configuration
+    let config = Config {
+        admin: Addr::unchecked("admin"),
+        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        consensus_data_valid_period: 3600, // 1 hour
+        price_max_blocks_old: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec!["BTC".to_string()],
+    };
+
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up consensus state data with an old timestamp
+    let current_time = 1700000000;
+    let binance_data = BinanceData {
+        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        positions: vec![],
+        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        spot_balances: vec![],
+        pm_account_actual_equity: SignedDecimal::from_str("80000.0").unwrap(),
+        withdrawable_usdt: SignedDecimal::from_str("3000.0").unwrap(),
+    };
+
+    let oracle_data = OracleData {
+        round: 1,
+        timestamp: 0,
+        data: binance_data,
+    };
+
+    CONSENSUS_STATE
+        .last_published_data
+        .save(deps.as_mut().storage, &oracle_data)
+        .unwrap();
+
+    // Create an environment with a timestamp that's beyond the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time + 7200); // 2 hours after the data timestamp
+
+    // Execute query - should fail because data is too old
+    let result = query_get_aum(deps.as_ref(), env);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), ContractError::PublishedDataTooOld {},);
+}
+
+#[test]
+fn test_query_get_aum_with_negative_equity() {
+    // Set up mock dependencies with price oracle responses
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![
+        // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USD".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("40000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("40000.0").unwrap(),
+            },
+        ),
+        // ETH/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "ETH".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("2000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("40000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("0.05").unwrap(),
+            },
+        ),
+    ];
+
+    let mut deps = custom_mock_dependencies(price_oracle_responses);
+
+    // Set up configuration
+    let config = Config {
+        admin: Addr::unchecked("admin"),
+        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        consensus_data_valid_period: 3600,
+        price_max_blocks_old: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec!["ETH".to_string()],
+    };
+
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up consensus state data with negative equity
+    let binance_data = BinanceData {
+        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        positions: vec![Position {
+            symbol: "BTCUSDT".to_string(),
+            amount: SignedDecimal::from_str("1.5").unwrap(),
+            pnl: SignedDecimal::from_str("-10000.0").unwrap(), // Negative PnL
+        }],
+        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        spot_balances: vec![SpotBalance {
+            asset: "ETH".to_string(),
+            amount: SignedDecimal::from_str("10.0").unwrap(),
+        }],
+        pm_account_actual_equity: SignedDecimal::from_str("-20000.0").unwrap(), // Negative equity
+        withdrawable_usdt: SignedDecimal::from_str("0.0").unwrap(),
+    };
+
+    let current_time = 1700000000;
+    let oracle_data = OracleData {
+        round: 1,
+        timestamp: current_time,
+        data: binance_data,
+    };
+
+    CONSENSUS_STATE
+        .last_published_data
+        .save(deps.as_mut().storage, &oracle_data)
+        .unwrap();
+
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time + 1800);
+
+    // Calculate expected AUM manually
+    // 1. PM account equity in BTC = -20000 USD / 40000 USD/BTC = -0.5 BTC
+    // 2. Spot balances in BTC:
+    //    - 10 ETH = 10 * 0.05 = 0.5 BTC
+    // 3. Total AUM = -0.5 + 0.5 = 0 BTC
+    let expected_aum = SignedDecimal::zero();
+
+    // Execute query
+    let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
+
+    // Verify results
+    assert_eq!(response.aum_in_btc, expected_aum);
+}
+
+#[test]
+fn test_query_get_aum_with_large_values() {
+    // Set up mock dependencies with price oracle responses
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![
+        // BTC/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("1.0").unwrap(),
+            },
+        ),
+        // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USD".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
+            },
+        ),
+        // ETH/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "ETH".to_string(),
+            "BTC".to_string(),
+            CombinedPriceResponse {
+                token_0_price: SignedDecimal::from_str("2480").unwrap(),
+                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("0.02").unwrap(),
+            },
+        ),
+    ];
+
+    let mut deps = custom_mock_dependencies(price_oracle_responses);
+
+    // Set up configuration
+    let config = Config {
+        admin: Addr::unchecked("admin"),
+        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        consensus_data_valid_period: 3600,
+        price_max_blocks_old: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec!["BTC".to_string(), "ETH".to_string()],
+    };
+
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up consensus state data with large values
+    let binance_data = BinanceData {
+        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        positions: vec![],
+        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        spot_balances: vec![
+            SpotBalance {
+                asset: "BTC".to_string(),
+                amount: SignedDecimal::from_str("1000.0").unwrap(), // 1000 BTC
+            },
+            SpotBalance {
+                asset: "ETH".to_string(),
+                amount: SignedDecimal::from_str("20000.0").unwrap(), // 20000 ETH
+            },
+        ],
+        pm_account_actual_equity: SignedDecimal::from_str("40000000.0").unwrap(), // 40M USD
+        withdrawable_usdt: SignedDecimal::from_str("1000000.0").unwrap(),
+    };
+
+    let current_time = 1700000000;
+    let oracle_data = OracleData {
+        round: 1,
+        timestamp: current_time,
+        data: binance_data,
+    };
+
+    CONSENSUS_STATE
+        .last_published_data
+        .save(deps.as_mut().storage, &oracle_data)
+        .unwrap();
+
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time + 1800);
+
+    // Calculate expected AUM manually
+    // 1. PM account equity in BTC = 40000000 USD / 100000 USD/BTC = 400 BTC
+    // 2. Spot balances in BTC:
+    //    - 1000 BTC = 1000 BTC
+    //    - 20000 ETH = 20000 * 0.02 = 400 BTC
+    // 3. Total AUM = 400 + 1000 + 1000 = 3000 BTC
+    let expected_aum = SignedDecimal::from_str("1800").unwrap();
+
+    // Execute query
+    let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
+
+    // Verify results
+    assert_eq!(response.aum_in_btc, expected_aum);
 }

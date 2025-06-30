@@ -4,5 +4,5 @@ mod error;
 mod msg;
 mod state;
 #[cfg(test)]
-mod tests;
+mod testing;
 mod utils;

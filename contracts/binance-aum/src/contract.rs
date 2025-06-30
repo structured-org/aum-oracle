@@ -119,13 +119,13 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
     })
 }
 
-fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
+pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
     let d = CONSENSUS_STATE
         .last_published_data
         .may_load(deps.storage)?
         .ok_or_else(|| StdError::generic_err("No published data"))?;
-    if d.timestamp + config.price_max_blocks_old < env.block.time.seconds() {
+    if d.timestamp + config.consensus_data_valid_period < env.block.time.seconds() {
         return Err(ContractError::PublishedDataTooOld {});
     }
 

@@ -27,7 +27,7 @@ pub fn spot_balance_in_btc(
         max_blocks_old,
     )?;
 
-    Ok(sb.amount.checked_div(price_in_btc.price_0_to_1)?)
+    Ok(sb.amount.checked_mul(price_in_btc.price_0_to_1)?)
 }
 
 // a helper to get prices from the price of token A in token B using oracle contract
