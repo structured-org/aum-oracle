@@ -3,7 +3,7 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use consensus::consensus::OracleData;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Decimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
@@ -199,11 +199,196 @@ fn test_query_get_aum() {
     )
     .unwrap();
     env.block.time = env.block.time.plus_seconds(101); // Advance time past valid_period (1000s)
-    // asserts data is there
+                                                       // asserts data is there
     let data = CONSENSUS_STATE
         .get_last_published_data(&env, &deps.storage)
         .unwrap();
     assert!(data.is_some());
+}
+
+#[test]
+fn test_update_consensus_config() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let msg = default_init_msg(&deps.api);
+    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg).unwrap();
+
+    let update_msg = ExecuteMsg::UpdateConsensusConfig {
+        oracles: Some(vec![deps.api.addr_make("oracle125").to_string()]),
+        threshold: Some(1),
+        data_delta_ppm: Some(5000),
+        round_length: Some(200),
+    };
+
+    // Unauthorized attempt
+    let stranger_info = message_info(&deps.api.addr_make("stranger"), &[]);
+    let res = execute(
+        deps.as_mut(),
+        env.clone(),
+        stranger_info,
+        update_msg.clone(),
+    );
+    assert!(matches!(res, Err(ContractError::Unauthorized {})));
+    // Data not updated
+    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config.threshold, 2);
+
+    // Authorized update
+    let res = execute(deps.as_mut(), env.clone(), admin_info, update_msg);
+    assert!(res.is_ok());
+    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        consensus_config.oracles,
+        vec![deps.api.addr_make("oracle125")]
+    );
+    assert_eq!(consensus_config.threshold, 1);
+    assert_eq!(consensus_config.data_delta_ppm, 5000);
+    assert_eq!(consensus_config.round_length, 200);
+}
+
+#[test]
+fn test_publish_data_unauthorized() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let init_msg = default_init_msg(&deps.api);
+    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+
+    let data = dummy_oracle_data();
+    let info = message_info(&deps.api.addr_make("hacker"), &[]);
+    let msg = ExecuteMsg::PublishData { data };
+    let res = execute(deps.as_mut(), env, info, msg);
+    assert!(matches!(res, Err(ContractError::Unauthorized {})));
+}
+
+#[test]
+fn test_publish_data_duplicate_oracle() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let admin_info = message_info(&api.addr_make("admin"), &[]);
+    instantiate(
+        deps.as_mut(),
+        env.clone(),
+        admin_info,
+        default_init_msg(&api),
+    )
+    .unwrap();
+
+    let info = message_info(&api.addr_make("oracle1"), &[]);
+    let data = dummy_oracle_data();
+    let msg = ExecuteMsg::PublishData { data: data.clone() };
+
+    execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
+    let res = execute(deps.as_mut(), env.clone(), info, msg);
+    assert!(matches!(res, Err(ContractError::Std(_))));
+}
+
+#[test]
+fn test_publish_data_invalid_custody() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api.clone();
+    let admin_info = message_info(&api.addr_make("admin"), &[]);
+    instantiate(
+        deps.as_mut(),
+        env.clone(),
+        admin_info,
+        default_init_msg(&api),
+    )
+    .unwrap();
+
+    let info = message_info(&api.addr_make("oracle1"), &[]);
+    let mut data = dummy_oracle_data();
+    data.data.custody_assets.clear();
+
+    let msg = ExecuteMsg::PublishData { data };
+    let res = execute(deps.as_mut(), env, info, msg);
+    assert!(matches!(res, Err(ContractError::Std(_))));
+}
+
+#[test]
+fn test_query_get_data_and_config() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let init_msg = default_init_msg(&deps.api);
+    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
+    assert!(res.len() > 0);
+
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetData {}).unwrap();
+    assert!(res.len() > 0);
+}
+
+#[test]
+fn test_query_round_info() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let init_msg = default_init_msg(&deps.api);
+
+    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+
+    let res = query(deps.as_ref(), env, QueryMsg::GetRoundInfo {}).unwrap();
+    assert!(res.len() > 0);
+}
+
+#[test]
+fn test_query_get_aum_data_stale() {
+    let mut deps = mock_dependencies();
+    let mut env = mock_env();
+    let start_time = 1000;
+    env.block.time = Timestamp::from_seconds(start_time);
+
+    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let oracle1 = deps.api.addr_make("oracle1");
+    let oracle2 = deps.api.addr_make("oracle2");
+    let init_msg = default_init_msg(&deps.api);
+
+    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+
+    let data = dummy_oracle_data();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&oracle1, &[]),
+        ExecuteMsg::PublishData { data: data.clone() },
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&oracle2, &[]),
+        ExecuteMsg::PublishData { data: data.clone() },
+    )
+    .unwrap();
+
+    env.block.time = env.block.time.plus_seconds(10_000);
+    let res = query(deps.as_ref(), env, QueryMsg::GetAUM {});
+    assert!(matches!(res, Err(ContractError::DataNotValid {})));
+}
+
+fn dummy_oracle_data() -> OracleData<SolanaData> {
+    OracleData {
+        round: 0,
+        timestamp: 1000,
+        data: SolanaData {
+            custody_assets: vec![CustodyAsset {
+                owned: 1,
+                locked: 0,
+                guaranteed_usd: 1,
+                decimals: 6,
+                denom: "USDC".to_string(),
+            }],
+            aum_usd: Uint128::new(500_000),
+            jlp_token_decimals: 6,
+            total_jlp_supply: Uint128::new(1_000),
+            strategy_jlp_balance: Uint128::new(10_000),
+        },
+    }
 }
 
 fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {

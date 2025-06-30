@@ -47,7 +47,7 @@ pub enum ExecuteMsg {
         oracles: Option<Vec<String>>,
         /// Threshold for consensus.
         threshold: Option<u32>,
-        // TODO
+        /// Delta in percent per million (ppm), for which two values are considered equal.
         data_delta_ppm: Option<u64>,
         /// Round length in seconds
         round_length: Option<u64>,
@@ -97,7 +97,9 @@ pub struct GetAUMResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct RoundInfoResponse {
+    /// Current round.
     pub pending_round: Round,
+    /// Next round.
     pub next_round: Round,
 }
 

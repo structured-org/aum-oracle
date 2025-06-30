@@ -60,15 +60,6 @@ impl SolanaData {
     }
 }
 
-// TODO: tests for different scenarios:
-// - NO data
-// - Consensus not reached
-// - Consensus reached
-// - Different scenarios tested for when consensus reached:
-//    - all oracles give exact data
-//    - almost all oracles exact data, one is not
-//    - all oracles with totally different values
-
 impl ConsensusData for SolanaData {
     fn try_consensus(data: &[SolanaData], threshold: usize, delta_ppm: u64) -> Option<SolanaData> {
         if data.len() < threshold {

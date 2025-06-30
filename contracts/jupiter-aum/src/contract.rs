@@ -76,7 +76,7 @@ pub fn execute(
             data_delta_ppm,
             round_length,
         } => update_consensus_config(deps, info, oracles, threshold, data_delta_ppm, round_length),
-        ExecuteMsg::PublishData { data } => publish_data(deps, env, info, data),
+        ExecuteMsg::PublishData { data } => execute_publish_data(deps, env, info, data),
     }
 }
 
@@ -166,7 +166,7 @@ fn update_config(
 /// Oracle can only publish once per slot.
 /// If consensus is reached, the `LAST_PUBLISHED_DATA` is updated
 /// and old pending slots are removed.
-fn publish_data(
+fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -187,8 +187,7 @@ fn publish_data(
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
 
-    let mut res = Response::new()
-        .add_attribute("action", "publish_consensus");
+    let mut res = Response::new().add_attribute("action", "publish_consensus");
 
     // If we have new published data for the current round, consensus was reached
     if let ConsensusResult::ConsensusReached(_) = result {
@@ -246,7 +245,6 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
     let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
         .ok_or(ContractError::NoDataPublished {})?;
-
     if env.block.time.seconds() > published_state.timestamp + config.valid_period {
         return Err(ContractError::DataNotValid {});
     }
