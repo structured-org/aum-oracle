@@ -34,9 +34,11 @@ fn create_test_consensus_config() -> ConsensusConfig {
 fn create_test_contract_config() -> Config {
     Config {
         admin: Addr::unchecked("admin"),
-        valid_period: 100,
+        price_max_blocks_old: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
+        price_oracle_contract: Addr::unchecked("price_oracle_contract"),
+        consensus_data_valid_period: 100,
     }
 }
 
@@ -671,7 +673,7 @@ fn test_try_consensus() {
     // Test 7: Consensus with multiple positions
     {
         let config = create_test_consensus_config();
-        let mut data1 = create_test_data(
+        let data1 = create_test_data(
             1,
             1000,
             SignedDecimal::from_ratio(5, 10),
@@ -679,7 +681,7 @@ fn test_try_consensus() {
             SignedDecimal::from_ratio(2000, 1),
             SignedDecimal::from_ratio(500, 1),
         );
-        let mut data2 = create_test_data(
+        let data2 = create_test_data(
             1,
             1001,
             SignedDecimal::from_ratio(505, 1000),
@@ -688,7 +690,7 @@ fn test_try_consensus() {
             SignedDecimal::from_ratio(505, 1),
         );
         //outlier
-        let mut data3 = create_test_data(
+        let data3 = create_test_data(
             1,
             1002,
             SignedDecimal::from_ratio(6, 10),
