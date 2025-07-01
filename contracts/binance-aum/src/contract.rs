@@ -4,7 +4,7 @@ use crate::msg::{
     UpdateConfig,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
-use crate::utils::{get_prices, spot_balance_in_btc};
+use crate::utils::{btc_in_spot_balance_asset, get_prices};
 use consensus::consensus::{Config as ConsensusConfig, OracleData, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
@@ -196,7 +196,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         .spot_balances
         .iter()
         .map(|b| {
-            spot_balance_in_btc(
+            btc_in_spot_balance_asset(
                 deps,
                 config.price_oracle_contract.to_string(),
                 config.price_max_blocks_old,

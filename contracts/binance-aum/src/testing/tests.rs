@@ -1712,37 +1712,26 @@ fn test_query_get_aum_basic() {
                 price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
             },
         ),
-        // USDT/USD price
+        // BTC/ETH price
         (
             price_oracle_addr.to_string(),
-            "USDT".to_string(),
-            "USD".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("1").unwrap(),
-                token_1_price: SignedDecimal::from_str("1").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("1").unwrap(),
-            },
-        ),
-        // ETH/BTC price
-        (
-            price_oracle_addr.to_string(),
+            "BTC".to_string(),
             "ETH".to_string(),
-            "BTC".to_string(),
             CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("2000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("0.02").unwrap(),
+                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("2000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("50").unwrap(),
             },
         ),
-        // USDT/BTC price
+        // BTC/USDT price
         (
             price_oracle_addr.to_string(),
-            "USDT".to_string(),
             "BTC".to_string(),
+            "USDT".to_string(),
             CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("1.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("0.00001").unwrap(), // 1 USDT = 0.00001 BTC
+                token_0_price: SignedDecimal::from_str("100000").unwrap(),
+                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("100000").unwrap(),
             },
         ),
     ];
@@ -1812,8 +1801,8 @@ fn test_query_get_aum_basic() {
     // 1. PM account equity in BTC: 80000 / 100000 = 0.8 BTC
     // 2. Spot balances in BTC:
     //    - 2.5 BTC = 2.5 BTC
-    //    - 20 ETH = 20 * 0.02 = 0.4 BTC
-    //    - 10000 USDT = 10000 * 0.00001 = 0.1 BTC
+    //    - 20 ETH = 20 / 50 = 0.4 BTC
+    //    - 10000 USDT = 10000 / 100000 = 0.1 BTC
     // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
     let expected_aum = SignedDecimal::from_str("3.8").unwrap();
 
@@ -1891,15 +1880,15 @@ fn test_query_get_aum_with_negative_equity() {
                 price_0_to_1: SignedDecimal::from_str("40000.0").unwrap(),
             },
         ),
-        // ETH/BTC price
+        // BTC/ETH price
         (
             price_oracle_addr.to_string(),
-            "ETH".to_string(),
             "BTC".to_string(),
+            "ETH".to_string(),
             CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("2000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("40000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("0.05").unwrap(),
+                token_0_price: SignedDecimal::from_str("40000.0").unwrap(),
+                token_1_price: SignedDecimal::from_str("2000.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("20").unwrap(),
             },
         ),
     ];
@@ -1954,7 +1943,7 @@ fn test_query_get_aum_with_negative_equity() {
     // Calculate expected AUM manually
     // 1. PM account equity in BTC = -20000 USD / 40000 USD/BTC = -0.5 BTC
     // 2. Spot balances in BTC:
-    //    - 10 ETH = 10 * 0.05 = 0.5 BTC
+    //    - 10 ETH = 10 / 20 = 0.5 BTC
     // 3. Total AUM = -0.5 + 0.5 = 0 BTC
     let expected_aum = SignedDecimal::zero();
 
@@ -2321,15 +2310,15 @@ fn test_query_get_aum_with_large_values() {
                 price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
             },
         ),
-        // ETH/BTC price
+        // BTC/ETH price
         (
             price_oracle_addr.to_string(),
-            "ETH".to_string(),
             "BTC".to_string(),
+            "ETH".to_string(),
             CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("2480").unwrap(),
-                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("0.02").unwrap(),
+                token_0_price: SignedDecimal::from_str("100000").unwrap(),
+                token_1_price: SignedDecimal::from_str("2500.0").unwrap(),
+                price_0_to_1: SignedDecimal::from_str("40").unwrap(),
             },
         ),
     ];
@@ -2387,9 +2376,9 @@ fn test_query_get_aum_with_large_values() {
     // 1. PM account equity in BTC = 40000000 USD / 100000 USD/BTC = 400 BTC
     // 2. Spot balances in BTC:
     //    - 1000 BTC = 1000 BTC
-    //    - 20000 ETH = 20000 * 0.02 = 400 BTC
-    // 3. Total AUM = 400 + 1000 + 1000 = 3000 BTC
-    let expected_aum = SignedDecimal::from_str("1800").unwrap();
+    //    - 20000 ETH = 20000 / 40 = 500 BTC
+    // 3. Total AUM = 400 + 1000 + 500 = 1900 BTC
+    let expected_aum = SignedDecimal::from_str("1900").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
