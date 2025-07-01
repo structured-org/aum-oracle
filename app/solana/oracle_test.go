@@ -10,8 +10,8 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/golang/mock/gomock"
+	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
-	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 	mock_solana "github.com/structured-org/aum-oracle/testutil/mocks/solana"
 	"go.uber.org/zap"
 )
@@ -31,7 +31,7 @@ func TestOracleRun(t *testing.T) {
 
 	solanaClient := mock_solana.NewMockSolanaClient(ctrl)
 	neutronClient := mock_solana.NewMockNeutronClient(ctrl)
-
+	jupiterClient := mock_solana.NewMockJupiterClient(ctrl)
 	usdtPubKey := testPubKey1
 	usdcPubKey := testPubKey2
 	btcPubKey := testPubKey3
@@ -51,7 +51,7 @@ func TestOracleRun(t *testing.T) {
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
-	solanaClient.EXPECT().GetJupiterPoolInfo(gomock.Any(), gomock.Any()).Return(&solanaclient.JupiterPoolAccount{
+	jupiterClient.EXPECT().GetJupiterPoolInfo(gomock.Any(), gomock.Any()).Return(&jupiterclient.JupiterPoolAccount{
 		AumUsd: solanabin.Uint128{
 			Lo: 5000000 * 1000000,
 		},
@@ -62,20 +62,20 @@ func TestOracleRun(t *testing.T) {
 	solanaClient.EXPECT().GetTokenAccountBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
 		Amount: "2000000",
 	}, nil)
-	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
-		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
-	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdcPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
-		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdcPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
-	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), btcPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
-		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 10000, Locked: 20000, GuaranteedUsd: 3000000}, Decimals: 6,
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), btcPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 10000, Locked: 20000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
-	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), ethPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
-		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000}, Decimals: 6,
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), ethPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
-	solanaClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), solPubKey).Return(&solanaclient.JupiterPerpsCustodyAccount{
-		Assets: solanaclient.JupiterPerpsCustodyAssets{Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000}, Decimals: 6,
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), solPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
 
 	expectedData := &neutronclient.SolanaData{
@@ -97,7 +97,7 @@ func TestOracleRun(t *testing.T) {
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 
-	oracle := NewOracle(solanaClient, neutronClient, jupCfg, zap.NewExample())
+	oracle := NewOracle(solanaClient, neutronClient, jupiterClient, jupCfg, zap.NewExample())
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go oracle.Run(ctx)

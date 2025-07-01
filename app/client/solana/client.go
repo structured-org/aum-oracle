@@ -8,15 +8,15 @@ import (
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 )
 
-// Client is a client for Solana and Jupiter.
+// Client is a client for Solana.
 type Client struct {
 	client *solanarpc.Client
 }
 
 // NewClient creates a new Solana client.
-func NewClient(rpcEndpoint string) *Client {
+func NewClient(solanaRpc string) *Client {
 	return &Client{
-		client: solanarpc.New(rpcEndpoint),
+		client: solanarpc.New(solanaRpc),
 	}
 }
 
@@ -28,26 +28,6 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 // SubmitBinanceAumData submits the Binance AUM data to the Solana AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceData) (*NextRound, error) {
 	return nil, fmt.Errorf("not implemented")
-}
-
-// GetJupiterCustodyInfo gets the Jupiter custody info.
-func (c *Client) GetJupiterCustodyInfo(ctx context.Context, custody solana.PublicKey) (*JupiterPerpsCustodyAccount, error) {
-	var resp JupiterPerpsCustodyAccount
-	if err := c.client.GetAccountDataBorshInto(ctx, custody, &resp); err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
-}
-
-// GetJupiterPoolInfo gets the Jupiter pool info.
-func (c *Client) GetJupiterPoolInfo(ctx context.Context, pool solana.PublicKey) (*JupiterPoolAccount, error) {
-	var resp JupiterPoolAccount
-	if err := c.client.GetAccountDataBorshInto(ctx, pool, &resp); err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
 }
 
 // GetTokenSupply gets the token total supply.

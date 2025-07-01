@@ -28,6 +28,7 @@ type JupiterConfig struct {
 type Oracle struct {
 	solanaClient  SolanaClient
 	neutronClient NeutronClient
+	jupiterClient JupiterClient
 	jupiterConfig JupiterConfig
 
 	logger *zap.Logger
@@ -37,12 +38,14 @@ type Oracle struct {
 func NewOracle(
 	solanaClient SolanaClient,
 	neutronClient NeutronClient,
+	jupiterClient JupiterClient,
 	jupiterConfig JupiterConfig,
 	logger *zap.Logger,
 ) *Oracle {
 	return &Oracle{
 		solanaClient:  solanaClient,
 		neutronClient: neutronClient,
+		jupiterClient: jupiterClient,
 		jupiterConfig: jupiterConfig,
 		logger:        logger,
 	}
@@ -110,7 +113,7 @@ func (o *Oracle) fetchSolanaData(ctx context.Context) (*neutronclient.SolanaData
 		go func(token string, programId solana.PublicKey) {
 			defer wg.Done()
 
-			custodyInfo, err := o.solanaClient.GetJupiterCustodyInfo(ctx, programId)
+			custodyInfo, err := o.jupiterClient.GetJupiterCustodyInfo(ctx, programId)
 			if err != nil {
 				o.logger.Error("failed to get Jupiter custody info",
 					zap.String("custody_token", token),
@@ -135,7 +138,7 @@ func (o *Oracle) fetchSolanaData(ctx context.Context) (*neutronclient.SolanaData
 	go func() {
 		defer wg.Done()
 
-		poolInfo, err := o.solanaClient.GetJupiterPoolInfo(ctx, o.jupiterConfig.Pool)
+		poolInfo, err := o.jupiterClient.GetJupiterPoolInfo(ctx, o.jupiterConfig.Pool)
 		if err != nil {
 			o.logger.Error("failed to get Jupiter pool info",
 				zap.String("pool_program_id", o.jupiterConfig.Pool.String()),

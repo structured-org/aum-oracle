@@ -11,9 +11,62 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	rpc "github.com/gagliardetto/solana-go/rpc"
 	gomock "github.com/golang/mock/gomock"
+	jupiter "github.com/structured-org/aum-oracle/client/jupiter"
 	neutron "github.com/structured-org/aum-oracle/client/neutron"
-	solana0 "github.com/structured-org/aum-oracle/client/solana"
 )
+
+// MockJupiterClient is a mock of JupiterClient interface.
+type MockJupiterClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockJupiterClientMockRecorder
+}
+
+// MockJupiterClientMockRecorder is the mock recorder for MockJupiterClient.
+type MockJupiterClientMockRecorder struct {
+	mock *MockJupiterClient
+}
+
+// NewMockJupiterClient creates a new mock instance.
+func NewMockJupiterClient(ctrl *gomock.Controller) *MockJupiterClient {
+	mock := &MockJupiterClient{ctrl: ctrl}
+	mock.recorder = &MockJupiterClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockJupiterClient) EXPECT() *MockJupiterClientMockRecorder {
+	return m.recorder
+}
+
+// GetJupiterCustodyInfo mocks base method.
+func (m *MockJupiterClient) GetJupiterCustodyInfo(ctx context.Context, custody solana.PublicKey) (*jupiter.JupiterPerpsCustodyAccount, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetJupiterCustodyInfo", ctx, custody)
+	ret0, _ := ret[0].(*jupiter.JupiterPerpsCustodyAccount)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetJupiterCustodyInfo indicates an expected call of GetJupiterCustodyInfo.
+func (mr *MockJupiterClientMockRecorder) GetJupiterCustodyInfo(ctx, custody interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJupiterCustodyInfo", reflect.TypeOf((*MockJupiterClient)(nil).GetJupiterCustodyInfo), ctx, custody)
+}
+
+// GetJupiterPoolInfo mocks base method.
+func (m *MockJupiterClient) GetJupiterPoolInfo(ctx context.Context, pool solana.PublicKey) (*jupiter.JupiterPoolAccount, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetJupiterPoolInfo", ctx, pool)
+	ret0, _ := ret[0].(*jupiter.JupiterPoolAccount)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetJupiterPoolInfo indicates an expected call of GetJupiterPoolInfo.
+func (mr *MockJupiterClientMockRecorder) GetJupiterPoolInfo(ctx, pool interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJupiterPoolInfo", reflect.TypeOf((*MockJupiterClient)(nil).GetJupiterPoolInfo), ctx, pool)
+}
 
 // MockSolanaClient is a mock of SolanaClient interface.
 type MockSolanaClient struct {
@@ -36,36 +89,6 @@ func NewMockSolanaClient(ctrl *gomock.Controller) *MockSolanaClient {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockSolanaClient) EXPECT() *MockSolanaClientMockRecorder {
 	return m.recorder
-}
-
-// GetJupiterCustodyInfo mocks base method.
-func (m *MockSolanaClient) GetJupiterCustodyInfo(ctx context.Context, custody solana.PublicKey) (*solana0.JupiterPerpsCustodyAccount, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJupiterCustodyInfo", ctx, custody)
-	ret0, _ := ret[0].(*solana0.JupiterPerpsCustodyAccount)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetJupiterCustodyInfo indicates an expected call of GetJupiterCustodyInfo.
-func (mr *MockSolanaClientMockRecorder) GetJupiterCustodyInfo(ctx, custody interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJupiterCustodyInfo", reflect.TypeOf((*MockSolanaClient)(nil).GetJupiterCustodyInfo), ctx, custody)
-}
-
-// GetJupiterPoolInfo mocks base method.
-func (m *MockSolanaClient) GetJupiterPoolInfo(ctx context.Context, pool solana.PublicKey) (*solana0.JupiterPoolAccount, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJupiterPoolInfo", ctx, pool)
-	ret0, _ := ret[0].(*solana0.JupiterPoolAccount)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetJupiterPoolInfo indicates an expected call of GetJupiterPoolInfo.
-func (mr *MockSolanaClientMockRecorder) GetJupiterPoolInfo(ctx, pool interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJupiterPoolInfo", reflect.TypeOf((*MockSolanaClient)(nil).GetJupiterPoolInfo), ctx, pool)
 }
 
 // GetTokenAccountBalance mocks base method.

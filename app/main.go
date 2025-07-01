@@ -13,6 +13,7 @@ import (
 	nlogger "github.com/neutron-org/neutron-logger"
 	binanceoracle "github.com/structured-org/aum-oracle/binance"
 	binanceclient "github.com/structured-org/aum-oracle/client/binance"
+	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 	solanaoracle "github.com/structured-org/aum-oracle/solana"
@@ -38,6 +39,7 @@ func main() {
 	}
 
 	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
+	jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
 	neutronClient, err := neutronclient.NewClient(logRegistry.Get(neutronClientContext))
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
@@ -65,6 +67,7 @@ func main() {
 	solanaOracle := solanaoracle.NewOracle(
 		solanaClient,
 		neutronClient,
+		jupiterClient,
 		jupiterConfig,
 		logRegistry.Get(solanaAumOracleContext),
 	)
