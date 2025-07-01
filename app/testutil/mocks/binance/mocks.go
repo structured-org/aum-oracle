@@ -12,6 +12,7 @@ import (
 	portfolio "github.com/adshao/go-binance/v2/portfolio"
 	gomock "github.com/golang/mock/gomock"
 	neutron "github.com/structured-org/aum-oracle/client/neutron"
+	solana "github.com/structured-org/aum-oracle/client/solana"
 )
 
 // MockBinanceClient is a mock of BinanceClient interface.
@@ -112,31 +113,31 @@ func (mr *MockBinanceClientMockRecorder) GetUmPositions(ctx interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUmPositions", reflect.TypeOf((*MockBinanceClient)(nil).GetUmPositions), ctx)
 }
 
-// MockNeutronClient is a mock of NeutronClient interface.
-type MockNeutronClient struct {
+// MockNeutronAumContractClient is a mock of NeutronAumContractClient interface.
+type MockNeutronAumContractClient struct {
 	ctrl     *gomock.Controller
-	recorder *MockNeutronClientMockRecorder
+	recorder *MockNeutronAumContractClientMockRecorder
 }
 
-// MockNeutronClientMockRecorder is the mock recorder for MockNeutronClient.
-type MockNeutronClientMockRecorder struct {
-	mock *MockNeutronClient
+// MockNeutronAumContractClientMockRecorder is the mock recorder for MockNeutronAumContractClient.
+type MockNeutronAumContractClientMockRecorder struct {
+	mock *MockNeutronAumContractClient
 }
 
-// NewMockNeutronClient creates a new mock instance.
-func NewMockNeutronClient(ctrl *gomock.Controller) *MockNeutronClient {
-	mock := &MockNeutronClient{ctrl: ctrl}
-	mock.recorder = &MockNeutronClientMockRecorder{mock}
+// NewMockNeutronAumContractClient creates a new mock instance.
+func NewMockNeutronAumContractClient(ctrl *gomock.Controller) *MockNeutronAumContractClient {
+	mock := &MockNeutronAumContractClient{ctrl: ctrl}
+	mock.recorder = &MockNeutronAumContractClientMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNeutronClient) EXPECT() *MockNeutronClientMockRecorder {
+func (m *MockNeutronAumContractClient) EXPECT() *MockNeutronAumContractClientMockRecorder {
 	return m.recorder
 }
 
 // GetBinanceAumContractNextRound mocks base method.
-func (m *MockNeutronClient) GetBinanceAumContractNextRound(ctx context.Context) (*neutron.NextRound, error) {
+func (m *MockNeutronAumContractClient) GetBinanceAumContractNextRound(ctx context.Context) (*neutron.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBinanceAumContractNextRound", ctx)
 	ret0, _ := ret[0].(*neutron.NextRound)
@@ -145,13 +146,13 @@ func (m *MockNeutronClient) GetBinanceAumContractNextRound(ctx context.Context) 
 }
 
 // GetBinanceAumContractNextRound indicates an expected call of GetBinanceAumContractNextRound.
-func (mr *MockNeutronClientMockRecorder) GetBinanceAumContractNextRound(ctx interface{}) *gomock.Call {
+func (mr *MockNeutronAumContractClientMockRecorder) GetBinanceAumContractNextRound(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBinanceAumContractNextRound", reflect.TypeOf((*MockNeutronClient)(nil).GetBinanceAumContractNextRound), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBinanceAumContractNextRound", reflect.TypeOf((*MockNeutronAumContractClient)(nil).GetBinanceAumContractNextRound), ctx)
 }
 
 // SubmitBinanceAumData mocks base method.
-func (m *MockNeutronClient) SubmitBinanceAumData(ctx context.Context, data *neutron.BinanceData) (*neutron.NextRound, error) {
+func (m *MockNeutronAumContractClient) SubmitBinanceAumData(ctx context.Context, data *neutron.BinanceData) (*neutron.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubmitBinanceAumData", ctx, data)
 	ret0, _ := ret[0].(*neutron.NextRound)
@@ -160,7 +161,60 @@ func (m *MockNeutronClient) SubmitBinanceAumData(ctx context.Context, data *neut
 }
 
 // SubmitBinanceAumData indicates an expected call of SubmitBinanceAumData.
-func (mr *MockNeutronClientMockRecorder) SubmitBinanceAumData(ctx, data interface{}) *gomock.Call {
+func (mr *MockNeutronAumContractClientMockRecorder) SubmitBinanceAumData(ctx, data interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitBinanceAumData", reflect.TypeOf((*MockNeutronClient)(nil).SubmitBinanceAumData), ctx, data)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitBinanceAumData", reflect.TypeOf((*MockNeutronAumContractClient)(nil).SubmitBinanceAumData), ctx, data)
+}
+
+// MockSolanaAumContractClient is a mock of SolanaAumContractClient interface.
+type MockSolanaAumContractClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockSolanaAumContractClientMockRecorder
+}
+
+// MockSolanaAumContractClientMockRecorder is the mock recorder for MockSolanaAumContractClient.
+type MockSolanaAumContractClientMockRecorder struct {
+	mock *MockSolanaAumContractClient
+}
+
+// NewMockSolanaAumContractClient creates a new mock instance.
+func NewMockSolanaAumContractClient(ctrl *gomock.Controller) *MockSolanaAumContractClient {
+	mock := &MockSolanaAumContractClient{ctrl: ctrl}
+	mock.recorder = &MockSolanaAumContractClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSolanaAumContractClient) EXPECT() *MockSolanaAumContractClientMockRecorder {
+	return m.recorder
+}
+
+// GetBinanceAumContractNextRound mocks base method.
+func (m *MockSolanaAumContractClient) GetBinanceAumContractNextRound(ctx context.Context) (*solana.NextRound, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBinanceAumContractNextRound", ctx)
+	ret0, _ := ret[0].(*solana.NextRound)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBinanceAumContractNextRound indicates an expected call of GetBinanceAumContractNextRound.
+func (mr *MockSolanaAumContractClientMockRecorder) GetBinanceAumContractNextRound(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBinanceAumContractNextRound", reflect.TypeOf((*MockSolanaAumContractClient)(nil).GetBinanceAumContractNextRound), ctx)
+}
+
+// SubmitBinanceAumData mocks base method.
+func (m *MockSolanaAumContractClient) SubmitBinanceAumData(ctx context.Context, data *solana.BinanceData) (*solana.NextRound, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubmitBinanceAumData", ctx, data)
+	ret0, _ := ret[0].(*solana.NextRound)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SubmitBinanceAumData indicates an expected call of SubmitBinanceAumData.
+func (mr *MockSolanaAumContractClientMockRecorder) SubmitBinanceAumData(ctx, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitBinanceAumData", reflect.TypeOf((*MockSolanaAumContractClient)(nil).SubmitBinanceAumData), ctx, data)
 }

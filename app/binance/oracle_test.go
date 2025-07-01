@@ -10,6 +10,7 @@ import (
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	"github.com/golang/mock/gomock"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
+	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 	mock_binance "github.com/structured-org/aum-oracle/testutil/mocks/binance"
 	"go.uber.org/zap"
 )
@@ -20,31 +21,37 @@ func TestOracleRun(t *testing.T) {
 	defer ctrl.Finish()
 
 	binanceClient := mock_binance.NewMockBinanceClient(ctrl)
-	neutronClient := mock_binance.NewMockNeutronClient(ctrl)
+	neutronAum := mock_binance.NewMockNeutronAumContractClient(ctrl)
+	solanaAum := mock_binance.NewMockSolanaAumContractClient(ctrl)
 
-	neutronClient.EXPECT().GetBinanceAumContractNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+	neutronAum.EXPECT().GetBinanceAumContractNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+		Round: 1, Timestamp: start + 2,
+	}, nil)
+	solanaAum.EXPECT().GetBinanceAumContractNextRound(gomock.Any()).Return(&solanaclient.NextRound{
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
 	binanceClient.EXPECT().GetUmPositions(gomock.Any()).Return([]*binanceportfolio.UMPosition{
 		{Symbol: "BTCUSDT", PositionAmt: "0.148", UnrealizedProfit: "1985.41474317"},
-	}, nil)
+		{Symbol: "XRPUSDT", PositionAmt: "-1643.52695386", UnrealizedProfit: "8362.86549337"},
+	}, nil).AnyTimes()
 	binanceClient.EXPECT().GetSpotAccountInfo(gomock.Any()).Return(&binance.Account{
 		Balances: []binance.Balance{
 			{Asset: "USDT", Free: "15.44528780", Locked: "15.44528780"},
 			{Asset: "BTC", Free: "0.10000000", Locked: "0.05000000"},
+			{Asset: "XRP", Free: "26.16936963", Locked: "0.10000000"},
 		},
-	}, nil)
+	}, nil).AnyTimes()
 	binanceClient.EXPECT().GetPMAccountInfo(gomock.Any()).Return(&binanceportfolio.Account{
 		ActualEquity:             "8.16774569",
 		VirtualMaxWithdrawAmount: "32.69173084",
 		UniMMR:                   "12.10275117",
-	}, nil)
+	}, nil).AnyTimes()
 	binanceClient.EXPECT().GetPMAccountBalance(gomock.Any()).Return([]*binanceportfolio.Balance{
 		{Asset: "USDT", UMWalletBalance: "-0.00307684"},
-	}, nil)
+	}, nil).AnyTimes()
 
-	expectedData := &neutronclient.BinanceData{
+	expectedBinanceData := &neutronclient.BinanceData{
 		Round:  1,
 		Unimmr: math.LegacyMustNewDecFromStr("12.10275117"),
 		Positions: []neutronclient.BinancePosition{
@@ -58,7 +65,26 @@ func TestOracleRun(t *testing.T) {
 		PmAccountActualEquity: math.LegacyMustNewDecFromStr("8.16774569"),
 		WithdrawableUsdt:      math.LegacyMustNewDecFromStr("32.69173084"),
 	}
-	neutronClient.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
+	neutronAum.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedBinanceData).Return(&neutronclient.NextRound{
+		Round: 2, Timestamp: start + 12,
+	}, nil)
+
+	expectedSolanaData := &solanaclient.BinanceData{
+		Round:  1,
+		Unimmr: 12.10275117,
+		Positions: []solanaclient.BinancePosition{
+			{Symbol: "BTCUSDT", Amount: 0.148, Pnl: 1985.41474317},
+		},
+		UmBalanceUsdt: -0.00307684,
+		SpotBalances: []solanaclient.BinanceBalance{
+			{Asset: "USDT", Amount: 30.89057560},
+			// summing floats is not precise: https://blog.stackademic.com/those-annoying-golang-floats-d65b20ea82f3
+			{Asset: "BTC", Amount: 0.15000000000000002},
+		},
+		PmAccountActualEquity: 8.16774569,
+		WithdrawableUsdt:      32.69173084,
+	}
+	solanaAum.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedSolanaData).Return(&solanaclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 
@@ -66,11 +92,10 @@ func TestOracleRun(t *testing.T) {
 		UmPositionsList: []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"},
 		SpotAssetsList:  []string{"USDT", "BTC", "ETH", "SOL"},
 	}
-	oracle := NewOracle(binanceClient, neutronClient, config, zap.NewExample())
+	oracle := NewOracle(binanceClient, neutronAum, solanaAum, config, zap.NewExample())
+
 	ctx, cancel := context.WithCancel(context.Background())
-
 	go oracle.Run(ctx)
-
 	time.Sleep(5 * time.Second)
 	cancel()
 }

@@ -51,6 +51,7 @@ func main() {
 	binanceOracle := binanceoracle.NewOracle(
 		binanceClient,
 		neutronClient,
+		solanaClient,
 		binanceOracleConfig,
 		logRegistry.Get(binanceAumOracleContext),
 	)

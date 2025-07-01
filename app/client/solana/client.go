@@ -20,6 +20,16 @@ func NewClient(rpcEndpoint string) *Client {
 	}
 }
 
+// GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
+func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// SubmitBinanceAumData submits the Binance AUM data to the Solana AUM contract.
+func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceData) (*NextRound, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // GetJupiterCustodyInfo gets the Jupiter custody info.
 func (c *Client) GetJupiterCustodyInfo(ctx context.Context, custody solana.PublicKey) (*JupiterPerpsCustodyAccount, error) {
 	var resp JupiterPerpsCustodyAccount
