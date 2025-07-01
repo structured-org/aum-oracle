@@ -1,12 +1,19 @@
+use consensus::error::ConsensusError;
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
-pub type ContractResult<T> = core::result::Result<T, ContractError>;
+pub type ContractResult<T> = Result<T, ContractError>;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] StdError),
+
+    #[error(transparent)]
+    ConsensusError(#[from] ConsensusError),
+
+    #[error("Invalid Binance data: {msg:?}")]
+    InvalidBinanceData { msg: String },
 
     #[error("Price is invalid")]
     InvalidPrice,

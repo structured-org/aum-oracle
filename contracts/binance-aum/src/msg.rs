@@ -21,6 +21,24 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     PublishData { new_data: OracleData<BinanceData> },
+    UpdateConfig { new_config: UpdateConfig },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UpdateConfig {
+    /// Contract configuration updates
+    pub admin: Option<String>,
+    pub consensus_data_valid_period: Option<u64>,
+    pub price_data_valid_period: Option<u64>,
+    pub required_binance_positions: Option<Vec<String>>,
+    pub required_binance_spot_assets: Option<Vec<String>>,
+    pub price_oracle_contract: Option<String>,
+
+    /// Consensus configuration updates
+    pub oracles: Option<Vec<String>>,
+    pub threshold: Option<u32>,
+    pub data_delta_ppm: Option<u64>,
+    pub round_length: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

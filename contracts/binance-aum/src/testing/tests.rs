@@ -5,10 +5,11 @@ use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
+use consensus::error::ConsensusError;
 use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env},
-    Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal, StdError, Timestamp,
+    Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal, Timestamp,
 };
 use std::str::FromStr;
 
@@ -151,10 +152,7 @@ fn test_execute_publish_data() {
     };
     let result = execute(deps.as_mut(), env.clone(), unauthorized_info, msg);
     assert!(result.is_err());
-    match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => assert_eq!(msg, "Unauthorized oracle"),
-        _ => panic!("Unexpected error"),
-    }
+    assert_eq!(result.unwrap_err(), ContractError::Unauthorized {});
 
     // Test 2: Invalid positions
     let oracle_info = message_info("oracle1", &[]);
@@ -185,7 +183,7 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => {
+        ContractError::InvalidBinanceData { msg } => {
             assert_eq!(msg, "Binance positions do not match required positions")
         }
         _ => panic!("Unexpected error"),
@@ -218,7 +216,7 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => {
+        ContractError::InvalidBinanceData { msg } => {
             assert_eq!(msg, "Binance spot assets do not match required spot assets")
         }
         _ => panic!("Unexpected error"),
@@ -240,7 +238,9 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => assert_eq!(msg, "Invalid round"),
+        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
+            assert_eq!(msg, "Round must be equal to the pending one")
+        }
         _ => panic!("Unexpected error"),
     }
 
@@ -335,7 +335,9 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => assert_eq!(msg, "Invalid round"),
+        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
+            assert_eq!(msg, "New round must be greater than last published")
+        }
         _ => panic!("Unexpected error"),
     };
 
@@ -1020,8 +1022,11 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Should fail because round 1 is now invalid (we're in round 2)
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => {
-            assert_eq!(msg, "Invalid round", "Should reject data for passed round")
+        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
+            assert_eq!(
+                msg, "Round must be equal to the pending one",
+                "Round must be equal to the pending one"
+            )
         }
         _ => panic!("Unexpected error"),
     }
@@ -1132,8 +1137,11 @@ fn test_multiple_rounds_passing() {
     // Should fail because round 2 is now invalid (we're in round 4)
     assert!(result.is_err());
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => {
-            assert_eq!(msg, "Invalid round", "Should reject data for passed round")
+        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
+            assert_eq!(
+                msg, "Round must be equal to the pending one",
+                "Should reject data for passed round"
+            )
         }
         _ => panic!("Unexpected error"),
     }
@@ -1513,10 +1521,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
         "Second submission for the same round should fail"
     );
     match result.unwrap_err() {
-        StdError::GenericErr { msg, .. } => assert_eq!(
-            msg, "Oracle has already submitted data for this round",
-            "Error message should indicate duplicate submission"
-        ),
+        ContractError::ConsensusError(ConsensusError::DoubleSubmission {}) => {}
         _ => panic!("Unexpected error"),
     }
 
@@ -1958,6 +1963,335 @@ fn test_query_get_aum_with_negative_equity() {
 
     // Verify results
     assert_eq!(response.aum_in_btc, expected_aum);
+}
+
+#[test]
+fn test_execute_update_config_admin_only() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    // Test 1: Non-admin tries to update config (should fail)
+    let non_admin_info = message_info("non_admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: Some("new_admin_attempt".to_string()),
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), non_admin_info, msg);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        ContractError::Unauthorized {} => {}
+        _ => panic!("Unexpected error"),
+    }
+
+    let new_admin = deps.api.addr_make("new_admin");
+    let oracle1 = deps.api.addr_make("oracle1");
+    let oracle2 = deps.api.addr_make("oracle2");
+    let price_oracle = deps.api.addr_make("price_oracle");
+
+    // Test 2: Admin successfully updates config
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: Some(new_admin.to_string()),
+        consensus_data_valid_period: Some(7200),
+        price_data_valid_period: Some(200),
+        required_binance_positions: Some(vec!["ETHUSDT".to_string()]),
+        required_binance_spot_assets: Some(vec!["ETH".to_string(), "USDT".to_string()]),
+        price_oracle_contract: Some(price_oracle.to_string()),
+        oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
+        threshold: Some(1),
+        data_delta_ppm: Some(5000),
+        round_length: Some(1800),
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    if result.is_err() {
+        println!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+
+    // Verify contract config was updated
+    let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(updated_contract_config.admin, new_admin);
+    assert_eq!(updated_contract_config.consensus_data_valid_period, 7200);
+    assert_eq!(updated_contract_config.price_max_blocks_old, 200);
+    assert_eq!(
+        updated_contract_config.required_binance_positions,
+        vec!["ETHUSDT".to_string()]
+    );
+    assert_eq!(
+        updated_contract_config.required_binance_spot_assets,
+        vec!["ETH".to_string(), "USDT".to_string()]
+    );
+    assert_eq!(updated_contract_config.price_oracle_contract, price_oracle);
+
+    // Verify consensus config was updated
+    let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(updated_consensus_config.oracles, vec![oracle1, oracle2]);
+    assert_eq!(updated_consensus_config.threshold, 1);
+    assert_eq!(updated_consensus_config.data_delta_ppm, 5000);
+    assert_eq!(updated_consensus_config.round_length, 1800);
+}
+
+#[test]
+fn test_execute_update_config_partial_updates() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    // Test partial update - only contract config fields
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: None,
+        consensus_data_valid_period: Some(3600),
+        price_data_valid_period: Some(150),
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_ok());
+
+    // Verify only specified fields were updated
+    let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(updated_contract_config.admin, Addr::unchecked("admin")); // unchanged
+    assert_eq!(updated_contract_config.consensus_data_valid_period, 3600); // updated
+    assert_eq!(updated_contract_config.price_max_blocks_old, 150); // updated
+    assert_eq!(
+        updated_contract_config.required_binance_positions,
+        vec!["BTCUSDT".to_string()]
+    ); // unchanged
+    assert_eq!(
+        updated_contract_config.required_binance_spot_assets,
+        vec!["BTC".to_string(), "USDT".to_string()]
+    ); // unchanged
+
+    // Verify consensus config was not updated
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after.oracles, consensus_config.oracles);
+    assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
+    assert_eq!(
+        consensus_config_after.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    );
+    assert_eq!(
+        consensus_config_after.round_length,
+        consensus_config.round_length
+    );
+
+    let oracle_a = deps.api.addr_make("oracle_a");
+    let oracle_b = deps.api.addr_make("oracle_b");
+
+    // Test partial update - only consensus config fields
+    let update_config = crate::msg::UpdateConfig {
+        admin: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: Some(vec![oracle_a.to_string(), oracle_b.to_string()]),
+        threshold: Some(1),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    assert!(result.is_ok());
+
+    // Verify only specified consensus fields were updated
+    let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(updated_consensus_config.oracles, vec![oracle_a, oracle_b]); // updated
+    assert_eq!(updated_consensus_config.threshold, 1); // updated
+    assert_eq!(
+        updated_consensus_config.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    ); // unchanged
+    assert_eq!(
+        updated_consensus_config.round_length,
+        consensus_config.round_length
+    ); // unchanged
+
+    // Verify contract config was not changed from previous update
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after.consensus_data_valid_period, 3600); // still updated value
+    assert_eq!(contract_config_after.price_max_blocks_old, 150); // still updated value
+}
+
+#[test]
+fn test_execute_update_config_empty_update() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    // Test empty update (all fields None)
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    assert!(result.is_ok());
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+}
+
+#[test]
+fn test_execute_update_config_admin_change() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    let new_admin = deps.api.addr_make("new_admin");
+    // Test admin change
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: Some(new_admin.to_string()),
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    assert!(result.is_ok());
+
+    // Verify admin was changed
+    let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(updated_contract_config.admin, new_admin);
+
+    // Test that old admin can no longer update config
+    let old_admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: Some("another_admin".to_string()),
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), old_admin_info, msg);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        ContractError::Unauthorized => {}
+        _ => panic!("Unexpected error"),
+    }
+
+    // Test that new admin can update config
+    let new_admin_info = message_info(new_admin.as_ref(), &[]);
+    let update_config = crate::msg::UpdateConfig {
+        admin: None,
+        consensus_data_valid_period: Some(5000),
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        oracles: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), new_admin_info, msg);
+    assert!(result.is_ok());
+
+    // Verify the update was successful
+    let final_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(final_contract_config.consensus_data_valid_period, 5000);
 }
 
 #[test]

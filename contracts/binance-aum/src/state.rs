@@ -1,5 +1,6 @@
+use crate::error::{ContractError, ContractResult};
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
-use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult};
+use cosmwasm_std::{Addr, Deps, SignedDecimal};
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
 
@@ -48,16 +49,16 @@ impl BinanceData {
         &mut self,
         required_binance_positions: Vec<String>,
         required_binance_spot_assets: Vec<String>,
-    ) -> StdResult<()> {
+    ) -> ContractResult<()> {
         // positions must contain only required binance positions
         self.positions
             .retain(|p| required_binance_positions.contains(&p.symbol));
         self.positions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
         if self.positions.len() != required_binance_positions.len() {
-            return Err(StdError::generic_err(
-                "Binance positions do not match required positions",
-            ));
+            return Err(ContractError::InvalidBinanceData {
+                msg: "Binance positions do not match required positions".to_string(),
+            });
         }
 
         // spot_balances must contain only required binance spot assets
@@ -66,9 +67,9 @@ impl BinanceData {
         self.spot_balances.sort_by(|a, b| a.asset.cmp(&b.asset));
 
         if self.spot_balances.len() != required_binance_spot_assets.len() {
-            return Err(StdError::generic_err(
-                "Binance spot assets do not match required spot assets",
-            ));
+            return Err(ContractError::InvalidBinanceData {
+                msg: "Binance spot assets do not match required spot assets".to_string(),
+            });
         }
 
         Ok(())
@@ -167,6 +168,35 @@ where
 {
     let items: Vec<SignedDecimal> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
+}
+
+impl Config {
+    /// Updates the contract configuration with new values, keeping existing values for None options
+    pub fn update_config(
+        &mut self,
+        deps: Deps,
+        new_config: &crate::msg::UpdateConfig,
+    ) -> ContractResult<()> {
+        if let Some(ref admin) = new_config.admin {
+            self.admin = deps.api.addr_validate(admin)?;
+        }
+        if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
+            self.consensus_data_valid_period = consensus_data_valid_period;
+        }
+        if let Some(price_data_valid_period) = new_config.price_data_valid_period {
+            self.price_max_blocks_old = price_data_valid_period;
+        }
+        if let Some(ref required_binance_positions) = new_config.required_binance_positions {
+            self.required_binance_positions = required_binance_positions.clone();
+        }
+        if let Some(ref required_binance_spot_assets) = new_config.required_binance_spot_assets {
+            self.required_binance_spot_assets = required_binance_spot_assets.clone();
+        }
+        if let Some(ref price_oracle_contract) = new_config.price_oracle_contract {
+            self.price_oracle_contract = deps.api.addr_validate(price_oracle_contract)?;
+        }
+        Ok(())
+    }
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");

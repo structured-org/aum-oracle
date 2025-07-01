@@ -244,6 +244,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

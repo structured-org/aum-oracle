@@ -1,10 +1,11 @@
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{
     ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
+    UpdateConfig,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_in_btc};
-use consensus::consensus::{Config as ConsensusConfig, ConsensusResult, OracleData};
+use consensus::consensus::{Config as ConsensusConfig, OracleData, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     SignedDecimal, StdError, StdResult,
@@ -44,9 +45,19 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> ContractResult<Response> {
     match msg {
-        ExecuteMsg::PublishData { new_data } => execute_publish_data(deps, env, info, new_data),
+        ExecuteMsg::PublishData { new_data } => {
+            Ok(execute_publish_data(deps, env, info, new_data)?)
+        }
+        ExecuteMsg::UpdateConfig { new_config } => {
+            Ok(execute_update_config(deps, env, info, new_config)?)
+        }
     }
 }
 
@@ -55,13 +66,13 @@ fn execute_publish_data(
     env: Env,
     info: MessageInfo,
     mut new_data: OracleData<BinanceData>,
-) -> StdResult<Response> {
+) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     // Only oracle can submit
     if !consensus_config.oracles.contains(&info.sender) {
-        return Err(StdError::generic_err("Unauthorized oracle"));
+        return Err(ContractError::Unauthorized {});
     }
 
     // clean and validate published data
@@ -76,7 +87,7 @@ fn execute_publish_data(
     let mut res = Response::new();
 
     // If we have new published data for the current round, consensus was reached
-    if let ConsensusResult::ConsensusReached(_) = result {
+    if let PublishResult::ConsensusReached(_) = result {
         res = res.add_attribute("action", "publish_consensus");
     }
 
@@ -92,6 +103,57 @@ fn execute_publish_data(
     ]);
 
     Ok(res)
+}
+
+fn execute_update_config(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    new_config: UpdateConfig,
+) -> ContractResult<Response> {
+    // Load current contract config
+    let mut contract_config = CONFIG.load(deps.storage)?;
+
+    // Only admin can update config
+    if info.sender != contract_config.admin {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Update contract configuration
+    contract_config.update_config(deps.as_ref(), &new_config)?;
+    CONFIG.save(deps.storage, &contract_config)?;
+
+    // Update consensus configuration if any consensus fields are provided
+    if new_config.oracles.is_some()
+        || new_config.threshold.is_some()
+        || new_config.data_delta_ppm.is_some()
+        || new_config.round_length.is_some()
+    {
+        let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+
+        // Update consensus config fields
+        if let Some(ref oracles) = new_config.oracles {
+            let validated_oracles: Vec<Addr> = oracles
+                .iter()
+                .map(|addr| deps.api.addr_validate(addr))
+                .collect::<StdResult<_>>()?;
+            consensus_config.oracles = validated_oracles;
+        }
+        if let Some(threshold) = new_config.threshold {
+            consensus_config.threshold = threshold;
+        }
+        if let Some(data_delta_ppm) = new_config.data_delta_ppm {
+            consensus_config.data_delta_ppm = data_delta_ppm;
+        }
+        if let Some(round_length) = new_config.round_length {
+            consensus_config.round_length = round_length;
+        }
+
+        // Save updated consensus config
+        CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
+    }
+
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 #[entry_point]
