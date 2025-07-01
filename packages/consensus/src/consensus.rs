@@ -1,5 +1,6 @@
-use crate::consensus::ConsensusResult::ConsensusReached;
-use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdError, StdResult, Storage, Uint128};
+use crate::consensus::PublishResult::ConsensusReached;
+use crate::error::{ConsensusError, ConsensusResult};
+use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -134,6 +135,11 @@ impl<T: ConsensusData> State<T> {
         self.pending_round.load(storage)
     }
 
+    /// Updates the consensus configuration
+    pub fn update_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
+        self.config.save(storage, &new_config)
+    }
+
     /// Returns the last current data oracles agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
@@ -189,12 +195,12 @@ impl<T: ConsensusData> State<T> {
         env: &Env,
         oracle: Addr,
         new_data: OracleData<T>,
-    ) -> StdResult<(ConsensusResult<T>, Round)> {
+    ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
         let config = self.config.load(storage)?;
 
-        let mut consensus_data = ConsensusResult::ConsensusNotReached;
+        let mut consensus_data = PublishResult::ConsensusNotReached;
 
         // if pending round is passed:
         // * process pending data for the passed round
@@ -235,13 +241,17 @@ impl<T: ConsensusData> State<T> {
         // oracles can't publish data for already finalized rounds
         if let Some(last_data) = self.last_published_data.may_load(storage)? {
             if last_data.round >= new_data.round {
-                return Err(StdError::generic_err("Invalid round"));
+                return Err(ConsensusError::InvalidRound {
+                    msg: "New round must be greater than last published".to_string(),
+                });
             }
         }
 
         // Only accept data for pending round
         if new_data.round != pending_round.round {
-            return Err(StdError::generic_err("Invalid round"));
+            return Err(ConsensusError::InvalidRound {
+                msg: "Round must be equal to the pending one".to_string(),
+            });
         }
 
         // Check if oracle has already submitted data for this round
@@ -250,9 +260,7 @@ impl<T: ConsensusData> State<T> {
             .may_load(storage, oracle.clone())?
             .is_some()
         {
-            return Err(StdError::generic_err(
-                "Oracle has already submitted data for this round",
-            ));
+            return Err(ConsensusError::DoubleSubmission {});
         }
 
         self.pending_data.save(
@@ -297,7 +305,7 @@ impl<T: ConsensusData> State<T> {
 }
 
 /// Result of the `publish_data` method
-pub enum ConsensusResult<T> {
+pub enum PublishResult<T> {
     /// The consensus was reached, the first element is the data
     ConsensusReached(OracleData<T>),
     /// The consensus was not reached

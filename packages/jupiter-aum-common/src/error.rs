@@ -1,3 +1,4 @@
+use consensus::error::ConsensusError;
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
@@ -5,6 +6,9 @@ use thiserror::Error;
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error(transparent)]
+    ConsensusError(#[from] ConsensusError),
 
     #[error("Unauthorized")]
     Unauthorized {},

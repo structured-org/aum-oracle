@@ -1,6 +1,6 @@
 use crate::state::{CONFIG, CONSENSUS_STATE};
-use consensus::consensus::OracleData;
-use consensus::consensus::{Config as ConsensusConfig, ConsensusResult};
+use consensus::consensus::Config as ConsensusConfig;
+use consensus::consensus::{OracleData, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
     Response, Uint128,
@@ -190,7 +190,7 @@ fn execute_publish_data(
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
     // If we have new published data for the current round, consensus was reached
-    if let ConsensusResult::ConsensusReached(_) = result {
+    if let PublishResult::ConsensusReached(_) = result {
         res = res.add_attribute("consensus_reached", "true");
     } else {
         res = res.add_attribute("consensus_reached", "false");

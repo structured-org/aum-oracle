@@ -1,6 +1,7 @@
 use crate::consensus::{
     consensus_on_items, exact_consensus_on_items, Config, ConsensusData, OracleData, Round, State,
 };
+use crate::error::ConsensusError;
 use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -562,12 +563,7 @@ fn test_state_publish_data() {
         result.is_err(),
         "Oracle should not be able to publish data twice for the same round"
     );
-    match result {
-        Err(cosmwasm_std::StdError::GenericErr { msg, .. }) => {
-            assert_eq!(msg, "Oracle has already submitted data for this round");
-        }
-        _ => panic!("Unexpected error"),
-    }
+    assert_eq!(result.err().unwrap(), ConsensusError::DoubleSubmission {});
 
     // Test 3: Another oracle publishes data
     let oracle2 = Addr::unchecked("oracle2");
@@ -645,8 +641,8 @@ fn test_state_publish_data() {
         "Oracle should not be able to publish data for a finalized round"
     );
     match result {
-        Err(cosmwasm_std::StdError::GenericErr { msg, .. }) => {
-            assert_eq!(msg, "Invalid round");
+        Err(ConsensusError::InvalidRound { msg }) => {
+            assert_eq!(msg, "New round must be greater than last published");
         }
         _ => panic!("Unexpected error"),
     }

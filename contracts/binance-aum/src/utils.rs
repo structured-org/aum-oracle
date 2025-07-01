@@ -13,7 +13,7 @@ pub struct CombinedPriceResponse {
 }
 
 // a helper to get spot balance in BTC using oracle contract
-pub fn spot_balance_in_btc(
+pub fn btc_in_spot_balance_asset(
     deps: Deps,
     price_oracle_contract: String,
     max_blocks_old: u64,
@@ -22,8 +22,8 @@ pub fn spot_balance_in_btc(
     let price_in_btc = get_prices(
         deps,
         price_oracle_contract,
-        sb.asset.clone(),
         "BTC".to_string(),
+        sb.asset.clone(),
         max_blocks_old,
     )?;
 
@@ -43,8 +43,7 @@ pub fn get_prices(
         .querier
         .query_wasm_smart(
             price_oracle_contract,
-            &serde_json::json!(
-                        {
+            &serde_json::json!({
               "get_prices": {
                 "token_a": {
                   "denom": token_a.clone(), // we don't care about denoms
