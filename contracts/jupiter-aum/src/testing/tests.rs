@@ -1,7 +1,6 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
-use consensus::consensus::OracleData;
 use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
 use cosmwasm_std::{Decimal, Timestamp, Uint128};
@@ -224,7 +223,7 @@ fn test_publish_data_unauthorized() {
     let init_msg = default_init_msg(&deps.api);
     instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
 
-    let data = dummy_oracle_data();
+    let data = dummy_solana_data();
     let info = message_info(&deps.api.addr_make("hacker"), &[]);
     let msg = ExecuteMsg::PublishData { data };
     let res = execute(deps.as_mut(), env, info, msg);
@@ -246,7 +245,7 @@ fn test_publish_data_duplicate_oracle() {
     .unwrap();
 
     let info = message_info(&api.addr_make("oracle1"), &[]);
-    let data = dummy_oracle_data();
+    let data = dummy_solana_data();
     let msg = ExecuteMsg::PublishData { data: data.clone() };
 
     execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
@@ -274,8 +273,8 @@ fn test_publish_data_invalid_custody() {
     .unwrap();
 
     let info = message_info(&api.addr_make("oracle1"), &[]);
-    let mut data = dummy_oracle_data();
-    data.data.custody_assets.clear();
+    let mut data = dummy_solana_data();
+    data.custody_assets.clear();
 
     let msg = ExecuteMsg::PublishData { data };
     let res = execute(deps.as_mut(), env, info, msg);
@@ -324,7 +323,7 @@ fn test_query_get_aum_data_stale() {
 
     instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
 
-    let data = dummy_oracle_data();
+    let data = dummy_solana_data();
     execute(
         deps.as_mut(),
         env.clone(),
@@ -345,38 +344,30 @@ fn test_query_get_aum_data_stale() {
     assert!(matches!(res, Err(ContractError::DataNotValid {})));
 }
 
-fn dummy_oracle_data() -> OracleData<SolanaData> {
-    OracleData {
-        round: 0,
-        timestamp: 1000,
-        data: SolanaData {
-            custody_assets: vec![CustodyAsset {
-                owned: 1,
-                locked: 0,
-                guaranteed_usd: 1,
-                decimals: 6,
-                denom: "USDC".to_string(),
-            }],
-            aum_usd: Uint128::new(500_000),
-            jlp_token_decimals: 6,
-            total_jlp_supply: Uint128::new(1_000),
-            strategy_jlp_balance: Uint128::new(10_000),
-        },
+fn dummy_solana_data() -> SolanaData {
+    SolanaData {
+        custody_assets: vec![CustodyAsset {
+            owned: 1,
+            locked: 0,
+            guaranteed_usd: 1,
+            decimals: 6,
+            denom: "USDC".to_string(),
+        }],
+        aum_usd: Uint128::new(500_000),
+        jlp_token_decimals: 6,
+        total_jlp_supply: Uint128::new(1_000),
+        strategy_jlp_balance: Uint128::new(10_000),
     }
 }
 
 fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
     ExecuteMsg::PublishData {
-        data: OracleData {
-            round: 0,
-            timestamp: 0,
-            data: SolanaData {
-                custody_assets: data.custody_assets.clone(),
-                aum_usd: data.aum_usd,
-                jlp_token_decimals: data.jlp_token_decimals,
-                total_jlp_supply: data.total_jlp_supply,
-                strategy_jlp_balance: data.strategy_jlp_balance,
-            },
+        data: SolanaData {
+            custody_assets: data.custody_assets.clone(),
+            aum_usd: data.aum_usd,
+            jlp_token_decimals: data.jlp_token_decimals,
+            total_jlp_supply: data.total_jlp_supply,
+            strategy_jlp_balance: data.strategy_jlp_balance,
         },
     }
 }

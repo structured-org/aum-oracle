@@ -1,6 +1,6 @@
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
-use consensus::consensus::{OracleData, PublishResult};
+use consensus::consensus::PublishResult;
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
     Response, StdResult, Uint128,
@@ -140,7 +140,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mut new_data: OracleData<SolanaData>,
+    mut new_data: SolanaData,
 ) -> Result<Response, ContractError> {
     let contract_config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
@@ -150,9 +150,7 @@ fn execute_publish_data(
         return Err(ContractError::Unauthorized {});
     }
 
-    new_data
-        .data
-        .clean_and_validate(contract_config.required_custody_assets)?;
+    new_data.clean_and_validate(contract_config.required_custody_assets)?;
 
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;

@@ -186,15 +186,15 @@ impl<T: ConsensusData> State<T> {
     /// * an oracle tries to publish data for the same round more than ones;
     /// * an oracle tries to publish data for the past or future round;
     ///
-    /// The method returns `ConsensusResult::ConsensusReached(OracleData<T>)` if the call
-    /// and `ConsensusResult::ConsensusNotReached` in case it did not as the first argument
+    /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
+    /// and `PublishResult::ConsensusNotReached` in case it did not as the first argument
     /// and the current pending round as the second
     pub fn publish_data(
         &self,
         storage: &mut dyn Storage,
         env: &Env,
         oracle: Addr,
-        new_data: OracleData<T>,
+        new_data: T,
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
@@ -238,22 +238,6 @@ impl<T: ConsensusData> State<T> {
             self.pending_data.clear(storage);
         }
 
-        // oracles can't publish data for already finalized rounds
-        if let Some(last_data) = self.last_published_data.may_load(storage)? {
-            if last_data.round >= new_data.round {
-                return Err(ConsensusError::InvalidRound {
-                    msg: "New round must be greater than last published".to_string(),
-                });
-            }
-        }
-
-        // Only accept data for pending round
-        if new_data.round != pending_round.round {
-            return Err(ConsensusError::InvalidRound {
-                msg: "Round must be equal to the pending one".to_string(),
-            });
-        }
-
         // Check if oracle has already submitted data for this round
         if self
             .pending_data
@@ -267,9 +251,9 @@ impl<T: ConsensusData> State<T> {
             storage,
             oracle.clone(),
             &OracleData {
-                round: new_data.round,
+                round: pending_round.round,
                 timestamp: env.block.time.seconds(),
-                data: new_data.data,
+                data: new_data,
             },
         )?;
 
@@ -289,7 +273,7 @@ impl<T: ConsensusData> State<T> {
                 config.data_delta_ppm,
             ) {
                 let oracle_data = OracleData {
-                    round: new_data.round,
+                    round: pending_round.round,
                     timestamp: env.block.time.seconds(),
                     data: consensus,
                 };
