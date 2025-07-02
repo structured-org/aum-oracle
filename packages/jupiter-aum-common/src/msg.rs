@@ -13,8 +13,6 @@ pub struct InstantiateMsg {
     pub oracles: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,
-    /// Initial value for extract_period (data extraction from each N-th Solana slot).
-    pub extract_period: u64,
     /// Delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
     /// Consensus round length in seconds
@@ -23,6 +21,8 @@ pub struct InstantiateMsg {
     pub valid_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
+    /// How many blocks we consider BTC/USD price from oracle as valid.
+    pub price_max_blocks_old: u64,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -31,27 +31,35 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
     /// Only callable by the admin. All fields are optional, allowing partial updates.
-    UpdateConfig {
-        /// New admin address.
-        admin: Option<String>,
-        /// New valid period for data in seconds.
-        valid_period: Option<u64>,
-        /// New required custody asset denoms.
-        required_custody_assets: Option<Vec<String>>,
-    },
+    UpdateConfig { new_config: UpdateConfig },
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { data: OracleData<SolanaData> },
-    UpdateConsensusConfig {
-        /// List of allowed oracle addresses.
-        oracles: Option<Vec<String>>,
-        /// Threshold for consensus.
-        threshold: Option<u32>,
-        /// Delta in percent per million (ppm), for which two values are considered equal.
-        data_delta_ppm: Option<u64>,
-        /// Round length in seconds
-        round_length: Option<u64>,
-    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct UpdateConfig {
+    /// Contract config updates.
+    ///
+    /// New admin address.
+    pub admin: Option<String>,
+    /// New valid period for data in seconds.
+    pub valid_period: Option<u64>,
+    /// New required custody asset denoms.
+    pub required_custody_assets: Option<Vec<String>>,
+    /// New value for how many blocks we consider BTC/USD price from oracle as valid.
+    pub price_max_blocks_old: Option<u64>,
+
+    /// Consensus configuration updates
+    ///
+    /// New list of oracles.
+    pub oracles: Option<Vec<String>>,
+    /// New threshold needed for consensus.
+    pub threshold: Option<u32>,
+    /// New delta in percent per million (ppm), for which two values are considered equal.
+    pub data_delta_ppm: Option<u64>,
+    /// New round length in seconds.
+    pub round_length: Option<u64>,
 }
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.

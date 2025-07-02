@@ -3,13 +3,13 @@ use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::{OracleData, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, Uint128,
+    Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg, RoundInfoResponse,
+    QueryMsg, RoundInfoResponse, UpdateConfig,
 };
 use jupiter_aum_common::types::{Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
@@ -36,6 +36,7 @@ pub fn instantiate(
         admin: deps.api.addr_validate(&msg.admin)?,
         valid_period: msg.valid_period,
         required_custody_assets: msg.required_custody_assets,
+        price_max_blocks_old: msg.price_max_blocks_old,
     };
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
@@ -65,65 +66,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::UpdateConfig {
-            admin,
-            valid_period,
-            required_custody_assets,
-        } => update_config(deps, info, admin, valid_period, required_custody_assets),
-        ExecuteMsg::UpdateConsensusConfig {
-            oracles,
-            threshold,
-            data_delta_ppm,
-            round_length,
-        } => update_consensus_config(deps, info, oracles, threshold, data_delta_ppm, round_length),
+        ExecuteMsg::UpdateConfig { new_config } => update_config(deps, info, new_config),
         ExecuteMsg::PublishData { data } => execute_publish_data(deps, env, info, data),
     }
-}
-
-/// Updates consensus configuration for the contract.
-/// Only admin can call this method.
-fn update_consensus_config(
-    deps: DepsMut,
-    info: MessageInfo,
-    oracles: Option<Vec<String>>,
-    threshold: Option<u32>,
-    data_delta_ppm: Option<u64>,
-    round_length: Option<u64>,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-
-    // ensure only the contract admin can update the configuration
-    if info.sender != config.admin {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
-
-    if let Some(oracles) = oracles {
-        consensus_config.oracles = oracles
-            .into_iter()
-            .map(|addr| deps.api.addr_validate(&addr))
-            .collect::<Result<Vec<Addr>, _>>()?;
-    }
-
-    if let Some(threshold) = threshold {
-        consensus_config.threshold = threshold;
-    }
-
-    if let Some(data_delta_ppm) = data_delta_ppm {
-        consensus_config.data_delta_ppm = data_delta_ppm;
-    }
-
-    if let Some(round_length) = round_length {
-        consensus_config.round_length = round_length;
-    }
-
-    // consensus_config.validate()?; // TODO: maybe implement later
-    CONSENSUS_STATE
-        .config
-        .save(deps.storage, &consensus_config)?;
-
-    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 /// Updates configuration parameters for the contract.
@@ -132,9 +77,7 @@ fn update_consensus_config(
 fn update_config(
     deps: DepsMut,
     info: MessageInfo,
-    admin: Option<String>,
-    valid_period: Option<u64>,
-    required_custody_assets: Option<Vec<String>>,
+    new_config: UpdateConfig,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
@@ -143,20 +86,47 @@ fn update_config(
         return Err(ContractError::Unauthorized {});
     }
 
-    if let Some(new_admin) = admin {
+    if let Some(new_admin) = new_config.admin {
         config.admin = deps.api.addr_validate(&new_admin)?;
     }
 
-    if let Some(new_valid_period) = valid_period {
+    if let Some(new_valid_period) = new_config.valid_period {
         config.valid_period = new_valid_period;
     }
 
-    if let Some(new_required_custody_assets) = required_custody_assets {
+    if let Some(new_required_custody_assets) = new_config.required_custody_assets {
         config.required_custody_assets = new_required_custody_assets;
+    }
+
+    if let Some(new_price_max_blocks_old) = new_config.price_max_blocks_old {
+        config.price_max_blocks_old = new_price_max_blocks_old;
     }
 
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
+
+    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+
+    // Update consensus config fields
+    if let Some(ref oracles) = new_config.oracles {
+        let validated_oracles: Vec<Addr> = oracles
+            .iter()
+            .map(|addr| deps.api.addr_validate(addr))
+            .collect::<StdResult<_>>()?;
+        consensus_config.oracles = validated_oracles;
+    }
+    if let Some(threshold) = new_config.threshold {
+        consensus_config.threshold = threshold;
+    }
+    if let Some(data_delta_ppm) = new_config.data_delta_ppm {
+        consensus_config.data_delta_ppm = data_delta_ppm;
+    }
+    if let Some(round_length) = new_config.round_length {
+        consensus_config.round_length = round_length;
+    }
+
+    // Save updated consensus config
+    CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -249,7 +219,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
         return Err(ContractError::DataNotValid {});
     }
 
-    let btc_price_in_usd = query_btc_price_in_usd(deps)?;
+    let btc_price_in_usd = query_btc_price_in_usd(deps, env, config)?;
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
     Ok(GetAUMResponse { aum_in_btc })
@@ -265,29 +235,33 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     })
 }
 
-fn query_btc_price_in_usd(deps: Deps) -> Result<Decimal, ContractError> {
+fn query_btc_price_in_usd(deps: Deps, env: Env, config: Config) -> Result<Decimal, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
-    let btc_usd_price_result = querier.get_price(Some(CurrencyPair {
+    let response = querier.get_price(Some(CurrencyPair {
         base: BTC_DENOM.to_string(),
         quote: USD_DENOM.to_string(),
     }))?;
-    let btc_usd_price_string = btc_usd_price_result
+    let quote = response
         .price
-        .ok_or(ContractError::SlinkyBTCPriceMissing {})?
-        .price;
-    let btc_price_in_usd = Uint128::from_str(&btc_usd_price_string).map_err(|e| {
-        ContractError::SlinkyBTCPriceIncorrect {
-            price: btc_usd_price_string,
-            error: e.to_string(),
-        }
-    })?;
+        .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
+
+    // TODO: unit test for that
+    if quote.block_height + config.price_max_blocks_old < env.block.height {
+        return Err(ContractError::SlinkyBTCPriceTooOld {
+            price_height: quote.block_height,
+        });
+    }
 
     let btc_price_in_usd =
-        Decimal::from_atomics(btc_price_in_usd, btc_usd_price_result.decimals as u32).map_err(
-            |e| ContractError::DecimalError {
-                error: e.to_string(),
-            },
-        )?;
+        Uint128::from_str(&quote.price).map_err(|e| ContractError::SlinkyBTCPriceIncorrect {
+            price: quote.price,
+            error: e.to_string(),
+        })?;
+
+    let btc_price_in_usd = Decimal::from_atomics(btc_price_in_usd, response.decimals as u32)
+        .map_err(|e| ContractError::DecimalError {
+            error: e.to_string(),
+        })?;
     Ok(btc_price_in_usd)
 }
 

@@ -2,6 +2,7 @@ use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use consensus::consensus::OracleData;
+use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
 use cosmwasm_std::{Decimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
@@ -19,7 +20,6 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
             api.addr_make("oracle3").to_string(),
         ],
         threshold: 2,
-        extract_period: 10,
         data_delta_ppm: 1000,
         round_length: 100,
         valid_period: 1_000,
@@ -207,47 +207,6 @@ fn test_query_get_aum() {
 }
 
 #[test]
-fn test_update_consensus_config() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
-    let msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg).unwrap();
-
-    let update_msg = ExecuteMsg::UpdateConsensusConfig {
-        oracles: Some(vec![deps.api.addr_make("oracle125").to_string()]),
-        threshold: Some(1),
-        data_delta_ppm: Some(5000),
-        round_length: Some(200),
-    };
-
-    // Unauthorized attempt
-    let stranger_info = message_info(&deps.api.addr_make("stranger"), &[]);
-    let res = execute(
-        deps.as_mut(),
-        env.clone(),
-        stranger_info,
-        update_msg.clone(),
-    );
-    assert!(matches!(res, Err(ContractError::Unauthorized {})));
-    // Data not updated
-    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config.threshold, 2);
-
-    // Authorized update
-    let res = execute(deps.as_mut(), env.clone(), admin_info, update_msg);
-    assert!(res.is_ok());
-    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(
-        consensus_config.oracles,
-        vec![deps.api.addr_make("oracle125")]
-    );
-    assert_eq!(consensus_config.threshold, 1);
-    assert_eq!(consensus_config.data_delta_ppm, 5000);
-    assert_eq!(consensus_config.round_length, 200);
-}
-
-#[test]
 fn test_publish_data_unauthorized() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -282,7 +241,12 @@ fn test_publish_data_duplicate_oracle() {
 
     execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
     let res = execute(deps.as_mut(), env.clone(), info, msg);
-    assert!(matches!(res, Err(ContractError::Std(_))));
+    assert!(matches!(
+        res,
+        Err(ContractError::ConsensusError(
+            ConsensusError::DoubleSubmission {}
+        ))
+    ));
 }
 
 #[test]

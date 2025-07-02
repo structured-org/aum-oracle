@@ -16,6 +16,8 @@ pub struct Config {
     pub valid_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
+    /// How many blocks we consider the last price from oracle as valid
+    pub price_max_blocks_old: u64,
 }
 
 impl Config {

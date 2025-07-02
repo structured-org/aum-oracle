@@ -28,11 +28,6 @@ pub enum ContractError {
     #[error("Oracle already published data for this slot")]
     AlreadyPublished {},
 
-    #[error("Invalid Solana slot: Data must be from an N-th slot ({extract_period})")]
-    InvalidSolanaSlot { extract_period: u64 },
-
-    // #[error("Invalid Solana slot: New data slot ({new_slot}) must be greater than last published slot ({last_slot})")]
-    // SlotTooOld { new_slot: u64, last_slot: u64 },
     #[error("Overflow: {error}")]
     DecimalError { error: String },
 
@@ -41,4 +36,7 @@ pub enum ContractError {
 
     #[error("Slinky BTC/USD price ({price}) is invalid: {error}")]
     SlinkyBTCPriceIncorrect { price: String, error: String },
+
+    #[error("Slinky BTC/USD price is too old: {price_height}")]
+    SlinkyBTCPriceTooOld { price_height: u64 },
 }
