@@ -21,11 +21,20 @@ pub fn mock_dependencies() -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
 pub struct WasmMockQuerier {
     base: MockQuerier,
     price: String,
+    price_block_height: u64,
 }
 
 impl WasmMockQuerier {
-    pub(crate) fn with_price(&mut self, price: String) {
-        self.price = price.to_string();
+    fn new(base: MockQuerier) -> WasmMockQuerier {
+        WasmMockQuerier {
+            base,
+            price: Default::default(),
+            price_block_height: 0,
+        }
+    }
+    pub(crate) fn with_price_and_height(&mut self, price: impl Into<String>, height: u64) {
+        self.price = price.into();
+        self.price_block_height = height;
     }
 }
 
@@ -46,35 +55,25 @@ impl Querier for WasmMockQuerier {
 
 impl WasmMockQuerier {
     pub fn handle_query(&self, request: &QueryRequest<Empty>) -> QuerierResult {
-        match &request {
-            // #[allow(deprecated)]
+        match request {
             QueryRequest::Grpc(GrpcQuery { data: _, path }) => match path.as_str() {
                 neutron_std::types::slinky::oracle::v1::GetPriceRequest::PATH => {
                     let resp = neutron_std::types::slinky::oracle::v1::GetPriceResponse {
                         price: Some(QuotePrice {
-                            price: self.price.to_string(),
+                            price: self.price.clone(),
                             block_timestamp: None,
-                            block_height: 0,
+                            block_height: self.price_block_height,
                         }),
                         nonce: 0,
                         decimals: 6,
                         id: 0,
                     }
                     .to_proto_bytes();
-                    SystemResult::Ok(ContractResult::Ok(Binary::new(resp.to_vec())))
+                    SystemResult::Ok(ContractResult::Ok(Binary::from(resp)))
                 }
                 _ => unimplemented!(),
             },
             _ => self.base.handle_query(request),
-        }
-    }
-}
-
-impl WasmMockQuerier {
-    fn new(base: MockQuerier) -> WasmMockQuerier {
-        WasmMockQuerier {
-            base,
-            price: Default::default(),
         }
     }
 }

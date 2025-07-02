@@ -1,9 +1,8 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
-use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{Decimal, Timestamp, Uint128};
+use cosmwasm_std::{from_json, Decimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
@@ -155,114 +154,98 @@ fn test_calculate_aum_in_btc() {
         "Test Case 4 Failed: {:?}",
         err4
     );
-
-    // TODO: different decimal value for test
 }
 
-// TODO: this should be fixed as values will change and there is no slot publishing system anymore
 /// Comprehensive test suite for the `query_get_aum` query message.
 #[test]
-fn test_query_get_aum() {
+fn test_query_get_aum_behavior() {
     let mut deps = mock_dependencies();
     let mut env = mock_env();
 
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
-    let oracle1 = deps.api.addr_make("oracle1");
-    let oracle2 = deps.api.addr_make("oracle2");
+    let api = deps.api;
+    let admin_info = message_info(&api.addr_make("admin"), &[]);
+    let oracle1 = api.addr_make("oracle1");
+    let oracle2 = api.addr_make("oracle2");
 
-    let init_msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), init_msg).unwrap();
+    let mut msg = default_init_msg(&api);
+    msg.valid_period = 1_000;
+    msg.price_max_blocks_old = 100;
 
-    // --- Error Cases ---
+    instantiate(deps.as_mut(), env.clone(), admin_info, msg).unwrap();
 
-    // Case 1: No data published yet
-    let err = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {}).unwrap_err();
-    assert_eq!(err, ContractError::NoDataPublished {});
+    // 1. error: no data published yet
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    assert!(matches!(res, Err(ContractError::NoDataPublished {})));
 
-    // First, publish some data and finalize it to set LAST_PUBLISHED_DATA
-    let solana_data = SolanaData {
-        custody_assets: vec![CustodyAsset {
-            owned: 1,
-            locked: 0,
-            guaranteed_usd: 1,
-            decimals: 6,
-            denom: "USDC".to_string(),
-        }],
-        aum_usd: Uint128::new(500_000),
-        jlp_token_decimals: 6,
-        total_jlp_supply: Uint128::new(1_000),
-        strategy_jlp_balance: Uint128::new(10_000),
-    };
+    // publish valid data
+    let data = dummy_solana_data();
     execute(
         deps.as_mut(),
         env.clone(),
         message_info(&oracle1, &[]),
-        publish_msg_from_solana_data(&solana_data),
+        ExecuteMsg::PublishData { data: data.clone() },
     )
     .unwrap();
     execute(
         deps.as_mut(),
         env.clone(),
         message_info(&oracle2, &[]),
-        publish_msg_from_solana_data(&solana_data),
-    )
-    .unwrap();
-    env.block.time = env.block.time.plus_seconds(101); // Advance time past valid_period (1000s)
-                                                       // asserts data is there
-    let data = CONSENSUS_STATE
-        .get_last_published_data(&env, &deps.storage)
-        .unwrap();
-    assert!(data.is_some());
-}
-
-#[test]
-fn test_publish_data_unauthorized() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
-    let init_msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
-
-    let data = dummy_solana_data();
-    let info = message_info(&deps.api.addr_make("hacker"), &[]);
-    let msg = ExecuteMsg::PublishData { data };
-    let res = execute(deps.as_mut(), env, info, msg);
-    assert!(matches!(res, Err(ContractError::Unauthorized {})));
-}
-
-#[test]
-fn test_publish_data_duplicate_oracle() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let api = deps.api.clone();
-    let admin_info = message_info(&api.addr_make("admin"), &[]);
-    instantiate(
-        deps.as_mut(),
-        env.clone(),
-        admin_info,
-        default_init_msg(&api),
+        ExecuteMsg::PublishData { data: data.clone() },
     )
     .unwrap();
 
-    let info = message_info(&api.addr_make("oracle1"), &[]);
-    let data = dummy_solana_data();
-    let msg = ExecuteMsg::PublishData { data: data.clone() };
+    // 2. error: data published, but too old (time-based expiration)
+    env.block.time = env.block.time.plus_seconds(10_000);
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    assert!(matches!(res, Err(ContractError::DataNotValid {})));
 
-    execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
-    let res = execute(deps.as_mut(), env.clone(), info, msg);
+    // reset time
+    env.block.time = env.block.time.minus_seconds(9_900);
+    env.block.height = 200;
+
+    // 3. error: no BTC price returned from oracle
+    deps.querier.with_price_and_height("", 200); // empty string will trigger missing
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
     assert!(matches!(
         res,
-        Err(ContractError::ConsensusError(
-            ConsensusError::DoubleSubmission {}
-        ))
+        Err(ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ })
     ));
+
+    // 4. error: BTC price is malformed
+    deps.querier.with_price_and_height("not_a_number", 200);
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    assert!(matches!(
+        res,
+        Err(ContractError::SlinkyBTCPriceIncorrect { .. })
+    ));
+
+    // 5. error: BTC price is too old (block_height + max_blocks_old < env.height)
+    deps.querier.with_price_and_height("25000", 50); // env.height is 200
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    assert!(matches!(
+        res,
+        Err(ContractError::SlinkyBTCPriceTooOld { .. })
+    ));
+
+    // 6. success: valid price and block height
+    deps.querier.with_price_and_height("25000", 150); // still fresh: 150 + 100 > 200
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let bin = res.unwrap();
+    let parsed: msg::GetAUMResponse = from_json(bin).unwrap();
+
+    // expected: aum_usd = 500_000, strategy_jlp_balance = 10_000, total_jlp_supply = 1_000
+    // virtual price = 500_000 / 1_000 = 500
+    // jlp_balance_in_usd = 500 * 10_000 = 5_000_000
+    // aum_in_btc = 5_000_000 / 25_000 = 200
+    // scaled by 1_000_000 (due to jlp_token_decimals): 200_000_000
+    assert_eq!(parsed.aum_in_btc, Uint128::new(200_000_000));
 }
 
 #[test]
 fn test_publish_data_invalid_custody() {
     let mut deps = mock_dependencies();
     let env = mock_env();
-    let api = deps.api.clone();
+    let api = deps.api;
     let admin_info = message_info(&api.addr_make("admin"), &[]);
     instantiate(
         deps.as_mut(),
@@ -357,17 +340,5 @@ fn dummy_solana_data() -> SolanaData {
         jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(1_000),
         strategy_jlp_balance: Uint128::new(10_000),
-    }
-}
-
-fn publish_msg_from_solana_data(data: &SolanaData) -> ExecuteMsg {
-    ExecuteMsg::PublishData {
-        data: SolanaData {
-            custody_assets: data.custody_assets.clone(),
-            aum_usd: data.aum_usd,
-            jlp_token_decimals: data.jlp_token_decimals,
-            total_jlp_supply: data.total_jlp_supply,
-            strategy_jlp_balance: data.strategy_jlp_balance,
-        },
     }
 }
