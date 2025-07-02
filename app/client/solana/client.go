@@ -25,7 +25,7 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 	return nil, fmt.Errorf("not implemented")
 }
 
-// SubmitBinanceAumData submits the Binance AUM data to the Solana AUM contract.
+// SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
 	return nil, fmt.Errorf("not implemented")
 }
