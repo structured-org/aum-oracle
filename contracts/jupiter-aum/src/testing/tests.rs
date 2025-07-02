@@ -6,6 +6,8 @@ use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
 use cosmwasm_std::{Decimal, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
+use jupiter_aum_common::msg;
+use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
 use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
 use std::str::FromStr;
@@ -24,55 +26,63 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         round_length: 100,
         valid_period: 1_000,
         required_custody_assets: vec!["USDC".to_string()],
+        price_max_blocks_old: 100,
     }
 }
 
-/// Tests the following scenario:
-///     1.  A non-authorized address tries to update config's contract (error)
-///     2.  An authorized address tries to update config's contract with invalid date
-///     3.  An authorized address tries to update config's contract
 #[test]
 fn test_update_config() {
     let mut deps = mock_dependencies();
 
-    // Instantiate
     let env = mock_env();
     let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
     let msg = default_init_msg(&deps.api);
-    let init_res = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg).unwrap();
-    assert_eq!(init_res.messages.len(), 0);
+    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg).unwrap();
 
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(config.admin, admin_info.sender);
 
-    let update_msg = ExecuteMsg::UpdateConfig {
+    let update = msg::UpdateConfig {
         admin: Some(deps.api.addr_make("admin2").to_string()),
         valid_period: Some(50_000),
         required_custody_assets: Some(vec!["BTC".to_string()]),
+        price_max_blocks_old: Some(999),
+        oracles: Some(vec![deps.api.addr_make("oracle1").to_string()]),
+        threshold: Some(1),
+        data_delta_ppm: Some(1234),
+        round_length: Some(99),
     };
 
-    // Unauthorized update
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+
+    // Unauthorized
     let stranger_info = message_info(&deps.api.addr_make("stranger"), &[]);
-    let unauthorized_res = execute(
+    let unauthorized = execute(
         deps.as_mut(),
         env.clone(),
         stranger_info,
         update_msg.clone(),
     );
-    assert_eq!(
-        unauthorized_res.err().unwrap(),
-        ContractError::Unauthorized {}
-    );
+    assert_eq!(unauthorized.unwrap_err(), ContractError::Unauthorized {});
 
-    // Authorized update
-    let authorized_res = execute(deps.as_mut(), env.clone(), admin_info.clone(), update_msg);
-    assert!(authorized_res.is_ok());
+    // Authorized
+    let authorized = execute(deps.as_mut(), env.clone(), admin_info.clone(), update_msg);
+    assert!(authorized.is_ok());
 
-    // Config should have updated values
+    // Assert config updated
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(config.admin, deps.api.addr_make("admin2"));
     assert_eq!(config.valid_period, 50_000);
-    assert_eq!(config.required_custody_assets, vec!["BTC".to_string()]);
+    assert_eq!(config.required_custody_assets, vec!["BTC"]);
+    assert_eq!(config.price_max_blocks_old, 999);
+
+    let consensus = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+    assert_eq!(consensus.threshold, 1);
+    assert_eq!(consensus.data_delta_ppm, 1234);
+    assert_eq!(consensus.round_length, 99);
+    assert_eq!(consensus.oracles, vec![deps.api.addr_make("oracle1")]);
 }
 
 #[test]
