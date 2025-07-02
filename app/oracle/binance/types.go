@@ -1,8 +1,12 @@
 package binance
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"sync"
 
 	"cosmossdk.io/math"
 	binance "github.com/adshao/go-binance/v2"
@@ -223,4 +227,100 @@ func (d *BinanceAumData) spotBalancesToSolanaBalances() ([]solanaclient.BinanceB
 	}
 
 	return balances, nil
+}
+
+// fetchBinanceData concurrently fetches all required data from Binance using the Binance client.
+func fetchBinanceData(
+	ctx context.Context,
+	binanceClient BinanceClient,
+	umPositionsList []string,
+	spotAssetsList []string,
+) (*BinanceAumData, error) {
+	data := &BinanceAumData{}
+	wg := sync.WaitGroup{}
+	errsMu := sync.Mutex{}
+	errs := make([]error, 0)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		umPositions, err := binanceClient.GetUmPositions(ctx)
+		if err != nil {
+			errsMu.Lock()
+			errs = append(errs, fmt.Errorf("failed to get UM positions: %w", err))
+			errsMu.Unlock()
+			return
+		}
+		for i, position := range umPositions {
+			if !slices.Contains(umPositionsList, position.Symbol) {
+				umPositions = append(umPositions[:i], umPositions[i+1:]...)
+			}
+		}
+
+		data.UmPositions = umPositions
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		spotAccountInfo, err := binanceClient.GetSpotAccountInfo(ctx)
+		if err != nil {
+			errsMu.Lock()
+			errs = append(errs, fmt.Errorf("failed to get spot balances: %w", err))
+			errsMu.Unlock()
+			return
+		}
+
+		balances := make([]*binance.Balance, 0)
+		for _, balance := range spotAccountInfo.Balances {
+			if slices.Contains(spotAssetsList, balance.Asset) {
+				balances = append(balances, &balance)
+			}
+		}
+
+		data.SpotBalances = balances
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		pmAccount, err := binanceClient.GetPMAccountInfo(ctx)
+		if err != nil {
+			errsMu.Lock()
+			errs = append(errs, fmt.Errorf("failed to get PM account info: %w", err))
+			errsMu.Unlock()
+			return
+		}
+
+		data.PmAccountActualEquity = pmAccount.ActualEquity
+		data.WithdrawableUsdt = pmAccount.VirtualMaxWithdrawAmount
+		data.UniMMR = pmAccount.UniMMR
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		pmAccountBalances, err := binanceClient.GetPMAccountBalance(ctx)
+		if err != nil {
+			errsMu.Lock()
+			errs = append(errs, fmt.Errorf("failed to get PM account balances: %w", err))
+			errsMu.Unlock()
+			return
+		}
+		for _, balance := range pmAccountBalances {
+			if balance.Asset == "USDT" {
+				data.UmBalanceUsdt = balance.UMWalletBalance
+			}
+		}
+	}()
+
+	wg.Wait()
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("some queries failed: %w", errors.Join(errs...))
+	}
+	return data, nil
 }

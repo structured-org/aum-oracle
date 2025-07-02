@@ -2,12 +2,8 @@ package binance
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"slices"
-	"sync"
 
-	binance "github.com/adshao/go-binance/v2"
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 	"github.com/structured-org/aum-oracle/oracle"
 	"go.uber.org/zap"
@@ -41,7 +37,7 @@ func NewBinanceAumOracleForSolana(
 func (o *BinanceAumOracleForSolana) GetNextRound(ctx context.Context) (*oracle.NextRound, error) {
 	nextRound, err := o.solanaClient.GetBinanceAumContractNextRound(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get next round: %w", err)
+		return nil, fmt.Errorf("failed to get AUM contract next round: %w", err)
 	}
 	return &oracle.NextRound{
 		Round:     nextRound.Round,
@@ -52,7 +48,7 @@ func (o *BinanceAumOracleForSolana) GetNextRound(ctx context.Context) (*oracle.N
 // FetchData retrieves the current AUM data from Binance and converts it to the Solana AUM
 // contract data structure.
 func (o *BinanceAumOracleForSolana) FetchData(ctx context.Context) (*solanaclient.BinanceAumData, error) {
-	d, err := o.fetchBinanceData(ctx)
+	d, err := fetchBinanceData(ctx, o.binanceClient, o.config.UmPositionsList, o.config.SpotAssetsList)
 	if err != nil {
 		return nil, err
 	}
@@ -67,101 +63,10 @@ func (o *BinanceAumOracleForSolana) Logger() *zap.Logger {
 func (o *BinanceAumOracleForSolana) SubmitData(ctx context.Context, data *solanaclient.BinanceAumData) (*oracle.NextRound, error) {
 	nextRound, err := o.solanaClient.SubmitBinanceAumData(ctx, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit Binance AUM data: %w", err)
+		return nil, err
 	}
 	return &oracle.NextRound{
 		Round:     nextRound.Round,
 		Timestamp: nextRound.Timestamp,
 	}, nil
-}
-
-// fetchBinanceData concurrently fetches all required data from Binance using the Binance client.
-func (o *BinanceAumOracleForSolana) fetchBinanceData(ctx context.Context) (*BinanceAumData, error) {
-	data := &BinanceAumData{}
-	wg := sync.WaitGroup{}
-	errsMu := sync.Mutex{}
-	errs := make([]error, 0)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		umPositions, err := o.binanceClient.GetUmPositions(ctx)
-		if err != nil {
-			errsMu.Lock()
-			errs = append(errs, fmt.Errorf("failed to get UM positions: %w", err))
-			errsMu.Unlock()
-			return
-		}
-		for i, position := range umPositions {
-			if !slices.Contains(o.config.UmPositionsList, position.Symbol) {
-				umPositions = append(umPositions[:i], umPositions[i+1:]...)
-			}
-		}
-
-		data.UmPositions = umPositions
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		spotAccountInfo, err := o.binanceClient.GetSpotAccountInfo(ctx)
-		if err != nil {
-			errsMu.Lock()
-			errs = append(errs, fmt.Errorf("failed to get spot balances: %w", err))
-			errsMu.Unlock()
-			return
-		}
-
-		balances := make([]*binance.Balance, 0)
-		for _, balance := range spotAccountInfo.Balances {
-			if slices.Contains(o.config.SpotAssetsList, balance.Asset) {
-				balances = append(balances, &balance)
-			}
-		}
-
-		data.SpotBalances = balances
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		pmAccount, err := o.binanceClient.GetPMAccountInfo(ctx)
-		if err != nil {
-			errsMu.Lock()
-			errs = append(errs, fmt.Errorf("failed to get PM account info: %w", err))
-			errsMu.Unlock()
-			return
-		}
-
-		data.PmAccountActualEquity = pmAccount.ActualEquity
-		data.WithdrawableUsdt = pmAccount.VirtualMaxWithdrawAmount
-		data.UniMMR = pmAccount.UniMMR
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		pmAccountBalances, err := o.binanceClient.GetPMAccountBalance(ctx)
-		if err != nil {
-			errsMu.Lock()
-			errs = append(errs, fmt.Errorf("failed to get PM account balances: %w", err))
-			errsMu.Unlock()
-			return
-		}
-		for _, balance := range pmAccountBalances {
-			if balance.Asset == "USDT" {
-				data.UmBalanceUsdt = balance.UMWalletBalance
-			}
-		}
-	}()
-
-	wg.Wait()
-	if len(errs) > 0 {
-		return nil, fmt.Errorf("failed to fetch Binance data: %w", errors.Join(errs...))
-	}
-	return data, nil
 }
