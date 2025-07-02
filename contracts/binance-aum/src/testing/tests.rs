@@ -49,37 +49,31 @@ fn create_test_contract_config() -> Config {
 
 // Helper function to create a test BinanceData object
 fn create_test_data(
-    round: u64,
-    timestamp: u64,
     unimmr: SignedDecimal,
     um_balance: SignedDecimal,
     pm_equity: SignedDecimal,
     withdrawable: SignedDecimal,
-) -> OracleData<BinanceData> {
-    OracleData {
-        round,
-        timestamp,
-        data: BinanceData {
-            unimmr,
-            positions: vec![Position {
-                symbol: "BTCUSDT".to_string(),
+) -> BinanceData {
+    BinanceData {
+        unimmr,
+        positions: vec![Position {
+            symbol: "BTCUSDT".to_string(),
+            amount: SignedDecimal::from_ratio(1, 1),
+            pnl: SignedDecimal::from_ratio(100, 1),
+        }],
+        um_balance_usdt: um_balance,
+        spot_balances: vec![
+            SpotBalance {
+                asset: "BTC".to_string(),
                 amount: SignedDecimal::from_ratio(1, 1),
-                pnl: SignedDecimal::from_ratio(100, 1),
-            }],
-            um_balance_usdt: um_balance,
-            spot_balances: vec![
-                SpotBalance {
-                    asset: "BTC".to_string(),
-                    amount: SignedDecimal::from_ratio(1, 1),
-                },
-                SpotBalance {
-                    asset: "USDT".to_string(),
-                    amount: SignedDecimal::from_ratio(10000, 1),
-                },
-            ],
-            pm_account_actual_equity: pm_equity,
-            withdrawable_usdt: withdrawable,
-        },
+            },
+            SpotBalance {
+                asset: "USDT".to_string(),
+                amount: SignedDecimal::from_ratio(10000, 1),
+            },
+        ],
+        pm_account_actual_equity: pm_equity,
+        withdrawable_usdt: withdrawable,
     }
 }
 
@@ -137,8 +131,6 @@ fn test_execute_publish_data() {
 
     // Create test data
     let test_data = create_test_data(
-        1,
-        1000,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -157,14 +149,12 @@ fn test_execute_publish_data() {
     // Test 2: Invalid positions
     let oracle_info = message_info("oracle1", &[]);
     let mut invalid_positions_data = create_test_data(
-        2, // Wrong round
-        1000,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
         SignedDecimal::from_ratio(500, 1),
     );
-    invalid_positions_data.data.positions = vec![
+    invalid_positions_data.positions = vec![
         Position {
             symbol: "WRONG_SYMBOL".to_string(),
             amount: SignedDecimal::from_ratio(1, 1),
@@ -192,14 +182,12 @@ fn test_execute_publish_data() {
     // Test 2: Invalid spot balances
     let oracle_info = message_info("oracle1", &[]);
     let mut invalid_spot_balances_data = create_test_data(
-        2, // Wrong round
-        1000,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
         SignedDecimal::from_ratio(500, 1),
     );
-    invalid_spot_balances_data.data.spot_balances = vec![
+    invalid_spot_balances_data.spot_balances = vec![
         SpotBalance {
             asset: "WRONG_ASSET".to_string(),
             amount: SignedDecimal::from_ratio(1, 1),
@@ -222,40 +210,17 @@ fn test_execute_publish_data() {
         _ => panic!("Unexpected error"),
     }
 
-    // Test 2: Invalid round rejection
+    // Test 2: Valid submission acceptance
     let oracle_info = message_info("oracle1", &[]);
-    let invalid_round_data = create_test_data(
-        2, // Wrong round
-        1000,
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
-    );
-    let msg = ExecuteMsg::PublishData {
-        new_data: invalid_round_data,
-    };
-    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
-            assert_eq!(msg, "Round must be equal to the pending one")
-        }
-        _ => panic!("Unexpected error"),
-    }
-
-    // Test 3: Valid submission acceptance
     let msg = ExecuteMsg::PublishData {
         new_data: test_data.clone(),
     };
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_ok());
 
-    // Test 4: Submit data from all oracles to reach consensus
+    // Test 3: Submit data from all oracles to reach consensus
     let oracle2_info = message_info("oracle2", &[]);
     let mut test_data2 = create_test_data(
-        1,
-        1001,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -263,7 +228,7 @@ fn test_execute_publish_data() {
     );
     // BinanceData with additional wrong positions and spot balances must be accepted anyway, since
     // the data is being cleaned
-    test_data2.data.positions.append(&mut vec![
+    test_data2.positions.append(&mut vec![
         Position {
             symbol: "WRONG_SYMBOL".to_string(),
             amount: SignedDecimal::from_ratio(1, 1),
@@ -275,7 +240,7 @@ fn test_execute_publish_data() {
             pnl: SignedDecimal::from_ratio(100, 1),
         },
     ]);
-    test_data2.data.spot_balances.append(&mut vec![
+    test_data2.spot_balances.append(&mut vec![
         SpotBalance {
             asset: "WRONG_ASSET".to_string(),
             amount: SignedDecimal::from_ratio(1, 1),
@@ -295,8 +260,6 @@ fn test_execute_publish_data() {
     // Submit data from the third oracle to reach consensus (all oracles)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        1,
-        1002,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -320,36 +283,13 @@ fn test_execute_publish_data() {
     assert!(round_attr.is_some());
     assert_eq!(round_attr.unwrap().value, "1");
 
-    // Test 5: Verify that oracles can't publish data for already finalized rounds
-    // After consensus is reached, attempting to submit data for the same round should fail
-    let oracle1_info = message_info("oracle1", &[]);
-    let new_data = create_test_data(
-        1, // Same round
-        1003,
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
-    );
-    let msg = ExecuteMsg::PublishData { new_data };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
-            assert_eq!(msg, "New round must be greater than last published")
-        }
-        _ => panic!("Unexpected error"),
-    };
-
-    // Test 6: Advance the round by time expiration
+    // Test 4: Advance the round by time expiration
     // Update the block time to after the round expiration
     env.block.time = Timestamp::from_seconds(1000 + consensus_config.round_length + 1);
 
     // Submit data for the new round (which should be 2 now)
     let oracle2_info = message_info("oracle2", &[]);
     let new_round_data = create_test_data(
-        2, // New round
-        1000 + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -395,8 +335,6 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Create test data
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -422,12 +360,10 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Test 3: Submit data from another oracle with identical data
     let test_data2 = create_test_data(
-        1, // Same round
-        start_time + 1,
-        SignedDecimal::from_ratio(5, 10), // Identical to test_data1
+        SignedDecimal::from_ratio(5, 10),   // Identical to test_data1
         SignedDecimal::from_ratio(1000, 1), // Identical to test_data1
         SignedDecimal::from_ratio(2000, 1), // Identical to test_data1
-        SignedDecimal::from_ratio(500, 1), // Identical to test_data1
+        SignedDecimal::from_ratio(500, 1),  // Identical to test_data1
     );
     let oracle2_info = message_info("oracle2", &[]);
     let msg = ExecuteMsg::PublishData {
@@ -447,8 +383,6 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Test 5: Submit data from the third oracle with identical data
     let test_data3 = create_test_data(
-        1, // Same round
-        start_time + 2,
         SignedDecimal::from_ratio(5, 10), // Identical to test_data1 and test_data2
         SignedDecimal::from_ratio(1000, 1), // Identical to test_data1 and test_data2
         SignedDecimal::from_ratio(2000, 1), // Identical to test_data1 and test_data2
@@ -488,17 +422,12 @@ fn test_try_consensus() {
     // Test 2: Data array with fewer elements than threshold should return None
     {
         let config = create_test_consensus_config();
-        let single_data = vec![
-            create_test_data(
-                1,
-                1000,
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
-        ];
+        let single_data = vec![create_test_data(
+            SignedDecimal::from_ratio(5, 10),
+            SignedDecimal::from_ratio(1000, 1),
+            SignedDecimal::from_ratio(2000, 1),
+            SignedDecimal::from_ratio(500, 1),
+        )];
         assert!(BinanceData::try_consensus(
             &single_data,
             config.threshold as usize,
@@ -512,23 +441,17 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data, // within 1% delta
+            ), // within 1% delta
         ];
         let consensus =
             BinanceData::try_consensus(&data, config.threshold as usize, config.data_delta_ppm);
@@ -554,23 +477,17 @@ fn test_try_consensus() {
 
         let data_divergent = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(51, 100),
                 SignedDecimal::from_ratio(1020, 1),
                 SignedDecimal::from_ratio(2050, 1),
                 SignedDecimal::from_ratio(510, 1),
-            )
-            .data, // outside 0.1% delta
+            ), // outside 0.1% delta
         ];
 
         assert!(BinanceData::try_consensus(
@@ -586,32 +503,23 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data_multiple = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1002,
                 SignedDecimal::from_ratio(503, 1000),
                 SignedDecimal::from_ratio(1003, 1),
                 SignedDecimal::from_ratio(2005, 1),
                 SignedDecimal::from_ratio(503, 1),
-            )
-            .data,
+            ),
         ];
 
         let consensus = BinanceData::try_consensus(
@@ -636,32 +544,23 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data_with_outliers = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1002,
                 SignedDecimal::from_ratio(6, 10),
                 SignedDecimal::from_ratio(1200, 1),
                 SignedDecimal::from_ratio(2500, 1),
                 SignedDecimal::from_ratio(600, 1),
-            )
-            .data, // outlier
+            ), // outlier
         ];
 
         let consensus = BinanceData::try_consensus(
@@ -680,16 +579,12 @@ fn test_try_consensus() {
     {
         let config = create_test_consensus_config();
         let data1 = create_test_data(
-            1,
-            1000,
             SignedDecimal::from_ratio(5, 10),
             SignedDecimal::from_ratio(1000, 1),
             SignedDecimal::from_ratio(2000, 1),
             SignedDecimal::from_ratio(500, 1),
         );
         let data2 = create_test_data(
-            1,
-            1001,
             SignedDecimal::from_ratio(505, 1000),
             SignedDecimal::from_ratio(1005, 1),
             SignedDecimal::from_ratio(2010, 1),
@@ -697,14 +592,12 @@ fn test_try_consensus() {
         );
         //outlier
         let data3 = create_test_data(
-            1,
-            1002,
             SignedDecimal::from_ratio(6, 10),
             SignedDecimal::from_ratio(1200, 1),
             SignedDecimal::from_ratio(2500, 1),
             SignedDecimal::from_ratio(600, 1),
         );
-        let data_with_outliers = vec![data1.data, data2.data, data3.data];
+        let data_with_outliers = vec![data1, data2, data3];
 
         let consensus = BinanceData::try_consensus(
             &data_with_outliers,
@@ -745,8 +638,6 @@ fn test_all_oracles_consensus_round_not_increased() {
     // Submit data from all oracles
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -760,8 +651,6 @@ fn test_all_oracles_consensus_round_not_increased() {
 
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -775,8 +664,6 @@ fn test_all_oracles_consensus_round_not_increased() {
 
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        1,
-        start_time + 2,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -848,8 +735,6 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from first oracle
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -875,8 +760,6 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from second oracle (should reach threshold)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -899,8 +782,6 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from third oracle (all oracles now)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        1,
-        start_time + 2,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -972,8 +853,6 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Submit data from only one oracle (below threshold)
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -999,42 +878,9 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Advance time past round length to trigger round change
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
-    // Last oracle tries to submit data for the previous round (which is now passed)
-    let oracle2_info = message_info("oracle2", &[]);
-    let test_data2 = create_test_data(
-        1, // Still trying to submit for round 1, which is now passed
-        start_time + consensus_config.round_length + 1,
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
-    );
-    let msg = ExecuteMsg::PublishData {
-        new_data: test_data2,
-    };
-    let result = execute(
-        deps.as_mut(),
-        env.clone(),
-        oracle2_info.clone(),
-        msg.clone(),
-    );
-
-    // Should fail because round 1 is now invalid (we're in round 2)
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
-            assert_eq!(
-                msg, "Round must be equal to the pending one",
-                "Round must be equal to the pending one"
-            )
-        }
-        _ => panic!("Unexpected error"),
-    }
-
     // Submit data for the new round (round 2)
+    let oracle2_info = message_info("oracle2", &[]);
     let test_data3 = create_test_data(
-        2, // New round
-        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1098,8 +944,6 @@ fn test_multiple_rounds_passing() {
     // Submit data from one oracle for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1114,42 +958,9 @@ fn test_multiple_rounds_passing() {
     // Advance time by 3 rounds (skipping rounds 2 and 3, landing in round 4)
     env.block.time = Timestamp::from_seconds(start_time + (3 * consensus_config.round_length) + 1);
 
-    // Oracle tries to submit data for round 2 (which is now passed)
-    let oracle2_info = message_info("oracle2", &[]);
-    let test_data2 = create_test_data(
-        2, // Trying to submit for round 2, which is now passed
-        start_time + (3 * consensus_config.round_length) + 1,
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
-    );
-    let msg = ExecuteMsg::PublishData {
-        new_data: test_data2,
-    };
-    let result = execute(
-        deps.as_mut(),
-        env.clone(),
-        oracle2_info.clone(),
-        msg.clone(),
-    );
-
-    // Should fail because round 2 is now invalid (we're in round 4)
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        ContractError::ConsensusError(ConsensusError::InvalidRound { msg }) => {
-            assert_eq!(
-                msg, "Round must be equal to the pending one",
-                "Should reject data for passed round"
-            )
-        }
-        _ => panic!("Unexpected error"),
-    }
-
     // Submit data for the current round (round 4)
+    let oracle2_info = message_info("oracle2", &[]);
     let test_data4 = create_test_data(
-        4, // Current round after 3 rounds passed
-        start_time + (3 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1218,8 +1029,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 1 submits data for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1241,8 +1050,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 2 submits data for round 1 (reaching threshold)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data1_2 = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1264,8 +1071,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 3 submits data for round 1 (all oracles)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data1_3 = create_test_data(
-        1,
-        start_time + 2,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -1295,8 +1100,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 2 submits data for round 2
     let test_data2 = create_test_data(
-        2, // Round 2
-        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1319,8 +1122,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 1 submits data for round 3
     let test_data3 = create_test_data(
-        3, // Round 3
-        start_time + (2 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(504, 1000),
         SignedDecimal::from_ratio(1004, 1),
         SignedDecimal::from_ratio(2008, 1),
@@ -1340,8 +1141,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 2 also submits data for round 3 (reaching threshold)
     let test_data3_2 = create_test_data(
-        3, // Round 3
-        start_time + (2 * consensus_config.round_length) + 2,
         SignedDecimal::from_ratio(504, 1000),
         SignedDecimal::from_ratio(1004, 1),
         SignedDecimal::from_ratio(2008, 1),
@@ -1387,8 +1186,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 3 submits data for round 4
     let test_data4 = create_test_data(
-        4, // Round 4
-        start_time + (3 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2020, 1),
@@ -1434,8 +1231,6 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 3 submits data for round 5
     let test_data5 = create_test_data(
-        5, // Round 5
-        start_time + (4 * consensus_config.round_length) + 1,
         SignedDecimal::from_ratio(50, 100),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1490,8 +1285,6 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     // Oracle 1 submits data for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1505,8 +1298,6 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
 
     // Oracle 1 tries to submit data for round 1 again (should fail)
     let test_data1_again = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1530,8 +1321,6 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
 
     // Oracle 1 submits data for round 2 (should succeed)
     let test_data2 = create_test_data(
-        2,
-        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(52, 100),
         SignedDecimal::from_ratio(1020, 1),
         SignedDecimal::from_ratio(2020, 1),
@@ -1577,8 +1366,6 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 1 submits data at the beginning of round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -1607,8 +1394,6 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 2 submits data in the middle of round 1
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        1, // Still round 1
-        start_time + consensus_config.round_length / 2,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -1632,8 +1417,6 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 3 submits data near the end of round 1
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        1, // Still round 1
-        start_time + consensus_config.round_length - 10,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -1666,8 +1449,6 @@ fn test_delayed_oracle_submissions_within_round() {
 
     // Oracle 3 submits data for round 2
     let test_data4 = create_test_data(
-        2, // Round 2
-        start_time + consensus_config.round_length + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2020, 1),

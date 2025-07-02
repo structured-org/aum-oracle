@@ -20,7 +20,7 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    PublishData { new_data: OracleData<BinanceData> },
+    PublishData { new_data: BinanceData },
     UpdateConfig { new_config: UpdateConfig },
 }
 

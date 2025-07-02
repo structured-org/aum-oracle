@@ -5,7 +5,7 @@ use crate::msg::{
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
 use crate::utils::{btc_in_spot_balance_asset, get_prices};
-use consensus::consensus::{Config as ConsensusConfig, OracleData, PublishResult};
+use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     SignedDecimal, StdError, StdResult,
@@ -65,7 +65,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mut new_data: OracleData<BinanceData>,
+    mut new_data: BinanceData,
 ) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
@@ -76,7 +76,7 @@ fn execute_publish_data(
     }
 
     // clean and validate published data
-    new_data.data.clean_and_validate(
+    new_data.clean_and_validate(
         contract_config.required_binance_positions,
         contract_config.required_binance_spot_assets,
     )?;

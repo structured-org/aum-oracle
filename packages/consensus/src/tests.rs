@@ -1,4 +1,4 @@
-use crate::consensus::{consensus_on_items, Config, ConsensusData, OracleData, Round, State};
+use crate::consensus::{consensus_on_items, Config, ConsensusData, Round, State};
 use crate::error::ConsensusError;
 use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal, Timestamp};
@@ -72,22 +72,16 @@ fn create_test_config() -> Config {
 
 // Helper function to create a test MockData object
 fn create_test_data(
-    round: u64,
-    timestamp: u64,
     value1: SignedDecimal,
     value2: SignedDecimal,
     value3: SignedDecimal,
     value4: SignedDecimal,
-) -> OracleData<MockData> {
-    OracleData {
-        round,
-        timestamp,
-        data: MockData {
-            value1,
-            value2,
-            value3,
-            value4,
-        },
+) -> MockData {
+    MockData {
+        value1,
+        value2,
+        value3,
+        value4,
     }
 }
 
@@ -108,17 +102,12 @@ fn test_try_consensus() {
     // Test 2: Data array with fewer elements than threshold should return None
     {
         let config = create_test_config();
-        let single_data = vec![
-            create_test_data(
-                1,
-                1000,
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
-        ];
+        let single_data = vec![create_test_data(
+            SignedDecimal::from_ratio(5, 10),
+            SignedDecimal::from_ratio(1000, 1),
+            SignedDecimal::from_ratio(2000, 1),
+            SignedDecimal::from_ratio(500, 1),
+        )];
         assert!(MockData::try_consensus(
             &single_data,
             config.threshold as usize,
@@ -132,23 +121,17 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data, // within 1% delta
+            ), // within 1% delta
         ];
         let consensus =
             MockData::try_consensus(&data, config.threshold as usize, config.data_delta_ppm);
@@ -168,23 +151,17 @@ fn test_try_consensus() {
 
         let data_divergent = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(51, 100),
                 SignedDecimal::from_ratio(1020, 1),
                 SignedDecimal::from_ratio(2050, 1),
                 SignedDecimal::from_ratio(510, 1),
-            )
-            .data, // outside 0.1% delta
+            ), // outside 0.1% delta
         ];
 
         assert!(MockData::try_consensus(
@@ -200,32 +177,23 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data_multiple = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1002,
                 SignedDecimal::from_ratio(503, 1000),
                 SignedDecimal::from_ratio(1003, 1),
                 SignedDecimal::from_ratio(2005, 1),
                 SignedDecimal::from_ratio(503, 1),
-            )
-            .data,
+            ),
         ];
 
         let consensus = MockData::try_consensus(
@@ -247,32 +215,23 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data_with_outliers = vec![
             create_test_data(
-                1,
-                1000,
                 SignedDecimal::from_ratio(5, 10),
                 SignedDecimal::from_ratio(1000, 1),
                 SignedDecimal::from_ratio(2000, 1),
                 SignedDecimal::from_ratio(500, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1001,
                 SignedDecimal::from_ratio(505, 1000),
                 SignedDecimal::from_ratio(1005, 1),
                 SignedDecimal::from_ratio(2010, 1),
                 SignedDecimal::from_ratio(505, 1),
-            )
-            .data,
+            ),
             create_test_data(
-                1,
-                1002,
                 SignedDecimal::from_ratio(6, 10),
                 SignedDecimal::from_ratio(1200, 1),
                 SignedDecimal::from_ratio(2500, 1),
                 SignedDecimal::from_ratio(600, 1),
-            )
-            .data, // outlier
+            ), // outlier
         ];
 
         let consensus = MockData::try_consensus(
@@ -542,8 +501,6 @@ fn test_state_publish_data() {
 
     // Create test data
     let test_data = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -566,8 +523,6 @@ fn test_state_publish_data() {
     // Test 3: Another oracle publishes data
     let oracle2 = Addr::unchecked("oracle2");
     let test_data2 = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -582,8 +537,6 @@ fn test_state_publish_data() {
     // Test 4: Third oracle publishes data (all oracles have now published)
     let oracle3 = Addr::unchecked("oracle3");
     let test_data3 = create_test_data(
-        1,
-        start_time + 2,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -623,27 +576,6 @@ fn test_state_publish_data() {
         SignedDecimal::from_ratio(503, 1),
         "Consensus value4 should be correct"
     );
-
-    // Test 6: Oracle tries to publish data for an already finalized round (should fail)
-    let test_data_finalized = create_test_data(
-        1, // Same round that's already finalized
-        start_time + 3,
-        SignedDecimal::from_ratio(51, 100),
-        SignedDecimal::from_ratio(1010, 1),
-        SignedDecimal::from_ratio(2020, 1),
-        SignedDecimal::from_ratio(510, 1),
-    );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data_finalized);
-    assert!(
-        result.is_err(),
-        "Oracle should not be able to publish data for a finalized round"
-    );
-    match result {
-        Err(ConsensusError::InvalidRound { msg }) => {
-            assert_eq!(msg, "New round must be greater than last published");
-        }
-        _ => panic!("Unexpected error"),
-    }
 }
 
 #[test]
@@ -668,8 +600,6 @@ fn test_state_round_advancement() {
     // Oracle publishes data for the new round
     let oracle1 = Addr::unchecked("oracle1");
     let test_data = create_test_data(
-        2, // New round
-        start_time + config.round_length + 1,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -695,8 +625,6 @@ fn test_state_round_advancement() {
 
     // Oracle publishes data for the new round
     let test_data_multi = create_test_data(
-        4, // New round after multiple advances
-        start_time + 3 * config.round_length + 1,
         SignedDecimal::from_ratio(51, 100),
         SignedDecimal::from_ratio(1010, 1),
         SignedDecimal::from_ratio(2020, 1),
@@ -744,8 +672,6 @@ fn test_state_get_last_published_data() {
     // Test 2: Publish data from all oracles
     let oracle1 = Addr::unchecked("oracle1");
     let test_data1 = create_test_data(
-        1,
-        start_time,
         SignedDecimal::from_ratio(5, 10),
         SignedDecimal::from_ratio(1000, 1),
         SignedDecimal::from_ratio(2000, 1),
@@ -757,8 +683,6 @@ fn test_state_get_last_published_data() {
 
     let oracle2 = Addr::unchecked("oracle2");
     let test_data2 = create_test_data(
-        1,
-        start_time + 1,
         SignedDecimal::from_ratio(505, 1000),
         SignedDecimal::from_ratio(1005, 1),
         SignedDecimal::from_ratio(2010, 1),
@@ -770,8 +694,6 @@ fn test_state_get_last_published_data() {
 
     let oracle3 = Addr::unchecked("oracle3");
     let test_data3 = create_test_data(
-        1,
-        start_time + 2,
         SignedDecimal::from_ratio(503, 1000),
         SignedDecimal::from_ratio(1003, 1),
         SignedDecimal::from_ratio(2005, 1),
@@ -800,8 +722,6 @@ fn test_state_get_last_published_data() {
 
     // Only one oracle publishes data (below threshold)
     let test_data4 = create_test_data(
-        2,
-        start_time + config.round_length + 1,
         SignedDecimal::from_ratio(52, 100),
         SignedDecimal::from_ratio(1020, 1),
         SignedDecimal::from_ratio(2040, 1),
@@ -819,8 +739,6 @@ fn test_state_get_last_published_data() {
 
     // Test 4: Publish enough data in round 2 to reach threshold
     let test_data5 = create_test_data(
-        2,
-        start_time + config.round_length + 2,
         SignedDecimal::from_ratio(525, 1000),
         SignedDecimal::from_ratio(1025, 1),
         SignedDecimal::from_ratio(2050, 1),
