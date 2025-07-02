@@ -243,7 +243,6 @@ fn query_btc_price_in_usd(deps: Deps, env: Env, config: Config) -> Result<Decima
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
 
-    // TODO: unit test for that
     if quote.block_height + config.price_max_blocks_old < env.block.height {
         return Err(ContractError::SlinkyBTCPriceTooOld {
             price_height: quote.block_height,
