@@ -38,7 +38,7 @@ fn create_test_consensus_config() -> ConsensusConfig {
 // Helper function to create a test contract config
 fn create_test_contract_config() -> Config {
     Config {
-        admin: Addr::unchecked("admin"),
+        owner: Addr::unchecked("admin"),
         price_max_blocks_old: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
@@ -1521,7 +1521,7 @@ fn test_query_get_aum_basic() {
 
     // Set up configuration
     let config = Config {
-        admin: Addr::unchecked("admin"),
+        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
         price_max_blocks_old: 100,
@@ -1603,7 +1603,7 @@ fn test_query_get_aum_with_expired_data() {
 
     // Set up configuration
     let config = Config {
-        admin: Addr::unchecked("admin"),
+        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
         price_max_blocks_old: 100,
@@ -1678,7 +1678,7 @@ fn test_query_get_aum_with_negative_equity() {
 
     // Set up configuration
     let config = Config {
-        admin: Addr::unchecked("admin"),
+        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
         price_max_blocks_old: 100,
@@ -1754,7 +1754,7 @@ fn test_execute_update_config_admin_only() {
     // Test 1: Non-admin tries to update config (should fail)
     let non_admin_info = message_info("non_admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: Some("new_admin_attempt".to_string()),
+        owner: Some("new_admin_attempt".to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -1783,7 +1783,7 @@ fn test_execute_update_config_admin_only() {
     // Test 2: Admin successfully updates config
     let admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: Some(new_admin.to_string()),
+        owner: Some(new_admin.to_string()),
         consensus_data_valid_period: Some(7200),
         price_data_valid_period: Some(200),
         required_binance_positions: Some(vec!["ETHUSDT".to_string()]),
@@ -1805,7 +1805,7 @@ fn test_execute_update_config_admin_only() {
 
     // Verify contract config was updated
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.admin, new_admin);
+    assert_eq!(updated_contract_config.owner, new_admin);
     assert_eq!(updated_contract_config.consensus_data_valid_period, 7200);
     assert_eq!(updated_contract_config.price_max_blocks_old, 200);
     assert_eq!(
@@ -1845,7 +1845,7 @@ fn test_execute_update_config_partial_updates() {
     // Test partial update - only contract config fields
     let admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: None,
+        owner: None,
         consensus_data_valid_period: Some(3600),
         price_data_valid_period: Some(150),
         required_binance_positions: None,
@@ -1864,7 +1864,7 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify only specified fields were updated
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.admin, Addr::unchecked("admin")); // unchanged
+    assert_eq!(updated_contract_config.owner, Addr::unchecked("admin")); // unchanged
     assert_eq!(updated_contract_config.consensus_data_valid_period, 3600); // updated
     assert_eq!(updated_contract_config.price_max_blocks_old, 150); // updated
     assert_eq!(
@@ -1894,7 +1894,7 @@ fn test_execute_update_config_partial_updates() {
 
     // Test partial update - only consensus config fields
     let update_config = crate::msg::UpdateConfig {
-        admin: None,
+        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -1949,7 +1949,7 @@ fn test_execute_update_config_empty_update() {
     // Test empty update (all fields None)
     let admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: None,
+        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -1994,7 +1994,7 @@ fn test_execute_update_config_admin_change() {
     // Test admin change
     let admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: Some(new_admin.to_string()),
+        owner: Some(new_admin.to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2013,12 +2013,12 @@ fn test_execute_update_config_admin_change() {
 
     // Verify admin was changed
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.admin, new_admin);
+    assert_eq!(updated_contract_config.owner, new_admin);
 
     // Test that old admin can no longer update config
     let old_admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: Some("another_admin".to_string()),
+        owner: Some("another_admin".to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2042,7 +2042,7 @@ fn test_execute_update_config_admin_change() {
     // Test that new admin can update config
     let new_admin_info = message_info(new_admin.as_ref(), &[]);
     let update_config = crate::msg::UpdateConfig {
-        admin: None,
+        owner: None,
         consensus_data_valid_period: Some(5000),
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2108,7 +2108,7 @@ fn test_query_get_aum_with_large_values() {
 
     // Set up configuration
     let config = Config {
-        admin: Addr::unchecked("admin"),
+        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
         price_max_blocks_old: 100,

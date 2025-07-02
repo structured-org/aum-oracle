@@ -32,7 +32,7 @@ pub fn instantiate(
     CONSENSUS_STATE.initialize(deps.storage, &env, consensus_config)?;
 
     let contract_config = Config {
-        admin: deps.api.addr_validate(&msg.admin)?,
+        owner: deps.api.addr_validate(&msg.owner)?,
         consensus_data_valid_period: msg.consensus_data_valid_period,
         required_binance_spot_assets: msg.required_binance_spot_assets,
         required_binance_positions: msg.required_binance_positions,
@@ -115,7 +115,7 @@ fn execute_update_config(
     let mut contract_config = CONFIG.load(deps.storage)?;
 
     // Only admin can update config
-    if info.sender != contract_config.admin {
+    if info.sender != contract_config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
