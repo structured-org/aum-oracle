@@ -11,8 +11,18 @@ import (
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 )
 
-// BinanceData is the data structure for the Binance oracle.
-type BinanceData struct {
+// Config is the configuration for a Binance oracle.
+type Config struct {
+	// UmPositionsList is the list of USD-margined portfolio perpetual futures positions to query
+	// information about.
+	UmPositionsList []string
+	// SpotAssetsList is the list of spot assets to query information about.
+	SpotAssetsList []string
+}
+
+// BinanceAumData is a data structure that aggregates all data retrieved from Binance and needed
+// to compose the result payload for an AUM contract.
+type BinanceAumData struct {
 	// Unimmr is the Unified Account Maintenance Margin Ratio. It is the overall risk measure of
 	// the entire portfolio.
 	UniMMR string
@@ -31,9 +41,9 @@ type BinanceData struct {
 	WithdrawableUsdt string
 }
 
-// ToNeutronData converts BinanceData to BinanceData representation that is used by the Neutron
+// ToNeutronData converts BinanceAumData to BinanceData representation that is used by the Neutron
 // AUM contract.
-func (d *BinanceData) ToNeutronData() (*neutronclient.BinanceData, error) {
+func (d *BinanceAumData) ToNeutronData() (*neutronclient.BinanceAumData, error) {
 	unimmr, err := math.LegacyNewDecFromStr(d.UniMMR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse UniMMR %s: %w", d.UniMMR, err)
@@ -64,7 +74,7 @@ func (d *BinanceData) ToNeutronData() (*neutronclient.BinanceData, error) {
 		return nil, fmt.Errorf("failed to parse PM account USDT balance %s: %w", d.UmBalanceUsdt, err)
 	}
 
-	return &neutronclient.BinanceData{
+	return &neutronclient.BinanceAumData{
 		Unimmr:                unimmr,
 		Positions:             umPositions,
 		UmBalanceUsdt:         umBalanceUsdt,
@@ -76,7 +86,7 @@ func (d *BinanceData) ToNeutronData() (*neutronclient.BinanceData, error) {
 
 // umPositionsToNeutronPositions converts d.UmPositions to Binance positions representation
 // that is used by the Neutron AUM contract.
-func (d *BinanceData) umPositionsToNeutronPositions() ([]neutronclient.BinancePosition, error) {
+func (d *BinanceAumData) umPositionsToNeutronPositions() ([]neutronclient.BinancePosition, error) {
 	positions := make([]neutronclient.BinancePosition, 0)
 	for _, position := range d.UmPositions {
 		amount, err := math.LegacyNewDecFromStr(position.PositionAmt)
@@ -101,7 +111,7 @@ func (d *BinanceData) umPositionsToNeutronPositions() ([]neutronclient.BinancePo
 
 // spotBalancesToNeutronBalances converts d.SpotBalances to Binance balances representation
 // that is used by the Neutron AUM contract.
-func (d *BinanceData) spotBalancesToNeutronBalances() ([]neutronclient.BinanceBalance, error) {
+func (d *BinanceAumData) spotBalancesToNeutronBalances() ([]neutronclient.BinanceBalance, error) {
 	balances := make([]neutronclient.BinanceBalance, 0)
 	for _, balance := range d.SpotBalances {
 		free, err := math.LegacyNewDecFromStr(balance.Free)
@@ -123,9 +133,9 @@ func (d *BinanceData) spotBalancesToNeutronBalances() ([]neutronclient.BinanceBa
 	return balances, nil
 }
 
-// ToSolanaData converts BinanceData to SolanaData representation that is used by the Solana
-// AUM contract.
-func (d *BinanceData) ToSolanaData() (*solanaclient.BinanceData, error) {
+// ToJupiterAumData converts BinanceAumData to JupiterAumData representation that is used by the
+// Jupiter AUM contract.
+func (d *BinanceAumData) ToJupiterAumData() (*solanaclient.BinanceAumData, error) {
 	unimmr, err := strconv.ParseFloat(d.UniMMR, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse UniMMR %s: %w", d.UniMMR, err)
@@ -156,7 +166,7 @@ func (d *BinanceData) ToSolanaData() (*solanaclient.BinanceData, error) {
 		return nil, fmt.Errorf("failed to parse PM account USDT balance %s: %w", d.UmBalanceUsdt, err)
 	}
 
-	return &solanaclient.BinanceData{
+	return &solanaclient.BinanceAumData{
 		Unimmr:                unimmr,
 		Positions:             umPositions,
 		UmBalanceUsdt:         umBalanceUsdt,
@@ -168,7 +178,7 @@ func (d *BinanceData) ToSolanaData() (*solanaclient.BinanceData, error) {
 
 // umPositionsToSolanaPositions converts d.UmPositions to Solana positions representation
 // that is used by the Solana AUM contract.
-func (d *BinanceData) umPositionsToSolanaPositions() ([]solanaclient.BinancePosition, error) {
+func (d *BinanceAumData) umPositionsToSolanaPositions() ([]solanaclient.BinancePosition, error) {
 	positions := make([]solanaclient.BinancePosition, 0)
 	for _, position := range d.UmPositions {
 		amount, err := strconv.ParseFloat(position.PositionAmt, 64)
@@ -193,7 +203,7 @@ func (d *BinanceData) umPositionsToSolanaPositions() ([]solanaclient.BinancePosi
 
 // spotBalancesToSolanaBalances converts d.SpotBalances to Solana balances representation
 // that is used by the Solana AUM contract.
-func (d *BinanceData) spotBalancesToSolanaBalances() ([]solanaclient.BinanceBalance, error) {
+func (d *BinanceAumData) spotBalancesToSolanaBalances() ([]solanaclient.BinanceBalance, error) {
 	balances := make([]solanaclient.BinanceBalance, 0)
 	for _, balance := range d.SpotBalances {
 		free, err := strconv.ParseFloat(balance.Free, 64)

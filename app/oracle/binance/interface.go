@@ -9,7 +9,7 @@ import (
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 )
 
-// BinanceClient is the definition of the expected Binance client interface.
+// BinanceClient is the definition of the expected Binance client.
 type BinanceClient interface {
 	GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error)
 	GetCmPositions(ctx context.Context) ([]*binanceportfolio.CMPosition, error)
@@ -18,18 +18,14 @@ type BinanceClient interface {
 	GetSpotAccountInfo(ctx context.Context) (*binance.Account, error)
 }
 
-// NeutronAumContractClient is the definition of the expected Neutron AUM contract client interface.
+// NeutronAumContractClient is the definition of the expected Neutron AUM contract client.
 type NeutronAumContractClient interface {
-	// GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 	GetBinanceAumContractNextRound(ctx context.Context) (*neutronclient.NextRound, error)
-	// SubmitBinanceAumData submits the Binance AUM data to the Neutron AUM contract.
-	SubmitBinanceAumData(ctx context.Context, data *neutronclient.BinanceData) (*neutronclient.NextRound, error)
+	SubmitBinanceAumData(ctx context.Context, data *neutronclient.BinanceAumData) (*neutronclient.NextRound, error)
 }
 
-// SolanaAumContractClient is the definition of the expected Solana AUM contract client interface.
+// SolanaAumContractClient is the definition of the expected Solana AUM contract client.
 type SolanaAumContractClient interface {
-	// GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 	GetBinanceAumContractNextRound(ctx context.Context) (*solanaclient.NextRound, error)
-	// SubmitBinanceAumData submits the Binance AUM data to the Solana AUM contract.
-	SubmitBinanceAumData(ctx context.Context, data *solanaclient.BinanceData) (*solanaclient.NextRound, error)
+	SubmitBinanceAumData(ctx context.Context, data *solanaclient.BinanceAumData) (*solanaclient.NextRound, error)
 }

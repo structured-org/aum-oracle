@@ -11,18 +11,19 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	nlogger "github.com/neutron-org/neutron-logger"
-	binanceoracle "github.com/structured-org/aum-oracle/binance"
 	binanceclient "github.com/structured-org/aum-oracle/client/binance"
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
-	solanaoracle "github.com/structured-org/aum-oracle/solana"
+	"github.com/structured-org/aum-oracle/oracle"
+	binanceoracle "github.com/structured-org/aum-oracle/oracle/binance"
+	jupiteroracle "github.com/structured-org/aum-oracle/oracle/jupiter"
 	"go.uber.org/zap"
 )
 
 var (
 	mainContext             = "main"
-	solanaAumOracleContext  = "solana_aum_oracle"
+	jupiterAumOracleContext = "jupiter_aum_oracle"
 	binanceAumOracleContext = "binance_aum_oracle"
 	neutronClientContext    = "neutron_client"
 )
@@ -50,26 +51,31 @@ func main() {
 		UmPositionsList: conf.BinanceUmPositionsList,
 		SpotAssetsList:  conf.BinanceSpotAssetsList,
 	}
-	binanceOracle := binanceoracle.NewOracle(
+	binanceOracleForNeutron := binanceoracle.NewBinanceAumOracleForNeutron(
 		binanceClient,
 		neutronClient,
+		binanceOracleConfig,
+		logRegistry.Get(binanceAumOracleContext),
+	)
+	binanceOracleForSolana := binanceoracle.NewBinanceAumOracleForSolana(
+		binanceClient,
 		solanaClient,
 		binanceOracleConfig,
 		logRegistry.Get(binanceAumOracleContext),
 	)
 
-	jupiterConfig := solanaoracle.JupiterConfig{
+	jupiterConfig := jupiteroracle.JupiterConfig{
 		Custodies: jupiterCustodies,
 		Token:     solana.MustPublicKeyFromBase58(conf.JupiterJlpToken),
 		Pool:      solana.MustPublicKeyFromBase58(conf.JupiterPool),
 		Strategy:  solana.MustPublicKeyFromBase58(conf.JupiterStrategyAddress),
 	}
-	solanaOracle := solanaoracle.NewOracle(
+	jupiterOracleForNeutron := jupiteroracle.NewJupiterAumOracleForNeutron(
 		solanaClient,
 		neutronClient,
 		jupiterClient,
 		jupiterConfig,
-		logRegistry.Get(solanaAumOracleContext),
+		logRegistry.Get(jupiterAumOracleContext),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,16 +84,25 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		binanceOracle.Run(ctx)
+		oracle.RunOracle(ctx, binanceOracleForNeutron)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		// shift oracles in time to avoid simultaneous prints to stdout at debug submission
-		// TODO: remove when neutron client is implemented
+		// TODO: remove when oracles and clients are fully implemented
 		time.Sleep(10 * time.Second)
-		go solanaOracle.Run(ctx)
+		go oracle.RunOracle(ctx, binanceOracleForSolana)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// shift oracles in time to avoid simultaneous prints to stdout at debug submission
+		// TODO: remove when oracles and clients are fully implemented
+		time.Sleep(10 * time.Second)
+		go oracle.RunOracle(ctx, jupiterOracleForNeutron)
 	}()
 
 	go func() {
@@ -112,7 +127,7 @@ func initLogRegistry(logLevel string) *nlogger.Registry {
 
 	logRegistry, err := nlogger.NewRegistry(
 		mainContext,
-		solanaAumOracleContext,
+		jupiterAumOracleContext,
 		binanceAumOracleContext,
 		neutronClientContext,
 	)

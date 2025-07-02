@@ -8,12 +8,10 @@ type NextRound struct {
 	Timestamp int64
 }
 
-// TODO: find out proper solana data types for BinanceData fields
+// TODO: find out proper solana data types for BinanceAumData fields
 
-// BinanceData contains all Binance data that is a matter of consensus for the Binance AUM contract.
-type BinanceData struct {
-	// Round is the consensus round number.
-	Round int64
+// BinanceAumData contains all Binance data that is a matter of consensus for the Binance AUM contract.
+type BinanceAumData struct {
 	// Unimmr is the Unified Account Maintenance Margin Ratio. It is the overall risk measure of
 	// the entire portfolio.
 	Unimmr float64

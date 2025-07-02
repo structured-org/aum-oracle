@@ -15,10 +15,8 @@ type NextRound struct {
 	Timestamp int64 `json:"timestamp"`
 }
 
-// BinanceData contains all Binance data that is a matter of consensus for the Binance AUM contract.
-type BinanceData struct {
-	// Round is the consensus round number.
-	Round int64 `json:"round"`
+// BinanceAumData contains all Binance data that is a matter of consensus for the Binance AUM contract.
+type BinanceAumData struct {
 	// Unimmr is the Unified Account Maintenance Margin Ratio. It is the overall risk measure of
 	// the entire portfolio.
 	Unimmr math.LegacyDec `json:"unimmr"`
@@ -55,10 +53,8 @@ type BinanceBalance struct {
 	Amount math.LegacyDec `json:"amount"`
 }
 
-// SolanaData contains all Solana data that is a matter of consensus for the Solana AUM contract.
-type SolanaData struct {
-	// Round is the consensus round number.
-	Round int64 `json:"round"`
+// JupiterAumData contains all Jupiter data that is a matter of consensus for the Jupiter AUM contract.
+type JupiterAumData struct {
 	// CustodyAssets contains information about Jupiter custodies.
 	CustodyAssets []JupiterCustodyAsset `json:"custody_assets"`
 	// AumUsd is the total Jupiter protocol AUM in USD.
@@ -73,7 +69,7 @@ type SolanaData struct {
 }
 
 // SortCustodyAssets sorts the custody assets by their denomination.
-func (s *SolanaData) SortCustodyAssets() {
+func (s *JupiterAumData) SortCustodyAssets() {
 	slices.SortFunc(s.CustodyAssets, func(a, b JupiterCustodyAsset) int {
 		return cmp.Compare(a.Denom, b.Denom)
 	})

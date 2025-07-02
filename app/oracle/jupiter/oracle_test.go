@@ -1,4 +1,4 @@
-package solana
+package jupiter
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
+	"github.com/structured-org/aum-oracle/oracle"
 	mock_solana "github.com/structured-org/aum-oracle/testutil/mocks/solana"
 	"go.uber.org/zap"
 )
@@ -24,7 +25,7 @@ var (
 	testPubKey5 = solana.MustPublicKeyFromBase58("92q4Y2xGE39Bm2JgNZLZWuafoBiBR4gCj4igfpwvpgcD")
 )
 
-func TestOracleRun(t *testing.T) {
+func TestOracleForNeutronRun(t *testing.T) {
 	start := time.Now().UTC().Unix()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -47,7 +48,7 @@ func TestOracleRun(t *testing.T) {
 		},
 	}
 
-	neutronClient.EXPECT().GetSolanaAumContractNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+	neutronClient.EXPECT().GetJupiterAumContractNextRound(gomock.Any()).Return(&neutronclient.NextRound{
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
@@ -78,8 +79,7 @@ func TestOracleRun(t *testing.T) {
 		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000}, Decimals: 6,
 	}, nil)
 
-	expectedData := &neutronclient.SolanaData{
-		Round: 1,
+	expectedData := &neutronclient.JupiterAumData{
 		CustodyAssets: []neutronclient.JupiterCustodyAsset{
 			{Denom: "USDT", Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000, Decimals: 6},
 			{Denom: "USDC", Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000, Decimals: 6},
@@ -93,14 +93,19 @@ func TestOracleRun(t *testing.T) {
 		JlpTokenDecimals:   6,
 	}
 	expectedData.SortCustodyAssets()
-	neutronClient.EXPECT().SubmitSolanaAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
+	neutronClient.EXPECT().SubmitJupiterAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 
-	oracle := NewOracle(solanaClient, neutronClient, jupiterClient, jupCfg, zap.NewExample())
+	o := NewJupiterAumOracleForNeutron(
+		solanaClient,
+		neutronClient,
+		jupiterClient,
+		jupCfg,
+		zap.NewExample(),
+	)
 	ctx, cancel := context.WithCancel(context.Background())
-
-	go oracle.Run(ctx)
+	go oracle.RunOracle(ctx, o)
 
 	time.Sleep(5 * time.Second)
 	cancel()

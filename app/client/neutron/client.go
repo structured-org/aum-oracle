@@ -22,7 +22,7 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 
 // TODO: use actual values when the client is implemented
 var binanceRound = 0
-var solanaRound = 0
+var jupiterRound = 0
 
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
@@ -34,7 +34,7 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 }
 
 // SubmitBinanceAumData submits the Binance AUM data to the Neutron AUM contract.
-func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceData) (*NextRound, error) {
+func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
 	// print for debug evaluation. TODO: use actual values when the client is implemented
 	spew.Dump("submitted Binance AUM data:", data)
 
@@ -45,23 +45,23 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceData) (*
 	}, nil
 }
 
-// GetSolanaAumContractNextRound gets the next consensus round for the Solana AUM contract.
-func (c *Client) GetSolanaAumContractNextRound(ctx context.Context) (*NextRound, error) {
+// GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
+func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound, error) {
 	// TODO: use actual values when the client is implemented
 	return &NextRound{
-		Round:     int64(solanaRound),
+		Round:     int64(jupiterRound),
 		Timestamp: time.Now().Add(time.Second).Unix(),
 	}, nil
 }
 
-// SubmitSolanaAumData submits the Solana AUM data to the Neutron AUM contract.
-func (c *Client) SubmitSolanaAumData(ctx context.Context, data *SolanaData) (*NextRound, error) {
+// SubmitJupiterAumData submits the Jupiter AUM data to the Neutron AUM contract.
+func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
 	// print for debug evaluation. TODO: use actual values when the client is implemented
-	spew.Dump("submitted Solana AUM data:", data)
+	spew.Dump("submitted Jupiter AUM data:", data)
 
-	solanaRound++
+	jupiterRound++
 	return &NextRound{
-		Round:     int64(solanaRound),
+		Round:     int64(jupiterRound),
 		Timestamp: time.Now().Add(time.Minute).Unix(),
 	}, nil
 }

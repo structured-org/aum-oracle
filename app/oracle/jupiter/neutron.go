@@ -1,110 +1,81 @@
-package solana
+package jupiter
 
 import (
 	"context"
+	"fmt"
 	"sync"
-	"time"
 
 	"cosmossdk.io/math"
 	solana "github.com/gagliardetto/solana-go"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
+	"github.com/structured-org/aum-oracle/oracle"
 	"go.uber.org/zap"
 )
 
-// JupiterConfig is the configuration for the Jupiter oracle.
-type JupiterConfig struct {
-	// Custodies is the map of Jupiter custodies represented as token->programId.
-	Custodies map[string]solana.PublicKey
-	// Token is the Jupiter JLP token address.
-	Token solana.PublicKey
-	// Pool is the Jupiter JLP pool address.
-	Pool solana.PublicKey
-	// Strategy is the Jupiter JLP strategy address.
-	Strategy solana.PublicKey
-}
-
-// Oracle is the Solana oracle. It is responsible for fetching data from the Solana blockchain and
-// submitting it to the Neutron client.
-type Oracle struct {
+// JupiterAumOracleForNeutron is an Oracle implementation that is used to fetch data from the
+// Jupiter protocol and submit it to the Neutron AUM contract.
+type JupiterAumOracleForNeutron struct {
 	solanaClient  SolanaClient
-	neutronClient NeutronClient
+	neutronClient NeutronAumContractClient
 	jupiterClient JupiterClient
 	jupiterConfig JupiterConfig
 
 	logger *zap.Logger
 }
 
-// NewOracle creates a new Solana oracle.
-func NewOracle(
+// NewJupiterAumOracleForNeutron creates a new Jupiter AUM oracle for the Neutron network.
+func NewJupiterAumOracleForNeutron(
 	solanaClient SolanaClient,
-	neutronClient NeutronClient,
+	neutronClient NeutronAumContractClient,
 	jupiterClient JupiterClient,
 	jupiterConfig JupiterConfig,
 	logger *zap.Logger,
-) *Oracle {
-	return &Oracle{
+) *JupiterAumOracleForNeutron {
+	return &JupiterAumOracleForNeutron{
 		solanaClient:  solanaClient,
 		neutronClient: neutronClient,
 		jupiterClient: jupiterClient,
 		jupiterConfig: jupiterConfig,
-		logger:        logger,
+		logger:        logger.With(zap.String("network", "neutron")),
 	}
 }
 
-// Run runs the Solana oracle. It starts query-submission loop that periodically fetches data from
-// the Solana blockchain and submits it using the Neutron client.
-func (o *Oracle) Run(ctx context.Context) {
-	// query the next round once at initialisation
-	// then the value is reassigned from submission response in the loop
-	nextRound, err := o.neutronClient.GetSolanaAumContractNextRound(ctx)
+// GetNextRound retrieves the next round for the Jupiter AUM oracle.
+func (o *JupiterAumOracleForNeutron) GetNextRound(ctx context.Context) (*oracle.NextRound, error) {
+	nextRound, err := o.neutronClient.GetJupiterAumContractNextRound(ctx)
 	if err != nil {
-		o.logger.Error("failed to get next round", zap.Error(err))
-		return
+		return nil, fmt.Errorf("failed to get next round: %w", err)
 	}
-
-	for {
-		timeTillNextRound := time.Duration(nextRound.Timestamp-time.Now().Unix()) * time.Second
-		o.logger.Info("waiting for next round",
-			zap.Int64("round", nextRound.Round),
-			zap.Int64("round_timestamp", nextRound.Timestamp),
-			zap.Duration("time_till_next_round", timeTillNextRound),
-		)
-
-		select {
-		case <-time.NewTimer(timeTillNextRound).C:
-			o.logger.Info("new round started",
-				zap.Int64("round", nextRound.Round),
-				zap.Int64("round_timestamp", nextRound.Timestamp),
-			)
-
-			data, err := o.fetchSolanaData(ctx)
-			if err != nil {
-				o.logger.Error("failed to fetch AUM data", zap.Error(err))
-				return
-			}
-			data.Round = nextRound.Round
-
-			nextRound, err = o.neutronClient.SubmitSolanaAumData(ctx, data)
-			if err != nil {
-				o.logger.Error("failed to submit AUM data", zap.Error(err))
-				return
-			}
-
-			o.logger.Info("submitted AUM data",
-				zap.Int64("round", data.Round),
-				zap.Any("data", *data),
-			)
-
-		case <-ctx.Done():
-			o.logger.Info("oracle stopped by context")
-			return
-		}
-	}
+	return &oracle.NextRound{
+		Round:     nextRound.Round,
+		Timestamp: nextRound.Timestamp,
+	}, nil
 }
 
-// fetchSolanaData concurrently fetches all required data from the Solana blockchain.
-func (o *Oracle) fetchSolanaData(ctx context.Context) (*neutronclient.SolanaData, error) {
-	data := &neutronclient.SolanaData{}
+// FetchData fetches the Jupiter AUM data from the Jupiter protocol.
+func (o *JupiterAumOracleForNeutron) FetchData(ctx context.Context) (*neutronclient.JupiterAumData, error) {
+	return o.fetchJupiterAumData(ctx)
+}
+
+func (o *JupiterAumOracleForNeutron) Logger() *zap.Logger {
+	return o.logger
+}
+
+// SubmitData submits the Jupiter AUM data to the Neutron AUM contract.
+func (o *JupiterAumOracleForNeutron) SubmitData(ctx context.Context, data *neutronclient.JupiterAumData) (*oracle.NextRound, error) {
+	nextRound, err := o.neutronClient.SubmitJupiterAumData(ctx, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to submit Jupiter AUM data: %w", err)
+	}
+	return &oracle.NextRound{
+		Round:     nextRound.Round,
+		Timestamp: nextRound.Timestamp,
+	}, nil
+}
+
+// fetchJupiterAumData concurrently fetches all required data from the Jupiter protocol.
+func (o *JupiterAumOracleForNeutron) fetchJupiterAumData(ctx context.Context) (*neutronclient.JupiterAumData, error) {
+	data := &neutronclient.JupiterAumData{}
 	wg := sync.WaitGroup{}
 
 	custodiesMu := sync.Mutex{}
