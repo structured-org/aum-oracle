@@ -2,6 +2,9 @@ package neutron
 
 import (
 	"context"
+	json2 "encoding/json"
+	"fmt"
+	"github.com/structured-org/aum-oracle/client/tm"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -10,13 +13,21 @@ import (
 
 // Client is the Neutron client.
 type Client struct {
-	logger *zap.Logger
+	logger             *zap.Logger
+	client             *tm.Client
+	jupiterAumContract string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(logger *zap.Logger) (*Client, error) {
+func NewClient(conf tm.ClientConfig, jupiterAumContract string, logger *zap.Logger) (*Client, error) {
+	tmClient, err := tm.New(&conf, logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not instantiate tm client: %w", err)
+	}
 	return &Client{
-		logger: logger,
+		logger:             logger,
+		client:             tmClient,
+		jupiterAumContract: jupiterAumContract,
 	}, nil
 }
 
@@ -58,6 +69,11 @@ func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound
 func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
 	// print for debug evaluation. TODO: use actual values when the client is implemented
 	spew.Dump("submitted Jupiter AUM data:", data)
+
+	msg := MsgExecuteContract{
+		// TODO
+	}
+	c.client.SignAndBroadcast(ctx, msg)
 
 	jupiterRound++
 	return &NextRound{

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/structured-org/aum-oracle/client/tm"
 	"log"
 	"os"
 
@@ -47,6 +48,15 @@ type config struct {
 	// JupiterStrategyAddress is the Jupiter strategy address pubkey.
 	JupiterStrategyAddress string `yaml:"jupiter_strategy_address"`
 
+	Clients ClientsConfig `yaml:"clients"`
+
+	// Jupiter aum contract address.
+	JupiterAumContract string `yaml:"jupiter_aum_contract"`
+
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
+}
+
+type ClientsConfig struct {
+	Neutron tm.ClientConfig `yaml:"neutron"`
 }

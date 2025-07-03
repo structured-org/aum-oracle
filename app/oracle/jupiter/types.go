@@ -107,6 +107,7 @@ func fetchJupiterAumData(
 		}
 
 		data.StrategyJlpBalance = math.NewUintFromString(supply.Amount)
+		// Why not use decimals here?
 	}()
 
 	wg.Wait()

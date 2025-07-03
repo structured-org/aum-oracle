@@ -41,7 +41,7 @@ func main() {
 
 	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
 	jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
-	neutronClient, err := neutronclient.NewClient(logRegistry.Get(neutronClientContext))
+	neutronClient, err := neutronclient.NewClient(conf.Clients.Neutron, conf.JupiterAumContract, logRegistry.Get(neutronClientContext))
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}

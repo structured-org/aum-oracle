@@ -3,8 +3,11 @@ module github.com/structured-org/aum-oracle
 go 1.23.6
 
 require (
+	github.com/cometbft/cometbft v0.38.17
+	github.com/cosmos/cosmos-sdk v0.50.11
 	cosmossdk.io/math v1.5.3
 	github.com/adshao/go-binance/v2 v2.8.2
+	github.com/avast/retry-go/v4 v4.6.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.12.0
