@@ -117,13 +117,13 @@ func (c *Client) GetAddress() string {
 
 // SignAndBroadcast signs and broadcasts the msg. It locks the client mutex to keep the tx
 // sequence value right.
-func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (uint64, error) {
+func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultTx, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	client, err := c.queryAccount(ctx, c.address.String())
 	if err != nil {
-		return 0, fmt.Errorf("failed to query client acc info: %w. probably the account has empty balances", err)
+		return nil, fmt.Errorf("failed to query client acc info: %w. probably the account has empty balances", err)
 	}
 	txFactory := c.baseTxFactory.
 		WithAccountNumber(client.AccountNumber).
@@ -131,32 +131,39 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (uint64, e
 
 	txBuilder, err := txFactory.BuildUnsignedTx(msg)
 	if err != nil {
-		return 0, fmt.Errorf("failed to build unsigned msg: %w", err)
+		return nil, fmt.Errorf("failed to build unsigned msg: %w", err)
 	}
 
 	if err = tx.Sign(ctx, txFactory, keyName, txBuilder, false); err != nil {
-		return 0, fmt.Errorf("failed to sign tx: %w", err)
+		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 	encodedMsg, err := c.txEncoder(txBuilder.GetTx())
 	if err != nil {
-		return 0, fmt.Errorf("failed to encode signed msg: %w", err)
+		return nil, fmt.Errorf("failed to encode signed msg: %w", err)
 	}
 
 	res, err := c.tmClient.BroadcastTxCommit(ctx, encodedMsg)
 	if err != nil {
-		return 0, fmt.Errorf("send msg broadcast error: %w", err)
+		return nil, fmt.Errorf("send msg broadcast error: %w", err)
 	}
 	if res.CheckTx.Code != abcitypes.CodeTypeOK {
-		return 0, fmt.Errorf("check tx failed: code %d, %s", res.CheckTx.Code, res.CheckTx.Log)
+		return nil, fmt.Errorf("check tx failed: code %d, %s", res.CheckTx.Code, res.CheckTx.Log)
 	}
-	// TODO: query tx?
-	//if res.DeliverTx.Code != abcitypes.CodeTypeOK {
-	//	return 0, fmt.Errorf("deliver tx failed: code %d, %s", res.DeliverTx.Code, res.DeliverTx.Log)
-	//}
-	// TODO: retry also
-	//res, err := c.tmClient.Tx(ctx, res.Hash, false)
 
-	return uint64(res.Height), nil
+	// TMP
+	time.Sleep(3 * time.Second)
+
+	// TODO: retry also
+	qTxRes, err := c.tmClient.Tx(ctx, res.Hash, false)
+	txRes := qTxRes.TxResult
+	fmt.Printf("Tx result: %v, rawLog: %s\n\n\n", txRes.Code, txRes.Log)
+
+	if txRes.Code != abcitypes.CodeTypeOK {
+		// TODO: proper message
+		return nil, fmt.Errorf("failed to get tx: %s", txRes.Log)
+	}
+
+	return qTxRes, nil
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.

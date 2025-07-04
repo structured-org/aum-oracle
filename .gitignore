@@ -2,3 +2,6 @@ app/config.yaml
 app/aum-oracle
 
 .idea
+
+artifacts
+target

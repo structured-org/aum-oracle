@@ -77,7 +77,6 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 		},
 	}
 	msgBz, _ := json.Marshal(msgPayload)
-	fmt.Printf("Marshalled json: %s\n", string(msgBz))
 	executeMsg := &types.MsgExecuteContract{
 		Sender:   c.client.GetAddress(),
 		Contract: c.jupiterAumContract,
@@ -85,14 +84,14 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 		Funds:    sdk.NewCoins(),
 	}
 
-	code, err := c.client.SignAndBroadcast(ctx, executeMsg)
-	fmt.Printf("code: %v, err: %v\n", code, err)
+	res, err := c.client.SignAndBroadcast(ctx, executeMsg)
 	if err != nil {
-		// TODO
+		return nil, fmt.Errorf("failed to sign and broadcast tx during submit data: %w", err)
 	}
-	if code != 0 {
-		// TODO
-	}
+	c.logger.Info("submitted jupiter aum data",
+		zap.Uint32("code", res.TxResult.Code),
+		zap.String("hash", res.Hash.String()), // TODO: check that hex output?
+		zap.Int64("height", res.Height))
 
 	jupiterRound++
 	return &NextRound{
