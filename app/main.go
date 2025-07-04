@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"log"
 	"os"
 	"os/signal"
@@ -26,7 +27,15 @@ var (
 	jupiterAumOracleContext = "jupiter_aum_oracle"
 	binanceAumOracleContext = "binance_aum_oracle"
 	neutronClientContext    = "neutron_client"
+	chainBechAddressPrefix  = "neutron"
+	chainBechPubPrefix      = "neutronpub"
 )
+
+func init() {
+	config := sdk.GetConfig()
+	config.SetBech32PrefixForAccount(chainBechAddressPrefix, chainBechPubPrefix)
+	config.Seal()
+}
 
 func main() {
 	conf := readConfig()

@@ -2,13 +2,14 @@ package neutron
 
 import (
 	"context"
-	json2 "encoding/json"
+	"encoding/json"
 	"fmt"
-	"github.com/structured-org/aum-oracle/client/tm"
-	"time"
-
+	"github.com/CosmWasm/wasmd/x/wasm/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/structured-org/aum-oracle/client/tm"
 	"go.uber.org/zap"
+	"time"
 )
 
 // Client is the Neutron client.
@@ -67,13 +68,31 @@ func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound
 
 // SubmitJupiterAumData submits the Jupiter AUM data to the Jupiter AUM contract.
 func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
-	// print for debug evaluation. TODO: use actual values when the client is implemented
 	spew.Dump("submitted Jupiter AUM data:", data)
 
-	msg := MsgExecuteContract{
+	// === BUILD EXECUTE MSG ===
+	msgPayload := map[string]interface{}{
+		"publish_data": map[string]interface{}{
+			"data": data,
+		},
+	}
+	msgBz, _ := json.Marshal(msgPayload)
+	fmt.Printf("Marshalled json: %s\n", string(msgBz))
+	executeMsg := &types.MsgExecuteContract{
+		Sender:   c.client.GetAddress(),
+		Contract: c.jupiterAumContract,
+		Msg:      msgBz,
+		Funds:    sdk.NewCoins(),
+	}
+
+	code, err := c.client.SignAndBroadcast(ctx, executeMsg)
+	fmt.Printf("code: %v, err: %v\n", code, err)
+	if err != nil {
 		// TODO
 	}
-	c.client.SignAndBroadcast(ctx, msg)
+	if code != 0 {
+		// TODO
+	}
 
 	jupiterRound++
 	return &NextRound{

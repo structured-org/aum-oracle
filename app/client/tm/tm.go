@@ -15,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdkcodec "github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/types"
@@ -44,13 +45,13 @@ var (
 
 // ClientConfig represents configuration for Client.
 type ClientConfig struct {
-	Mnemonic           string
-	GasPrices          string
-	Gas                uint64
-	ChainID            string
-	Node               string
-	NodeConnRetries    uint
-	NodeConnRetryDelay time.Duration
+	Mnemonic           string        `yaml:"mnemonic"`
+	GasPrices          string        `yaml:"gas_prices"`
+	Gas                uint64        `yaml:"gas"`
+	ChainID            string        `yaml:"chain_id"`
+	Node               string        `yaml:"node"`
+	NodeConnRetries    uint          `yaml:"node_conn_retries"`
+	NodeConnRetryDelay time.Duration `yaml:"node_conn_retry_delay"`
 }
 
 // New creates a new instance of Client.
@@ -71,7 +72,7 @@ func New(cfg *ClientConfig, logger *zap.Logger) (*Client, error) {
 		logger:       logger,
 		cfg:          cfg,
 	}
-	keybase := keyring.NewInMemory(cdc)
+	keybase := keyring.NewInMemory(getCryptoCodec())
 	c.baseTxFactory = tx.Factory{}.
 		WithKeybase(keybase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT).
@@ -132,6 +133,7 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (uint64, e
 	if err != nil {
 		return 0, fmt.Errorf("failed to build unsigned msg: %w", err)
 	}
+
 	if err = tx.Sign(ctx, txFactory, keyName, txBuilder, false); err != nil {
 		return 0, fmt.Errorf("failed to sign tx: %w", err)
 	}
@@ -151,6 +153,9 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (uint64, e
 	//if res.DeliverTx.Code != abcitypes.CodeTypeOK {
 	//	return 0, fmt.Errorf("deliver tx failed: code %d, %s", res.DeliverTx.Code, res.DeliverTx.Log)
 	//}
+	// TODO: retry also
+	//res, err := c.tmClient.Tx(ctx, res.Hash, false)
+
 	return uint64(res.Height), nil
 }
 
@@ -267,4 +272,10 @@ func createTmHttp(addr string, retries uint, delay time.Duration, logger *zap.Lo
 	}
 	logger.Debug("connection to node successful", zap.String("node_address", addr))
 	return tmClient, nil
+}
+
+func getCryptoCodec() *sdkcodec.ProtoCodec {
+	registry := codectypes.NewInterfaceRegistry()
+	cryptocodec.RegisterInterfaces(registry)
+	return sdkcodec.NewProtoCodec(registry)
 }
