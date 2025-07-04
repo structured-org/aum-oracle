@@ -117,7 +117,7 @@ func (c *Client) GetAddress() string {
 
 // SignAndBroadcast signs and broadcasts the msg. It locks the client mutex to keep the tx
 // sequence value right.
-func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultTx, error) {
+func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultBroadcastTxCommit, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -150,20 +150,11 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcorety
 		return nil, fmt.Errorf("check tx failed: code %d, %s", res.CheckTx.Code, res.CheckTx.Log)
 	}
 
-	// TMP
-	time.Sleep(3 * time.Second)
-
-	// TODO: retry also
-	qTxRes, err := c.tmClient.Tx(ctx, res.Hash, false)
-	txRes := qTxRes.TxResult
-	fmt.Printf("Tx result: %v, rawLog: %s\n\n\n", txRes.Code, txRes.Log)
-
-	if txRes.Code != abcitypes.CodeTypeOK {
-		// TODO: proper message
-		return nil, fmt.Errorf("failed to get tx: %s", txRes.Log)
+	if res.TxResult.Code != abcitypes.CodeTypeOK {
+		return nil, fmt.Errorf("submit tx failed: code %d, %s", res.TxResult.Code, res.TxResult.Log)
 	}
 
-	return qTxRes, nil
+	return res, nil
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.

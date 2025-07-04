@@ -50,8 +50,10 @@ type config struct {
 
 	Clients ClientsConfig `yaml:"clients"`
 
-	// Jupiter aum contract address.
+	// Jupiter AUM oracle contract address.
 	JupiterAumContract string `yaml:"jupiter_aum_contract"`
+	// Binance AUM oracle contract address.
+	BinanceAumContract string `yaml:"binance_aum_contract"`
 
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
