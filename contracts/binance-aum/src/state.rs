@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {
     /// owner of the contract
-    pub admin: Addr,
+    pub owner: Addr,
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
     /// how many seconds we consider the last published consensus as valid
@@ -177,8 +177,8 @@ impl Config {
         deps: Deps,
         new_config: &crate::msg::UpdateConfig,
     ) -> ContractResult<()> {
-        if let Some(ref admin) = new_config.admin {
-            self.admin = deps.api.addr_validate(admin)?;
+        if let Some(ref admin) = new_config.owner {
+            self.owner = deps.api.addr_validate(admin)?;
         }
         if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
             self.consensus_data_valid_period = consensus_data_valid_period;
