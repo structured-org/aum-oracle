@@ -6,11 +6,15 @@ use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
 use consensus::error::ConsensusError;
+use cosmwasm_schema::schemars;
+use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env},
-    Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal, Timestamp,
+    to_json_binary, Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal256, Timestamp,
 };
+use neutron_std::types::neutron::util::precdec::PrecDec;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 // Helper function to create a MessageInfo object for testing
@@ -49,27 +53,27 @@ fn create_test_contract_config() -> Config {
 
 // Helper function to create a test BinanceData object
 fn create_test_data(
-    unimmr: SignedDecimal,
-    um_balance: SignedDecimal,
-    pm_equity: SignedDecimal,
-    withdrawable: SignedDecimal,
+    unimmr: SignedDecimal256,
+    um_balance: SignedDecimal256,
+    pm_equity: SignedDecimal256,
+    withdrawable: SignedDecimal256,
 ) -> BinanceData {
     BinanceData {
         unimmr,
         positions: vec![Position {
             symbol: "BTCUSDT".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
-            pnl: SignedDecimal::from_ratio(100, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
+            pnl: SignedDecimal256::from_ratio(100, 1),
         }],
         um_balance_usdt: um_balance,
         spot_balances: vec![
             SpotBalance {
                 asset: "BTC".to_string(),
-                amount: SignedDecimal::from_ratio(1, 1),
+                amount: SignedDecimal256::from_ratio(1, 1),
             },
             SpotBalance {
                 asset: "USDT".to_string(),
-                amount: SignedDecimal::from_ratio(10000, 1),
+                amount: SignedDecimal256::from_ratio(10000, 1),
             },
         ],
         pm_account_actual_equity: pm_equity,
@@ -131,10 +135,10 @@ fn test_execute_publish_data() {
 
     // Create test data
     let test_data = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
 
     // Test 1: Unauthorized oracle rejection
@@ -149,21 +153,21 @@ fn test_execute_publish_data() {
     // Test 2: Invalid positions
     let oracle_info = message_info("oracle1", &[]);
     let mut invalid_positions_data = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     invalid_positions_data.positions = vec![
         Position {
             symbol: "WRONG_SYMBOL".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
-            pnl: SignedDecimal::from_ratio(100, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
+            pnl: SignedDecimal256::from_ratio(100, 1),
         },
         Position {
             symbol: "ANOTHER_WRONG_SYMBOL".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
-            pnl: SignedDecimal::from_ratio(100, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
+            pnl: SignedDecimal256::from_ratio(100, 1),
         },
     ];
 
@@ -182,19 +186,19 @@ fn test_execute_publish_data() {
     // Test 2: Invalid spot balances
     let oracle_info = message_info("oracle1", &[]);
     let mut invalid_spot_balances_data = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     invalid_spot_balances_data.spot_balances = vec![
         SpotBalance {
             asset: "WRONG_ASSET".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
         },
         SpotBalance {
             asset: "ANOTHER_WRONG_ASSET".to_string(),
-            amount: SignedDecimal::from_ratio(10000, 1),
+            amount: SignedDecimal256::from_ratio(10000, 1),
         },
     ];
 
@@ -221,33 +225,33 @@ fn test_execute_publish_data() {
     // Test 3: Submit data from all oracles to reach consensus
     let oracle2_info = message_info("oracle2", &[]);
     let mut test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     // BinanceData with additional wrong positions and spot balances must be accepted anyway, since
     // the data is being cleaned
     test_data2.positions.append(&mut vec![
         Position {
             symbol: "WRONG_SYMBOL".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
-            pnl: SignedDecimal::from_ratio(100, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
+            pnl: SignedDecimal256::from_ratio(100, 1),
         },
         Position {
             symbol: "ANOTHER_WRONG_SYMBOL".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
-            pnl: SignedDecimal::from_ratio(100, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
+            pnl: SignedDecimal256::from_ratio(100, 1),
         },
     ]);
     test_data2.spot_balances.append(&mut vec![
         SpotBalance {
             asset: "WRONG_ASSET".to_string(),
-            amount: SignedDecimal::from_ratio(1, 1),
+            amount: SignedDecimal256::from_ratio(1, 1),
         },
         SpotBalance {
             asset: "ANOTHER_WRONG_ASSET".to_string(),
-            amount: SignedDecimal::from_ratio(10000, 1),
+            amount: SignedDecimal256::from_ratio(10000, 1),
         },
     ]);
 
@@ -260,10 +264,10 @@ fn test_execute_publish_data() {
     // Submit data from the third oracle to reach consensus (all oracles)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
@@ -290,10 +294,10 @@ fn test_execute_publish_data() {
     // Submit data for the new round (which should be 2 now)
     let oracle2_info = message_info("oracle2", &[]);
     let new_round_data = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: new_round_data,
@@ -335,10 +339,10 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Create test data
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
 
     // Test 1: Submit data from one oracle
@@ -360,10 +364,10 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Test 3: Submit data from another oracle with identical data
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),   // Identical to test_data1
-        SignedDecimal::from_ratio(1000, 1), // Identical to test_data1
-        SignedDecimal::from_ratio(2000, 1), // Identical to test_data1
-        SignedDecimal::from_ratio(500, 1),  // Identical to test_data1
+        SignedDecimal256::from_ratio(5, 10),   // Identical to test_data1
+        SignedDecimal256::from_ratio(1000, 1), // Identical to test_data1
+        SignedDecimal256::from_ratio(2000, 1), // Identical to test_data1
+        SignedDecimal256::from_ratio(500, 1),  // Identical to test_data1
     );
     let oracle2_info = message_info("oracle2", &[]);
     let msg = ExecuteMsg::PublishData {
@@ -383,10 +387,10 @@ fn test_execute_publish_data_time_based_consensus() {
 
     // Test 5: Submit data from the third oracle with identical data
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(5, 10), // Identical to test_data1 and test_data2
-        SignedDecimal::from_ratio(1000, 1), // Identical to test_data1 and test_data2
-        SignedDecimal::from_ratio(2000, 1), // Identical to test_data1 and test_data2
-        SignedDecimal::from_ratio(500, 1), // Identical to test_data1 and test_data2
+        SignedDecimal256::from_ratio(5, 10), // Identical to test_data1 and test_data2
+        SignedDecimal256::from_ratio(1000, 1), // Identical to test_data1 and test_data2
+        SignedDecimal256::from_ratio(2000, 1), // Identical to test_data1 and test_data2
+        SignedDecimal256::from_ratio(500, 1), // Identical to test_data1 and test_data2
     );
     let oracle3_info = message_info("oracle3", &[]);
     let msg = ExecuteMsg::PublishData {
@@ -423,10 +427,10 @@ fn test_try_consensus() {
     {
         let config = create_test_consensus_config();
         let single_data = vec![create_test_data(
-            SignedDecimal::from_ratio(5, 10),
-            SignedDecimal::from_ratio(1000, 1),
-            SignedDecimal::from_ratio(2000, 1),
-            SignedDecimal::from_ratio(500, 1),
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
         )];
         assert!(BinanceData::try_consensus(
             &single_data,
@@ -441,16 +445,16 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ), // within 1% delta
         ];
         let consensus =
@@ -458,15 +462,18 @@ fn test_try_consensus() {
         assert!(consensus.is_some());
 
         let result = consensus.unwrap();
-        assert_eq!(result.unimmr, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505
-        assert_eq!(result.um_balance_usdt, SignedDecimal::from_ratio(10025, 10)); // median of 1000 and 1005
+        assert_eq!(result.unimmr, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505
+        assert_eq!(
+            result.um_balance_usdt,
+            SignedDecimal256::from_ratio(10025, 10)
+        ); // median of 1000 and 1005
         assert_eq!(
             result.pm_account_actual_equity,
-            SignedDecimal::from_ratio(2005, 1)
+            SignedDecimal256::from_ratio(2005, 1)
         ); // median of 2000 and 2010
         assert_eq!(
             result.withdrawable_usdt,
-            SignedDecimal::from_ratio(5025, 10)
+            SignedDecimal256::from_ratio(5025, 10)
         ); // median of 500 and 505
     }
 
@@ -477,16 +484,16 @@ fn test_try_consensus() {
 
         let data_divergent = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(51, 100),
-                SignedDecimal::from_ratio(1020, 1),
-                SignedDecimal::from_ratio(2050, 1),
-                SignedDecimal::from_ratio(510, 1),
+                SignedDecimal256::from_ratio(51, 100),
+                SignedDecimal256::from_ratio(1020, 1),
+                SignedDecimal256::from_ratio(2050, 1),
+                SignedDecimal256::from_ratio(510, 1),
             ), // outside 0.1% delta
         ];
 
@@ -503,22 +510,22 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data_multiple = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(503, 1000),
-                SignedDecimal::from_ratio(1003, 1),
-                SignedDecimal::from_ratio(2005, 1),
-                SignedDecimal::from_ratio(503, 1),
+                SignedDecimal256::from_ratio(503, 1000),
+                SignedDecimal256::from_ratio(1003, 1),
+                SignedDecimal256::from_ratio(2005, 1),
+                SignedDecimal256::from_ratio(503, 1),
             ),
         ];
 
@@ -530,13 +537,19 @@ fn test_try_consensus() {
         assert!(consensus.is_some());
 
         let result = consensus.unwrap();
-        assert_eq!(result.unimmr, SignedDecimal::from_ratio(503, 1000));
-        assert_eq!(result.um_balance_usdt, SignedDecimal::from_ratio(1003, 1));
+        assert_eq!(result.unimmr, SignedDecimal256::from_ratio(503, 1000));
+        assert_eq!(
+            result.um_balance_usdt,
+            SignedDecimal256::from_ratio(1003, 1)
+        );
         assert_eq!(
             result.pm_account_actual_equity,
-            SignedDecimal::from_ratio(2005, 1)
+            SignedDecimal256::from_ratio(2005, 1)
         );
-        assert_eq!(result.withdrawable_usdt, SignedDecimal::from_ratio(503, 1));
+        assert_eq!(
+            result.withdrawable_usdt,
+            SignedDecimal256::from_ratio(503, 1)
+        );
     }
 
     // Test 6: Consensus with some outliers
@@ -544,22 +557,22 @@ fn test_try_consensus() {
         let config = create_test_consensus_config();
         let data_with_outliers = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(6, 10),
-                SignedDecimal::from_ratio(1200, 1),
-                SignedDecimal::from_ratio(2500, 1),
-                SignedDecimal::from_ratio(600, 1),
+                SignedDecimal256::from_ratio(6, 10),
+                SignedDecimal256::from_ratio(1200, 1),
+                SignedDecimal256::from_ratio(2500, 1),
+                SignedDecimal256::from_ratio(600, 1),
             ), // outlier
         ];
 
@@ -572,30 +585,30 @@ fn test_try_consensus() {
 
         // The outlier should be excluded from the consensus
         let result = consensus.unwrap();
-        assert_eq!(result.unimmr, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
+        assert_eq!(result.unimmr, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
     }
 
     // Test 7: Consensus with multiple positions
     {
         let config = create_test_consensus_config();
         let data1 = create_test_data(
-            SignedDecimal::from_ratio(5, 10),
-            SignedDecimal::from_ratio(1000, 1),
-            SignedDecimal::from_ratio(2000, 1),
-            SignedDecimal::from_ratio(500, 1),
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
         );
         let data2 = create_test_data(
-            SignedDecimal::from_ratio(505, 1000),
-            SignedDecimal::from_ratio(1005, 1),
-            SignedDecimal::from_ratio(2010, 1),
-            SignedDecimal::from_ratio(505, 1),
+            SignedDecimal256::from_ratio(505, 1000),
+            SignedDecimal256::from_ratio(1005, 1),
+            SignedDecimal256::from_ratio(2010, 1),
+            SignedDecimal256::from_ratio(505, 1),
         );
         //outlier
         let data3 = create_test_data(
-            SignedDecimal::from_ratio(6, 10),
-            SignedDecimal::from_ratio(1200, 1),
-            SignedDecimal::from_ratio(2500, 1),
-            SignedDecimal::from_ratio(600, 1),
+            SignedDecimal256::from_ratio(6, 10),
+            SignedDecimal256::from_ratio(1200, 1),
+            SignedDecimal256::from_ratio(2500, 1),
+            SignedDecimal256::from_ratio(600, 1),
         );
         let data_with_outliers = vec![data1, data2, data3];
 
@@ -608,7 +621,7 @@ fn test_try_consensus() {
 
         // The outlier should be excluded from the consensus
         let result = consensus.unwrap();
-        assert_eq!(result.unimmr, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
+        assert_eq!(result.unimmr, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
     }
 }
 
@@ -638,10 +651,10 @@ fn test_all_oracles_consensus_round_not_increased() {
     // Submit data from all oracles
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -651,10 +664,10 @@ fn test_all_oracles_consensus_round_not_increased() {
 
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
@@ -664,10 +677,10 @@ fn test_all_oracles_consensus_round_not_increased() {
 
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
@@ -735,10 +748,10 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from first oracle
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -760,10 +773,10 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from second oracle (should reach threshold)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
@@ -782,10 +795,10 @@ fn test_partial_oracles_consensus_round_not_increased() {
     // Submit data from third oracle (all oracles now)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
@@ -853,10 +866,10 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Submit data from only one oracle (below threshold)
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -881,10 +894,10 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Submit data for the new round (round 2)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
@@ -944,10 +957,10 @@ fn test_multiple_rounds_passing() {
     // Submit data from one oracle for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -961,10 +974,10 @@ fn test_multiple_rounds_passing() {
     // Submit data for the current round (round 4)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data4 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4,
@@ -1029,10 +1042,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 1 submits data for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1.clone(),
@@ -1050,10 +1063,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 2 submits data for round 1 (reaching threshold)
     let oracle2_info = message_info("oracle2", &[]);
     let test_data1_2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_2.clone(),
@@ -1071,10 +1084,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Oracle 3 submits data for round 1 (all oracles)
     let oracle3_info = message_info("oracle3", &[]);
     let test_data1_3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_3.clone(),
@@ -1100,10 +1113,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 2 submits data for round 2
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2.clone(),
@@ -1122,10 +1135,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 1 submits data for round 3
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(504, 1000),
-        SignedDecimal::from_ratio(1004, 1),
-        SignedDecimal::from_ratio(2008, 1),
-        SignedDecimal::from_ratio(504, 1),
+        SignedDecimal256::from_ratio(504, 1000),
+        SignedDecimal256::from_ratio(1004, 1),
+        SignedDecimal256::from_ratio(2008, 1),
+        SignedDecimal256::from_ratio(504, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3.clone(),
@@ -1141,10 +1154,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 2 also submits data for round 3 (reaching threshold)
     let test_data3_2 = create_test_data(
-        SignedDecimal::from_ratio(504, 1000),
-        SignedDecimal::from_ratio(1004, 1),
-        SignedDecimal::from_ratio(2008, 1),
-        SignedDecimal::from_ratio(504, 1),
+        SignedDecimal256::from_ratio(504, 1000),
+        SignedDecimal256::from_ratio(1004, 1),
+        SignedDecimal256::from_ratio(2008, 1),
+        SignedDecimal256::from_ratio(504, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3_2.clone(),
@@ -1186,10 +1199,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 3 submits data for round 4
     let test_data4 = create_test_data(
-        SignedDecimal::from_ratio(51, 100),
-        SignedDecimal::from_ratio(1010, 1),
-        SignedDecimal::from_ratio(2020, 1),
-        SignedDecimal::from_ratio(510, 1),
+        SignedDecimal256::from_ratio(51, 100),
+        SignedDecimal256::from_ratio(1010, 1),
+        SignedDecimal256::from_ratio(2020, 1),
+        SignedDecimal256::from_ratio(510, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4.clone(),
@@ -1231,10 +1244,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
 
     // Oracle 3 submits data for round 5
     let test_data5 = create_test_data(
-        SignedDecimal::from_ratio(50, 100),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(50, 100),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data5.clone(),
@@ -1285,10 +1298,10 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     // Oracle 1 submits data for round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1.clone(),
@@ -1298,10 +1311,10 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
 
     // Oracle 1 tries to submit data for round 1 again (should fail)
     let test_data1_again = create_test_data(
-        SignedDecimal::from_ratio(51, 100),
-        SignedDecimal::from_ratio(1010, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(510, 1),
+        SignedDecimal256::from_ratio(51, 100),
+        SignedDecimal256::from_ratio(1010, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(510, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_again,
@@ -1321,10 +1334,10 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
 
     // Oracle 1 submits data for round 2 (should succeed)
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(52, 100),
-        SignedDecimal::from_ratio(1020, 1),
-        SignedDecimal::from_ratio(2020, 1),
-        SignedDecimal::from_ratio(520, 1),
+        SignedDecimal256::from_ratio(52, 100),
+        SignedDecimal256::from_ratio(1020, 1),
+        SignedDecimal256::from_ratio(2020, 1),
+        SignedDecimal256::from_ratio(520, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
@@ -1366,10 +1379,10 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 1 submits data at the beginning of round 1
     let oracle1_info = message_info("oracle1", &[]);
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -1394,10 +1407,10 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 2 submits data in the middle of round 1
     let oracle2_info = message_info("oracle2", &[]);
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
@@ -1417,10 +1430,10 @@ fn test_delayed_oracle_submissions_within_round() {
     // Oracle 3 submits data near the end of round 1
     let oracle3_info = message_info("oracle3", &[]);
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
@@ -1449,10 +1462,10 @@ fn test_delayed_oracle_submissions_within_round() {
 
     // Oracle 3 submits data for round 2
     let test_data4 = create_test_data(
-        SignedDecimal::from_ratio(51, 100),
-        SignedDecimal::from_ratio(1010, 1),
-        SignedDecimal::from_ratio(2020, 1),
-        SignedDecimal::from_ratio(510, 1),
+        SignedDecimal256::from_ratio(51, 100),
+        SignedDecimal256::from_ratio(1010, 1),
+        SignedDecimal256::from_ratio(2020, 1),
+        SignedDecimal256::from_ratio(510, 1),
     );
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4,
@@ -1477,43 +1490,47 @@ fn test_query_get_aum_basic() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "BTC".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("1.0").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
+            })
+            .unwrap(),
         ), // BTC/USD price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("2000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("50").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("2000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("50").unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/USDT price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USDT".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000").unwrap(),
-                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("100000").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("100000").unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -1537,29 +1554,29 @@ fn test_query_get_aum_basic() {
 
     // Set up consensus state data
     let binance_data = BinanceData {
-        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
         positions: vec![Position {
             symbol: "BTCUSDT".to_string(),
-            amount: SignedDecimal::from_str("1.5").unwrap(),
-            pnl: SignedDecimal::from_str("1000.0").unwrap(),
+            amount: SignedDecimal256::from_str("1.5").unwrap(),
+            pnl: SignedDecimal256::from_str("1000.0").unwrap(),
         }],
-        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![
             SpotBalance {
                 asset: "BTC".to_string(),
-                amount: SignedDecimal::from_str("2.5").unwrap(),
+                amount: SignedDecimal256::from_str("2.5").unwrap(),
             },
             SpotBalance {
                 asset: "ETH".to_string(),
-                amount: SignedDecimal::from_str("20.0").unwrap(),
+                amount: SignedDecimal256::from_str("20.0").unwrap(),
             },
             SpotBalance {
                 asset: "USDT".to_string(),
-                amount: SignedDecimal::from_str("10000.0").unwrap(),
+                amount: SignedDecimal256::from_str("10000.0").unwrap(),
             },
         ],
-        pm_account_actual_equity: SignedDecimal::from_str("80000.0").unwrap(),
-        withdrawable_usdt: SignedDecimal::from_str("3000.0").unwrap(),
+        pm_account_actual_equity: SignedDecimal256::from_str("80000.0").unwrap(),
+        withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
     };
 
     let current_time = 1700000000;
@@ -1585,7 +1602,7 @@ fn test_query_get_aum_basic() {
     //    - 20 ETH = 20 / 50 = 0.4 BTC
     //    - 10000 USDT = 10000 / 100000 = 0.1 BTC
     // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
-    let expected_aum = SignedDecimal::from_str("3.8").unwrap();
+    let expected_aum = SignedDecimal256::from_str("3.8").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
@@ -1616,12 +1633,12 @@ fn test_query_get_aum_with_expired_data() {
     // Set up consensus state data with an old timestamp
     let current_time = 1700000000;
     let binance_data = BinanceData {
-        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
         positions: vec![],
-        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![],
-        pm_account_actual_equity: SignedDecimal::from_str("80000.0").unwrap(),
-        withdrawable_usdt: SignedDecimal::from_str("3000.0").unwrap(),
+        pm_account_actual_equity: SignedDecimal256::from_str("80000.0").unwrap(),
+        withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
     };
 
     let oracle_data = OracleData {
@@ -1655,22 +1672,24 @@ fn test_query_get_aum_with_negative_equity() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("40000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("40000.0").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("40000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("40000.0").unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("40000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("2000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("20").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("40000.0").unwrap(),
+                token_1_price: PrecDec::from_str("2000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("20").unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -1690,19 +1709,19 @@ fn test_query_get_aum_with_negative_equity() {
 
     // Set up consensus state data with negative equity
     let binance_data = BinanceData {
-        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
         positions: vec![Position {
             symbol: "BTCUSDT".to_string(),
-            amount: SignedDecimal::from_str("1.5").unwrap(),
-            pnl: SignedDecimal::from_str("-10000.0").unwrap(), // Negative PnL
+            amount: SignedDecimal256::from_str("1.5").unwrap(),
+            pnl: SignedDecimal256::from_str("-10000.0").unwrap(), // Negative PnL
         }],
-        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![SpotBalance {
             asset: "ETH".to_string(),
-            amount: SignedDecimal::from_str("10.0").unwrap(),
+            amount: SignedDecimal256::from_str("10.0").unwrap(),
         }],
-        pm_account_actual_equity: SignedDecimal::from_str("-20000.0").unwrap(), // Negative equity
-        withdrawable_usdt: SignedDecimal::from_str("0.0").unwrap(),
+        pm_account_actual_equity: SignedDecimal256::from_str("-20000.0").unwrap(), // Negative equity
+        withdrawable_usdt: SignedDecimal256::from_str("0.0").unwrap(),
     };
 
     let current_time = 1700000000;
@@ -1726,7 +1745,7 @@ fn test_query_get_aum_with_negative_equity() {
     // 2. Spot balances in BTC:
     //    - 10 ETH = 10 / 20 = 0.5 BTC
     // 3. Total AUM = -0.5 + 0.5 = 0 BTC
-    let expected_aum = SignedDecimal::zero();
+    let expected_aum = SignedDecimal256::zero();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
@@ -2074,33 +2093,36 @@ fn test_query_get_aum_with_large_values() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "BTC".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("1.0").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/USD price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000.0").unwrap(),
-                token_1_price: SignedDecimal::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("100000.0").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            CombinedPriceResponse {
-                token_0_price: SignedDecimal::from_str("100000").unwrap(),
-                token_1_price: SignedDecimal::from_str("2500.0").unwrap(),
-                price_0_to_1: SignedDecimal::from_str("40").unwrap(),
-            },
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000").unwrap(),
+                token_1_price: PrecDec::from_str("2500.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("40").unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -2120,21 +2142,21 @@ fn test_query_get_aum_with_large_values() {
 
     // Set up consensus state data with large values
     let binance_data = BinanceData {
-        unimmr: SignedDecimal::from_str("0.1").unwrap(),
+        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
         positions: vec![],
-        um_balance_usdt: SignedDecimal::from_str("5000.0").unwrap(),
+        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![
             SpotBalance {
                 asset: "BTC".to_string(),
-                amount: SignedDecimal::from_str("1000.0").unwrap(), // 1000 BTC
+                amount: SignedDecimal256::from_str("1000.0").unwrap(), // 1000 BTC
             },
             SpotBalance {
                 asset: "ETH".to_string(),
-                amount: SignedDecimal::from_str("20000.0").unwrap(), // 20000 ETH
+                amount: SignedDecimal256::from_str("20000.0").unwrap(), // 20000 ETH
             },
         ],
-        pm_account_actual_equity: SignedDecimal::from_str("40000000.0").unwrap(), // 40M USD
-        withdrawable_usdt: SignedDecimal::from_str("1000000.0").unwrap(),
+        pm_account_actual_equity: SignedDecimal256::from_str("40000000.0").unwrap(), // 40M USD
+        withdrawable_usdt: SignedDecimal256::from_str("1000000.0").unwrap(),
     };
 
     let current_time = 1700000000;
@@ -2159,7 +2181,146 @@ fn test_query_get_aum_with_large_values() {
     //    - 1000 BTC = 1000 BTC
     //    - 20000 ETH = 20000 / 40 = 500 BTC
     // 3. Total AUM = 400 + 1000 + 500 = 1900 BTC
-    let expected_aum = SignedDecimal::from_str("1900").unwrap();
+    let expected_aum = SignedDecimal256::from_str("1900").unwrap();
+
+    // Execute query
+    let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
+
+    // Verify results
+    assert_eq!(response.aum_in_btc, expected_aum);
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct CombinedPriceResponseWithPrecDec {
+    pub token_0_price: PrecDec,
+    pub token_1_price: PrecDec,
+    pub price_0_to_1: PrecDec,
+}
+
+#[test]
+fn test_query_aum_with_high_precision_prices_from_oracle() {
+    // Set up mock dependencies with price oracle responses
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![
+        // BTC/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "BTC".to_string(),
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("100000.0").unwrap(),
+                price_0_to_1: PrecDec::from_str("1.0").unwrap(),
+            })
+            .unwrap(),
+        ), // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USD".to_string(),
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: PrecDec::from_str("100000.0").unwrap(),
+            })
+            .unwrap(),
+        ),
+        // BTC/ETH price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "ETH".to_string(),
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("2000.0").unwrap(),
+                // this must be parsed successfully and the precision must be dropped just to 50.0
+                price_0_to_1: PrecDec::from_str("50.00000000000000000000001").unwrap(),
+            })
+            .unwrap(),
+        ),
+        // BTC/USDT price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USDT".to_string(),
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
+                token_0_price: PrecDec::from_str("100000").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: PrecDec::from_str("100000").unwrap(),
+            })
+            .unwrap(),
+        ),
+    ];
+
+    let mut deps = custom_mock_dependencies(price_oracle_responses);
+
+    // Set up configuration
+    let config = Config {
+        owner: Addr::unchecked("admin"),
+        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        consensus_data_valid_period: 3600, // 1 hour
+        price_max_blocks_old: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec![
+            "BTC".to_string(),
+            "ETH".to_string(),
+            "USDT".to_string(),
+        ],
+    };
+
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up consensus state data
+    let binance_data = BinanceData {
+        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
+        positions: vec![Position {
+            symbol: "BTCUSDT".to_string(),
+            amount: SignedDecimal256::from_str("1.5").unwrap(),
+            pnl: SignedDecimal256::from_str("1000.0").unwrap(),
+        }],
+        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
+        spot_balances: vec![
+            SpotBalance {
+                asset: "BTC".to_string(),
+                amount: SignedDecimal256::from_str("2.5").unwrap(),
+            },
+            SpotBalance {
+                asset: "ETH".to_string(),
+                amount: SignedDecimal256::from_str("20.0").unwrap(),
+            },
+            SpotBalance {
+                asset: "USDT".to_string(),
+                amount: SignedDecimal256::from_str("10000.0").unwrap(),
+            },
+        ],
+        pm_account_actual_equity: SignedDecimal256::from_str("80000.0").unwrap(),
+        withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
+    };
+
+    let current_time = 1700000000;
+    let oracle_data = OracleData {
+        round: 1,
+        timestamp: current_time,
+        data: binance_data,
+    };
+
+    CONSENSUS_STATE
+        .last_published_data
+        .save(deps.as_mut().storage, &oracle_data)
+        .unwrap();
+
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time + 1800); // 30 minutes after the data timestamp
+
+    // Calculate expected AUM manually
+    // 1. PM account equity in BTC: 80000 / 100000 = 0.8 BTC
+    // 2. Spot balances in BTC:
+    //    - 2.5 BTC = 2.5 BTC
+    //    - 20 ETH = 20 / 50 = 0.4 BTC
+    //    - 10000 USDT = 10000 / 100000 = 0.1 BTC
+    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
+    let expected_aum = SignedDecimal256::from_str("3.8").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();

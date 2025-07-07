@@ -1,5 +1,5 @@
 use consensus::error::ConsensusError;
-use cosmwasm_std::StdError;
+use cosmwasm_std::{SignedDecimal256RangeExceeded, StdError};
 use thiserror::Error;
 
 pub type ContractResult<T> = Result<T, ContractError>;
@@ -12,17 +12,20 @@ pub enum ContractError {
     #[error(transparent)]
     ConsensusError(#[from] ConsensusError),
 
+    #[error("Failed to convert value to SignedDecimal256: {msg:?}")]
+    SignedDecimal256RangeExceeded { msg: String },
+
     #[error("Invalid Binance data: {msg:?}")]
     InvalidBinanceData { msg: String },
 
     #[error("Price is invalid")]
     InvalidPrice,
 
-    #[error("Failed to convert value to Decimal")]
-    DecimalConversionError,
+    #[error("Failed to convert value to Decimal256")]
+    Decimal256ConversionError,
 
-    #[error("Too many decimals from oracle responce, exceeds u32 allowance")]
-    TooManyDecimals,
+    #[error("Too many Decimal256s from oracle responce, exceeds u32 allowance")]
+    TooManyDecimal256s,
 
     #[error("Market {symbol}, {quote} did not return an block height")]
     PriceAgeUnavailable { symbol: String, quote: String },
@@ -65,6 +68,14 @@ pub enum ContractError {
 impl From<cosmwasm_std::OverflowError> for ContractError {
     fn from(err: cosmwasm_std::OverflowError) -> Self {
         ContractError::Overflow(err)
+    }
+}
+
+impl From<SignedDecimal256RangeExceeded> for ContractError {
+    fn from(err: SignedDecimal256RangeExceeded) -> Self {
+        ContractError::SignedDecimal256RangeExceeded {
+            msg: err.to_string(),
+        }
     }
 }
 

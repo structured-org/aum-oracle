@@ -3,7 +3,7 @@ use consensus::consensus::{
     consensus_on_items, consensus_on_items_u64, consensus_on_items_uint128,
     exact_consensus_on_items, ConsensusData,
 };
-use cosmwasm_std::{Addr, SignedDecimal, StdError, StdResult, Uint128};
+use cosmwasm_std::{Addr, SignedDecimal256, StdError, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -135,11 +135,11 @@ impl ConsensusData for SolanaData {
 }
 
 // Single field exact consensus
-fn exact_consensus_on_field<F>(data: &[SolanaData], extract: F) -> Option<u8>
+fn exact_consensus_on_field<F, T: Eq + Clone>(data: &[SolanaData], extract: F) -> Option<T>
 where
-    F: Fn(&SolanaData) -> u8,
+    F: Fn(&SolanaData) -> T,
 {
-    let items: Vec<u8> = data.iter().map(&extract).collect();
+    let items: Vec<T> = data.iter().map(&extract).collect();
     exact_consensus_on_items(&items)
 }
 
@@ -149,11 +149,11 @@ pub fn consensus_on_field<F>(
     extract: F,
     threshold: usize,
     delta_ppm: u64,
-) -> Option<SignedDecimal>
+) -> Option<SignedDecimal256>
 where
-    F: Fn(&SolanaData) -> SignedDecimal,
+    F: Fn(&SolanaData) -> SignedDecimal256,
 {
-    let items: Vec<SignedDecimal> = data.iter().map(&extract).collect();
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
 }
 

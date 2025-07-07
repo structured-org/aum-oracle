@@ -3,16 +3,16 @@ use crate::consensus::{
 };
 use crate::error::ConsensusError;
 use cosmwasm_std::testing::mock_env;
-use cosmwasm_std::{Addr, SignedDecimal, Timestamp};
+use cosmwasm_std::{Addr, SignedDecimal256, Timestamp};
 use serde::{Deserialize, Serialize};
 
 // Mock data structure for testing OracleData<T>
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct MockData {
-    pub value1: SignedDecimal,
-    pub value2: SignedDecimal,
-    pub value3: SignedDecimal,
-    pub value4: SignedDecimal,
+    pub value1: SignedDecimal256,
+    pub value2: SignedDecimal256,
+    pub value3: SignedDecimal256,
+    pub value4: SignedDecimal256,
 }
 
 impl ConsensusData for MockData {
@@ -74,10 +74,10 @@ fn create_test_config() -> Config {
 
 // Helper function to create a test MockData object
 fn create_test_data(
-    value1: SignedDecimal,
-    value2: SignedDecimal,
-    value3: SignedDecimal,
-    value4: SignedDecimal,
+    value1: SignedDecimal256,
+    value2: SignedDecimal256,
+    value3: SignedDecimal256,
+    value4: SignedDecimal256,
 ) -> MockData {
     MockData {
         value1,
@@ -105,10 +105,10 @@ fn test_try_consensus() {
     {
         let config = create_test_config();
         let single_data = vec![create_test_data(
-            SignedDecimal::from_ratio(5, 10),
-            SignedDecimal::from_ratio(1000, 1),
-            SignedDecimal::from_ratio(2000, 1),
-            SignedDecimal::from_ratio(500, 1),
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
         )];
         assert!(MockData::try_consensus(
             &single_data,
@@ -123,16 +123,16 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ), // within 1% delta
         ];
         let consensus =
@@ -140,10 +140,10 @@ fn test_try_consensus() {
         assert!(consensus.is_some());
 
         let result = consensus.unwrap();
-        assert_eq!(result.value1, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505
-        assert_eq!(result.value2, SignedDecimal::from_ratio(10025, 10)); // median of 1000 and 1005
-        assert_eq!(result.value3, SignedDecimal::from_ratio(2005, 1)); // median of 2000 and 2010
-        assert_eq!(result.value4, SignedDecimal::from_ratio(5025, 10)); // median of 500 and 505
+        assert_eq!(result.value1, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505
+        assert_eq!(result.value2, SignedDecimal256::from_ratio(10025, 10)); // median of 1000 and 1005
+        assert_eq!(result.value3, SignedDecimal256::from_ratio(2005, 1)); // median of 2000 and 2010
+        assert_eq!(result.value4, SignedDecimal256::from_ratio(5025, 10)); // median of 500 and 505
     }
 
     // Test 4: Data outside acceptable delta should not reach consensus
@@ -153,16 +153,16 @@ fn test_try_consensus() {
 
         let data_divergent = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(51, 100),
-                SignedDecimal::from_ratio(1020, 1),
-                SignedDecimal::from_ratio(2050, 1),
-                SignedDecimal::from_ratio(510, 1),
+                SignedDecimal256::from_ratio(51, 100),
+                SignedDecimal256::from_ratio(1020, 1),
+                SignedDecimal256::from_ratio(2050, 1),
+                SignedDecimal256::from_ratio(510, 1),
             ), // outside 0.1% delta
         ];
 
@@ -179,22 +179,22 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data_multiple = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(503, 1000),
-                SignedDecimal::from_ratio(1003, 1),
-                SignedDecimal::from_ratio(2005, 1),
-                SignedDecimal::from_ratio(503, 1),
+                SignedDecimal256::from_ratio(503, 1000),
+                SignedDecimal256::from_ratio(1003, 1),
+                SignedDecimal256::from_ratio(2005, 1),
+                SignedDecimal256::from_ratio(503, 1),
             ),
         ];
 
@@ -206,10 +206,10 @@ fn test_try_consensus() {
         assert!(consensus.is_some());
 
         let result = consensus.unwrap();
-        assert_eq!(result.value1, SignedDecimal::from_ratio(503, 1000));
-        assert_eq!(result.value2, SignedDecimal::from_ratio(1003, 1));
-        assert_eq!(result.value3, SignedDecimal::from_ratio(2005, 1));
-        assert_eq!(result.value4, SignedDecimal::from_ratio(503, 1));
+        assert_eq!(result.value1, SignedDecimal256::from_ratio(503, 1000));
+        assert_eq!(result.value2, SignedDecimal256::from_ratio(1003, 1));
+        assert_eq!(result.value3, SignedDecimal256::from_ratio(2005, 1));
+        assert_eq!(result.value4, SignedDecimal256::from_ratio(503, 1));
     }
 
     // Test 6: Consensus with some outliers
@@ -217,22 +217,22 @@ fn test_try_consensus() {
         let config = create_test_config();
         let data_with_outliers = vec![
             create_test_data(
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(1000, 1),
-                SignedDecimal::from_ratio(2000, 1),
-                SignedDecimal::from_ratio(500, 1),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(1000, 1),
+                SignedDecimal256::from_ratio(2000, 1),
+                SignedDecimal256::from_ratio(500, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(1005, 1),
-                SignedDecimal::from_ratio(2010, 1),
-                SignedDecimal::from_ratio(505, 1),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(1005, 1),
+                SignedDecimal256::from_ratio(2010, 1),
+                SignedDecimal256::from_ratio(505, 1),
             ),
             create_test_data(
-                SignedDecimal::from_ratio(6, 10),
-                SignedDecimal::from_ratio(1200, 1),
-                SignedDecimal::from_ratio(2500, 1),
-                SignedDecimal::from_ratio(600, 1),
+                SignedDecimal256::from_ratio(6, 10),
+                SignedDecimal256::from_ratio(1200, 1),
+                SignedDecimal256::from_ratio(2500, 1),
+                SignedDecimal256::from_ratio(600, 1),
             ), // outlier
         ];
 
@@ -245,7 +245,7 @@ fn test_try_consensus() {
 
         // The outlier should be excluded from the consensus
         let result = consensus.unwrap();
-        assert_eq!(result.value1, SignedDecimal::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
+        assert_eq!(result.value1, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505 (outlier excluded)
     }
 }
 
@@ -337,10 +337,10 @@ fn test_round_operations() {
 fn test_consensus_on_items() {
     struct TestCase {
         name: &'static str,
-        items: Vec<SignedDecimal>,
+        items: Vec<SignedDecimal256>,
         threshold: usize,
         delta: u64,
-        expected: Option<SignedDecimal>,
+        expected: Option<SignedDecimal256>,
     }
 
     let test_cases = vec![
@@ -353,7 +353,7 @@ fn test_consensus_on_items() {
         },
         TestCase {
             name: "Array smaller than threshold should return None",
-            items: vec![SignedDecimal::from_ratio(5, 10)],
+            items: vec![SignedDecimal256::from_ratio(5, 10)],
             threshold: 2,
             delta: 0,
             expected: None,
@@ -361,20 +361,20 @@ fn test_consensus_on_items() {
         TestCase {
             name: "Values within delta should reach consensus",
             items: vec![
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(505, 1000),
-                SignedDecimal::from_ratio(51, 100),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(505, 1000),
+                SignedDecimal256::from_ratio(51, 100),
             ],
             threshold: 2,
             delta: 10000,
-            expected: Some(SignedDecimal::from_ratio(5025, 10000)),
+            expected: Some(SignedDecimal256::from_ratio(5025, 10000)),
         },
         TestCase {
             name: "Values outside delta should not reach consensus",
             items: vec![
-                SignedDecimal::from_ratio(5, 10),
-                SignedDecimal::from_ratio(6, 10), // 20% difference
-                SignedDecimal::from_ratio(45, 100),
+                SignedDecimal256::from_ratio(5, 10),
+                SignedDecimal256::from_ratio(6, 10), // 20% difference
+                SignedDecimal256::from_ratio(45, 100),
             ],
             threshold: 2,
             delta: 10000,
@@ -383,34 +383,34 @@ fn test_consensus_on_items() {
         TestCase {
             name: "Values that are all within delta but with zero as corner value",
             items: vec![
-                SignedDecimal::from_ratio(0, 1),
-                SignedDecimal::from_ratio(-9, 1),
-                SignedDecimal::from_ratio(-8, 1),
-                SignedDecimal::from_ratio(-7, 1),
-                SignedDecimal::from_ratio(-6, 1),
-                SignedDecimal::from_ratio(-5, 1),
-                SignedDecimal::from_ratio(-4, 1),
-                SignedDecimal::from_ratio(-3, 1),
-                SignedDecimal::from_ratio(-2, 1),
-                SignedDecimal::from_ratio(-1, 1),
+                SignedDecimal256::from_ratio(0, 1),
+                SignedDecimal256::from_ratio(-9, 1),
+                SignedDecimal256::from_ratio(-8, 1),
+                SignedDecimal256::from_ratio(-7, 1),
+                SignedDecimal256::from_ratio(-6, 1),
+                SignedDecimal256::from_ratio(-5, 1),
+                SignedDecimal256::from_ratio(-4, 1),
+                SignedDecimal256::from_ratio(-3, 1),
+                SignedDecimal256::from_ratio(-2, 1),
+                SignedDecimal256::from_ratio(-1, 1),
             ],
             threshold: 7,
             delta: 1000000,
-            expected: Some(SignedDecimal::from_ratio(-45, 10)),
+            expected: Some(SignedDecimal256::from_ratio(-45, 10)),
         },
         TestCase {
             name: "No consensus with 10% delta and incremented numbers",
             items: vec![
-                SignedDecimal::from_ratio(1, 1),
-                SignedDecimal::from_ratio(2, 1),
-                SignedDecimal::from_ratio(3, 1),
-                SignedDecimal::from_ratio(4, 1),
-                SignedDecimal::from_ratio(5, 1),
-                SignedDecimal::from_ratio(6, 1),
-                SignedDecimal::from_ratio(7, 1),
-                SignedDecimal::from_ratio(8, 1),
-                SignedDecimal::from_ratio(9, 1),
-                SignedDecimal::from_ratio(10, 1),
+                SignedDecimal256::from_ratio(1, 1),
+                SignedDecimal256::from_ratio(2, 1),
+                SignedDecimal256::from_ratio(3, 1),
+                SignedDecimal256::from_ratio(4, 1),
+                SignedDecimal256::from_ratio(5, 1),
+                SignedDecimal256::from_ratio(6, 1),
+                SignedDecimal256::from_ratio(7, 1),
+                SignedDecimal256::from_ratio(8, 1),
+                SignedDecimal256::from_ratio(9, 1),
+                SignedDecimal256::from_ratio(10, 1),
             ],
             threshold: 7,
             delta: 100000,
@@ -419,34 +419,34 @@ fn test_consensus_on_items() {
         TestCase {
             name: "Consensus with a couple of large wrong numbers (threshold is reached)",
             items: vec![
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(1, 1),
-                SignedDecimal::from_ratio(101, 100),
-                SignedDecimal::from_ratio(102, 100),
-                SignedDecimal::from_ratio(103, 100),
-                SignedDecimal::from_ratio(104, 100),
-                SignedDecimal::from_ratio(105, 100),
-                SignedDecimal::from_ratio(106, 100),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(1, 1),
+                SignedDecimal256::from_ratio(101, 100),
+                SignedDecimal256::from_ratio(102, 100),
+                SignedDecimal256::from_ratio(103, 100),
+                SignedDecimal256::from_ratio(104, 100),
+                SignedDecimal256::from_ratio(105, 100),
+                SignedDecimal256::from_ratio(106, 100),
             ],
             threshold: 7,
             delta: 100000,
-            expected: Some(SignedDecimal::from_ratio(103, 100)),
+            expected: Some(SignedDecimal256::from_ratio(103, 100)),
         },
         TestCase {
             name: "No consensus with a couple of large wrong numbers (threshold is reached not)",
             items: vec![
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(100000, 1),
-                SignedDecimal::from_ratio(1, 1),
-                SignedDecimal::from_ratio(101, 100),
-                SignedDecimal::from_ratio(102, 100),
-                SignedDecimal::from_ratio(103, 100),
-                SignedDecimal::from_ratio(104, 100),
-                SignedDecimal::from_ratio(105, 100),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(100000, 1),
+                SignedDecimal256::from_ratio(1, 1),
+                SignedDecimal256::from_ratio(101, 100),
+                SignedDecimal256::from_ratio(102, 100),
+                SignedDecimal256::from_ratio(103, 100),
+                SignedDecimal256::from_ratio(104, 100),
+                SignedDecimal256::from_ratio(105, 100),
             ],
             threshold: 7,
             delta: 100000,
@@ -503,10 +503,10 @@ fn test_state_publish_data() {
 
     // Create test data
     let test_data = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
 
     // Test 1: Oracle publishes data
@@ -525,10 +525,10 @@ fn test_state_publish_data() {
     // Test 3: Another oracle publishes data
     let oracle2 = Addr::unchecked("oracle2");
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     let result = state.publish_data(&mut deps, &env, oracle2.clone(), test_data2);
     assert!(
@@ -539,10 +539,10 @@ fn test_state_publish_data() {
     // Test 4: Third oracle publishes data (all oracles have now published)
     let oracle3 = Addr::unchecked("oracle3");
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     let result = state.publish_data(&mut deps, &env, oracle3.clone(), test_data3);
     assert!(
@@ -560,22 +560,22 @@ fn test_state_publish_data() {
     assert_eq!(data.round, 1, "Published data should be for round 1");
     assert_eq!(
         data.data.value1,
-        SignedDecimal::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(503, 1000),
         "Consensus value1 should be correct"
     );
     assert_eq!(
         data.data.value2,
-        SignedDecimal::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(1003, 1),
         "Consensus value2 should be correct"
     );
     assert_eq!(
         data.data.value3,
-        SignedDecimal::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(2005, 1),
         "Consensus value3 should be correct"
     );
     assert_eq!(
         data.data.value4,
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1),
         "Consensus value4 should be correct"
     );
 }
@@ -602,10 +602,10 @@ fn test_state_round_advancement() {
     // Oracle publishes data for the new round
     let oracle1 = Addr::unchecked("oracle1");
     let test_data = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data);
     assert!(
@@ -627,10 +627,10 @@ fn test_state_round_advancement() {
 
     // Oracle publishes data for the new round
     let test_data_multi = create_test_data(
-        SignedDecimal::from_ratio(51, 100),
-        SignedDecimal::from_ratio(1010, 1),
-        SignedDecimal::from_ratio(2020, 1),
-        SignedDecimal::from_ratio(510, 1),
+        SignedDecimal256::from_ratio(51, 100),
+        SignedDecimal256::from_ratio(1010, 1),
+        SignedDecimal256::from_ratio(2020, 1),
+        SignedDecimal256::from_ratio(510, 1),
     );
     let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data_multi);
     assert!(
@@ -674,10 +674,10 @@ fn test_state_get_last_published_data() {
     // Test 2: Publish data from all oracles
     let oracle1 = Addr::unchecked("oracle1");
     let test_data1 = create_test_data(
-        SignedDecimal::from_ratio(5, 10),
-        SignedDecimal::from_ratio(1000, 1),
-        SignedDecimal::from_ratio(2000, 1),
-        SignedDecimal::from_ratio(500, 1),
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
     );
     state
         .publish_data(&mut deps, &env, oracle1.clone(), test_data1)
@@ -685,10 +685,10 @@ fn test_state_get_last_published_data() {
 
     let oracle2 = Addr::unchecked("oracle2");
     let test_data2 = create_test_data(
-        SignedDecimal::from_ratio(505, 1000),
-        SignedDecimal::from_ratio(1005, 1),
-        SignedDecimal::from_ratio(2010, 1),
-        SignedDecimal::from_ratio(505, 1),
+        SignedDecimal256::from_ratio(505, 1000),
+        SignedDecimal256::from_ratio(1005, 1),
+        SignedDecimal256::from_ratio(2010, 1),
+        SignedDecimal256::from_ratio(505, 1),
     );
     state
         .publish_data(&mut deps, &env, oracle2.clone(), test_data2)
@@ -696,10 +696,10 @@ fn test_state_get_last_published_data() {
 
     let oracle3 = Addr::unchecked("oracle3");
     let test_data3 = create_test_data(
-        SignedDecimal::from_ratio(503, 1000),
-        SignedDecimal::from_ratio(1003, 1),
-        SignedDecimal::from_ratio(2005, 1),
-        SignedDecimal::from_ratio(503, 1),
+        SignedDecimal256::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(1003, 1),
+        SignedDecimal256::from_ratio(2005, 1),
+        SignedDecimal256::from_ratio(503, 1),
     );
     state
         .publish_data(&mut deps, &env, oracle3.clone(), test_data3)
@@ -715,7 +715,7 @@ fn test_state_get_last_published_data() {
     assert_eq!(data.round, 1, "Published data should be for round 1");
     assert_eq!(
         data.data.value1,
-        SignedDecimal::from_ratio(503, 1000),
+        SignedDecimal256::from_ratio(503, 1000),
         "Consensus value1 should be correct"
     );
 
@@ -724,10 +724,10 @@ fn test_state_get_last_published_data() {
 
     // Only one oracle publishes data (below threshold)
     let test_data4 = create_test_data(
-        SignedDecimal::from_ratio(52, 100),
-        SignedDecimal::from_ratio(1020, 1),
-        SignedDecimal::from_ratio(2040, 1),
-        SignedDecimal::from_ratio(520, 1),
+        SignedDecimal256::from_ratio(52, 100),
+        SignedDecimal256::from_ratio(1020, 1),
+        SignedDecimal256::from_ratio(2040, 1),
+        SignedDecimal256::from_ratio(520, 1),
     );
     state
         .publish_data(&mut deps, &env, oracle1.clone(), test_data4)
@@ -741,10 +741,10 @@ fn test_state_get_last_published_data() {
 
     // Test 4: Publish enough data in round 2 to reach threshold
     let test_data5 = create_test_data(
-        SignedDecimal::from_ratio(525, 1000),
-        SignedDecimal::from_ratio(1025, 1),
-        SignedDecimal::from_ratio(2050, 1),
-        SignedDecimal::from_ratio(525, 1),
+        SignedDecimal256::from_ratio(525, 1000),
+        SignedDecimal256::from_ratio(1025, 1),
+        SignedDecimal256::from_ratio(2050, 1),
+        SignedDecimal256::from_ratio(525, 1),
     );
     state
         .publish_data(&mut deps, &env, oracle2.clone(), test_data5)
@@ -766,7 +766,7 @@ fn test_state_get_last_published_data() {
     assert_eq!(data.round, 2, "Should return data from round 2");
     assert_eq!(
         data.data.value1,
-        SignedDecimal::from_ratio(5225, 10000),
+        SignedDecimal256::from_ratio(5225, 10000),
         "Consensus value1 should be correct"
     );
 }

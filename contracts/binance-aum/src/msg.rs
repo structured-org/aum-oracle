@@ -1,6 +1,6 @@
 use crate::state::BinanceData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_std::SignedDecimal;
+use cosmwasm_std::SignedDecimal256;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -92,5 +92,5 @@ pub struct GetDataResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles
-    pub aum_in_btc: SignedDecimal,
+    pub aum_in_btc: SignedDecimal256,
 }

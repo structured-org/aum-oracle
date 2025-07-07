@@ -8,7 +8,7 @@ use crate::utils::{btc_in_spot_balance_asset, get_prices};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    SignedDecimal, StdError, StdResult,
+    SignedDecimal256, StdError, StdResult,
 };
 
 #[entry_point]
@@ -203,9 +203,9 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
                 b,
             )
         })
-        .collect::<ContractResult<Vec<SignedDecimal>>>()?
+        .collect::<ContractResult<Vec<SignedDecimal256>>>()?
         .iter()
-        .try_fold(SignedDecimal::zero(), |total, b| total.checked_add(*b))?;
+        .try_fold(SignedDecimal256::zero(), |total, b| total.checked_add(*b))?;
 
     let btc_price_in_usd = get_prices(
         deps,
