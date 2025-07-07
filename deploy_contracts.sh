@@ -66,11 +66,11 @@ HASH=$(extract_tx_hash "$TX")
 SLINKY_CONTRACT_ADDR=$(get_contract_addr "$HASH" | tr -d '\n')
 sleep 2
 
-BINANCE_INIT_MSG=$(jq -nc --arg admin "$ADMIN" \
+BINANCE_INIT_MSG=$(jq -nc --arg owner "$ADMIN" \
   --arg addr "$SLINKY_CONTRACT_ADDR" \
   '{
-    admin: $admin,
-    oracles: [$admin],
+    owner: $owner,
+    oracles: [$owner],
     threshold: 1,
     data_delta_ppm: 10000,
     round_length: 5,

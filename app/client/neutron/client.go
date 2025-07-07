@@ -11,7 +11,11 @@ import (
 	"github.com/structured-org/aum-oracle/client/tm"
 	"go.uber.org/zap"
 	"strconv"
-	"time"
+)
+
+const (
+	nextRoundTimestampAttr = "next_round_timestamp"
+	nextRoundAttr          = "next_round"
 )
 
 // Client is the Neutron client.
@@ -84,8 +88,11 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 
 	events := res.TxResult.GetEvents()
 	spew.Dump("binance events: ", events)
-	nextRound := GetNextRoundFromEvents(events)
-	return &nextRound, nil
+	nextRound, err := GetNextRoundFromEvents(events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch next data from events")
+	}
+	return nextRound, nil
 }
 
 // GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
@@ -115,7 +122,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 
 	msgPayload := map[string]interface{}{
 		"publish_data": map[string]interface{}{
-			"data": data,
+			"new_data": data,
 		},
 	}
 	msgBz, _ := json.Marshal(msgPayload)
@@ -137,13 +144,15 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 
 	events := res.TxResult.GetEvents()
 	spew.Dump("jupiter events: ", events)
-	nextRound := GetNextRoundFromEvents(events)
-
-	return &nextRound, nil
+	nextRound, err := GetNextRoundFromEvents(events)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch next data from events")
+	}
+	return nextRound, nil
 }
 
-func GetNextRoundFromEvents(events []comettypes.Event) NextRound {
-	var nextRoundStr string
+func GetNextRoundFromEvents(events []comettypes.Event) (*NextRound, error) {
+	var nextRoundStr, nextRoundTimestampStr string
 
 	for _, evt := range events {
 		if evt.Type != "wasm" {
@@ -152,20 +161,25 @@ func GetNextRoundFromEvents(events []comettypes.Event) NextRound {
 
 		for _, attr := range evt.Attributes {
 			switch attr.Key {
-			case "next_round":
+			case nextRoundAttr:
 				nextRoundStr = attr.Value
+			case nextRoundTimestampAttr:
+				nextRoundTimestampStr = attr.Value
 			}
 		}
 	}
 
-	nextRound, _ := strconv.ParseUint(nextRoundStr, 10, 64)
-
-	// just use current unix time as placeholder — replace with real logic if needed
-	// TODO: write timestamp of next round in the events as well?
-	timestamp := uint64(time.Now().Unix())
-
-	return NextRound{
-		Round:     nextRound,
-		Timestamp: timestamp,
+	nextRound, err := strconv.ParseUint(nextRoundStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse next_round from events")
 	}
+	nextRoundTimestamp, err := strconv.ParseUint(nextRoundTimestampStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse next_round_timestamp from events")
+	}
+
+	return &NextRound{
+		Round:     nextRound,
+		Timestamp: nextRoundTimestamp,
+	}, nil
 }
