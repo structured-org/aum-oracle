@@ -40,10 +40,22 @@ var jupiterRound = 0
 
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	// TODO: use actual values when the client is implemented
+	msgPayload := map[string]interface{}{
+		"get_round": map[string]interface{}{},
+	}
+	msgBz, _ := json.Marshal(msgPayload)
+	resBz, err := c.client.QuerySmartContract(ctx, c.jupiterAumContract, msgBz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query jupiter aum smart contract for next round: %w", err)
+	}
+	var response GetRoundResponse
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal next round response fro jupiter aum contract: %w", err)
+	}
+
 	return &NextRound{
-		Round:     uint64(binanceRound),
-		Timestamp: time.Now().Add(time.Second * 10).Unix(),
+		Round:     response.NextRound.Round,
+		Timestamp: time.Now().Add(time.Second * 10).Unix(), // TODO: real data
 	}, nil
 }
 
@@ -54,7 +66,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 
 	msgPayload := map[string]interface{}{
 		"publish_data": map[string]interface{}{
-			"data": data,
+			"new_data": data,
 		},
 	}
 	msgBz, _ := json.Marshal(msgPayload)
@@ -76,7 +88,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 	binanceRound++
 	return &NextRound{
 		Round:     uint64(binanceRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
+		Timestamp: time.Now().Add(time.Minute).Unix(), // TODO: real data
 	}, nil
 }
 
