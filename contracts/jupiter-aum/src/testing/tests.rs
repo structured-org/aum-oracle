@@ -174,7 +174,7 @@ fn test_query_get_aum_behavior() {
     instantiate(deps.as_mut(), env.clone(), admin_info, msg).unwrap();
 
     // 1. error: no data published yet
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(res, Err(ContractError::NoDataPublished {})));
 
     // publish valid data
@@ -196,7 +196,7 @@ fn test_query_get_aum_behavior() {
 
     // 2. error: data published, but too old (time-based expiration)
     env.block.time = env.block.time.plus_seconds(10_000);
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(res, Err(ContractError::DataNotValid {})));
 
     // reset time
@@ -205,7 +205,7 @@ fn test_query_get_aum_behavior() {
 
     // 3. error: no BTC price returned from oracle
     deps.querier.with_price_and_height("", 200); // empty string will trigger missing
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
         res,
         Err(ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ })
@@ -213,7 +213,7 @@ fn test_query_get_aum_behavior() {
 
     // 4. error: BTC price is malformed
     deps.querier.with_price_and_height("not_a_number", 200);
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
         res,
         Err(ContractError::SlinkyBTCPriceIncorrect { .. })
@@ -221,7 +221,7 @@ fn test_query_get_aum_behavior() {
 
     // 5. error: BTC price is too old (block_height + max_blocks_old < env.height)
     deps.querier.with_price_and_height("25000", 50); // env.height is 200
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
         res,
         Err(ContractError::SlinkyBTCPriceTooOld { .. })
@@ -229,9 +229,9 @@ fn test_query_get_aum_behavior() {
 
     // 6. success: valid price and block height
     deps.querier.with_price_and_height("25000", 150); // still fresh: 150 + 100 > 200
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     let bin = res.unwrap();
-    let parsed: msg::GetAUMResponse = from_json(bin).unwrap();
+    let parsed: msg::GetAumResponse = from_json(bin).unwrap();
 
     // expected: aum_usd = 500_000, strategy_jlp_balance = 10_000, total_jlp_supply = 1_000
     // virtual price = 500_000 / 1_000 = 500
@@ -323,7 +323,7 @@ fn test_query_get_aum_data_stale() {
     .unwrap();
 
     env.block.time = env.block.time.plus_seconds(10_000);
-    let res = query(deps.as_ref(), env, QueryMsg::GetAUM {});
+    let res = query(deps.as_ref(), env, QueryMsg::GetAum {});
     assert!(matches!(res, Err(ContractError::DataNotValid {})));
 }
 

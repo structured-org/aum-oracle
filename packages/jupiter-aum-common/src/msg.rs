@@ -70,10 +70,10 @@ pub enum QueryMsg {
     Config {},
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
     GetData {},
-    /// GetAUM calculates and returns the current Jupiter AUM value represented in BTC.
+    /// GetAum calculates and returns the current Jupiter AUM value represented in BTC.
     /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
     /// Returns error if data is not valid.
-    GetAUM {},
+    GetAum {},
     /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
     GetRoundInfo {},
 }
@@ -96,9 +96,9 @@ pub struct GetDataResponse {
     pub last_published_data: Option<OracleData<SolanaData>>,
 }
 
-/// GetAUMResponse contains the calculated AUM value in BTC.
+/// GetAumResponse contains the calculated AUM value in BTC.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct GetAUMResponse {
+pub struct GetAumResponse {
     /// The calculated AUM value in BTC, represented as a Uint128 with `U128_PRECISION`.
     pub aum_in_btc: Uint128,
 }

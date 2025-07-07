@@ -8,7 +8,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
-    ConfigResponse, ExecuteMsg, GetAUMResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
+    ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
     QueryMsg, RoundInfoResponse, UpdateConfig,
 };
 use jupiter_aum_common::types::{Config, SolanaData};
@@ -186,7 +186,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     match msg {
         QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
-        QueryMsg::GetAUM {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
+        QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
     }
 }
@@ -208,7 +208,7 @@ fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError
 }
 
 /// Returns Jupiter AUM value represented in BTC.
-fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> {
+fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
@@ -220,7 +220,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAUMResponse, ContractError> 
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, config)?;
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
-    Ok(GetAUMResponse { aum_in_btc })
+    Ok(GetAumResponse { aum_in_btc })
 }
 
 fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, ContractError> {
