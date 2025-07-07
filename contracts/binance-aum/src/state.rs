@@ -1,6 +1,6 @@
 use crate::error::{ContractError, ContractResult};
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
-use cosmwasm_std::{Addr, Deps, SignedDecimal};
+use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
 
@@ -22,24 +22,24 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Position {
     pub symbol: String,
-    pub amount: SignedDecimal,
-    pub pnl: SignedDecimal,
+    pub amount: SignedDecimal256,
+    pub pnl: SignedDecimal256,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SpotBalance {
     pub asset: String,
-    pub amount: SignedDecimal,
+    pub amount: SignedDecimal256,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct BinanceData {
-    pub unimmr: SignedDecimal,
+    pub unimmr: SignedDecimal256,
     pub positions: Vec<Position>,
-    pub um_balance_usdt: SignedDecimal,
+    pub um_balance_usdt: SignedDecimal256,
     pub spot_balances: Vec<SpotBalance>,
-    pub pm_account_actual_equity: SignedDecimal,
-    pub withdrawable_usdt: SignedDecimal,
+    pub pm_account_actual_equity: SignedDecimal256,
+    pub withdrawable_usdt: SignedDecimal256,
 }
 
 impl BinanceData {
@@ -123,8 +123,8 @@ impl ConsensusData for BinanceData {
         // Vec<Position> consensus (safe because of checks above)
         let mut consensus_positions = Vec::with_capacity(positions_len);
         for i in 0..positions_len {
-            let amounts: Vec<SignedDecimal> = data.iter().map(|d| d.positions[i].amount).collect();
-            let pnls: Vec<SignedDecimal> = data.iter().map(|d| d.positions[i].pnl).collect();
+            let amounts: Vec<SignedDecimal256> = data.iter().map(|d| d.positions[i].amount).collect();
+            let pnls: Vec<SignedDecimal256> = data.iter().map(|d| d.positions[i].pnl).collect();
 
             consensus_positions.push(Position {
                 symbol: data[0].positions[i].symbol.clone(), // all equal
@@ -136,7 +136,7 @@ impl ConsensusData for BinanceData {
         // Vec<SpotBalance> consensus
         let mut consensus_spot = Vec::with_capacity(spot_len);
         for i in 0..spot_len {
-            let amounts: Vec<SignedDecimal> =
+            let amounts: Vec<SignedDecimal256> =
                 data.iter().map(|d| d.spot_balances[i].amount).collect();
             consensus_spot.push(SpotBalance {
                 asset: data[0].spot_balances[i].asset.clone(), // all equal
@@ -162,11 +162,11 @@ pub fn consensus_on_field<F>(
     extract: F,
     threshold: usize,
     delta_ppm: u64,
-) -> Option<SignedDecimal>
+) -> Option<SignedDecimal256>
 where
-    F: Fn(&BinanceData) -> SignedDecimal,
+    F: Fn(&BinanceData) -> SignedDecimal256,
 {
-    let items: Vec<SignedDecimal> = data.iter().map(&extract).collect();
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
 }
 

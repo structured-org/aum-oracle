@@ -1,6 +1,6 @@
 use crate::consensus::PublishResult::ConsensusReached;
 use crate::error::{ConsensusError, ConsensusResult};
-use cosmwasm_std::{Addr, Decimal, Env, SignedDecimal, StdResult, Storage};
+use cosmwasm_std::{Addr, Decimal256, Env, SignedDecimal256, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -306,20 +306,20 @@ pub struct OracleData<T> {
     pub data: T,
 }
 
-/// A helper function that calculates consensus for a given array of SignedDecimals
+/// A helper function that calculates consensus for a given array of SignedDecimal256s
 // TODO: make it generic (not critical for now, but it would be nice to have)
 pub fn consensus_on_items(
-    items: &[SignedDecimal],
+    items: &[SignedDecimal256],
     threshold: usize,
     delta_ppm: u64,
-) -> Option<SignedDecimal> {
+) -> Option<SignedDecimal256> {
     if items.len() < threshold {
         return None;
     }
     let mut sorted = items.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
-    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    let ppm = Decimal256::from_ratio(delta_ppm, 1_000_000u64);
     let mut max_len = 0;
     let mut best_slice = (0, 0);
     for i in 0..sorted.len() {
@@ -330,8 +330,8 @@ pub fn consensus_on_items(
             // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
             if high.abs_diff(low)
                 <= low
-                    .abs_diff(SignedDecimal::zero())
-                    .max(high.abs_diff(SignedDecimal::zero()))
+                    .abs_diff(SignedDecimal256::zero())
+                    .max(high.abs_diff(SignedDecimal256::zero()))
                     * ppm
                 && j - i > max_len
             {
@@ -347,15 +347,15 @@ pub fn consensus_on_items(
     Some(median(slice))
 }
 
-/// Utility function that calculates the median value of a slice of SignedDecimals
-fn median(slice: &[SignedDecimal]) -> SignedDecimal {
+/// Utility function that calculates the median value of a slice of SignedDecimal256s
+fn median(slice: &[SignedDecimal256]) -> SignedDecimal256 {
     let n = slice.len();
     if n == 0 {
-        return SignedDecimal::zero();
+        return SignedDecimal256::zero();
     }
     if n % 2 == 1 {
         slice[n / 2]
     } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / SignedDecimal::from_ratio(2, 1)
+        (slice[n / 2 - 1] + slice[n / 2]) / SignedDecimal256::from_ratio(2, 1)
     }
 }

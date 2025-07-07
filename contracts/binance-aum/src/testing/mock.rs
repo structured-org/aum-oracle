@@ -1,15 +1,11 @@
-use crate::utils::CombinedPriceResponse;
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
-use cosmwasm_std::{
-    from_json, to_json_binary, ContractResult, OwnedDeps, Querier, QuerierResult, QueryRequest,
-    SystemError, SystemResult, WasmQuery,
-};
+use cosmwasm_std::{from_json, Binary, ContractResult, OwnedDeps, Querier, QuerierResult, QueryRequest, SystemError, SystemResult, WasmQuery};
 use std::marker::PhantomData;
 
 // Custom MockQuerier that can respond to price oracle queries
 pub struct CustomMockQuerier {
     base: MockQuerier,
-    price_oracle_responses: Vec<(String, String, String, CombinedPriceResponse)>,
+    price_oracle_responses: Vec<(String, String, String, Binary)>,
 }
 
 impl Querier for CustomMockQuerier {
@@ -50,7 +46,7 @@ impl Querier for CustomMockQuerier {
                                     && token_b == response_token_b
                                 {
                                     return SystemResult::Ok(ContractResult::Ok(
-                                        to_json_binary(price_response).unwrap(),
+                                        price_response.clone()
                                     ));
                                 }
                             }
@@ -72,7 +68,7 @@ impl Querier for CustomMockQuerier {
 impl CustomMockQuerier {
     pub fn new(
         base: MockQuerier,
-        price_oracle_responses: Vec<(String, String, String, CombinedPriceResponse)>,
+        price_oracle_responses: Vec<(String, String, String, Binary)>,
     ) -> Self {
         CustomMockQuerier {
             base,
@@ -83,7 +79,7 @@ impl CustomMockQuerier {
 
 // Helper function to create mock dependencies with custom querier
 pub fn custom_mock_dependencies(
-    price_oracle_responses: Vec<(String, String, String, CombinedPriceResponse)>,
+    price_oracle_responses: Vec<(String, String, String, Binary)>,
 ) -> OwnedDeps<MockStorage, MockApi, CustomMockQuerier> {
     let base_querier = MockQuerier::new(&[]);
     let custom_querier = CustomMockQuerier::new(base_querier, price_oracle_responses);

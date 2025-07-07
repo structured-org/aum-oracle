@@ -9,7 +9,7 @@ This package provides a robust and configurable framework for establishing conse
 *   **Oracle Data Submission**: Oracles can submit their data for a given round. The system prevents double submissions within the same round.
 *   **Automated Consensus Calculation**: The package automatically attempts to form a consensus when a round concludes or when all participating oracles have submitted their data.
 *   **Generic Data Support**: The core consensus logic is generic, allowing any data type that implements the `ConsensusData` trait (requiring `Serialize`, `DeserializeOwned`, and `Clone`) to be used for consensus.
-*   **Specialized Numerical Consensus**: Includes a helper function (`consensus_on_items`) specifically designed for calculating consensus on `SignedDecimal` values, finding the median of a statistically significant subset of submitted data.
+*   **Specialized Numerical Consensus**: Includes a helper function (`consensus_on_items`) specifically designed for calculating consensus on `SignedDecimal256` values, finding the median of a statistically significant subset of submitted data.
 *   **Error Handling**: Comprehensive error types are defined to cover various scenarios, including standard CosmWasm errors, double submissions, invalid round numbers, and arithmetic overflows.
 
 ## Core Components
@@ -41,7 +41,7 @@ The primary entry point for oracles to submit their data. This function handles:
 A structure that encapsulates the data submitted by an oracle, including the `round` number, `timestamp` of submission, and the `data` itself.
 
 ### `consensus_on_items`
-A utility function for `SignedDecimal` values that implements a specific algorithm to find a consensus value. It sorts the submitted data and identifies the largest subset of values that fall within the `data_delta_ppm` range, then calculates the median of that subset.
+A utility function for `SignedDecimal256` values that implements a specific algorithm to find a consensus value. It sorts the submitted data and identifies the largest subset of values that fall within the `data_delta_ppm` range, then calculates the median of that subset.
 
 ### `ConsensusError`
 An enum defining specific error conditions that can occur within the consensus process, such as `DoubleSubmission`, `InvalidRound`, and various arithmetic errors.
