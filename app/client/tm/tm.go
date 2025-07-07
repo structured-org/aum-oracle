@@ -3,9 +3,11 @@ package tm
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	retry "github.com/avast/retry-go/v4"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/rpc/client"
@@ -143,6 +145,7 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcorety
 	}
 
 	res, err := c.tmClient.BroadcastTxCommit(ctx, encodedMsg)
+	spew.Dump("============= \nresult of tx: ", res)
 	if err != nil {
 		return nil, fmt.Errorf("send msg broadcast error: %w", err)
 	}
@@ -155,6 +158,44 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcorety
 	}
 
 	return res, nil
+}
+
+// QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
+func (c *Client) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
+	var queryData []byte
+	switch q := query.(type) {
+	case string:
+		// assume it's a JSON string
+		//var raw json.RawMessage
+		//if err := json.Unmarshal([]byte(q), &raw); err != nil {
+		//	return nil, fmt.Errorf("invalid JSON string: %w", err)
+		//}
+		queryData = []byte(q)
+	case []byte:
+		queryData = q
+	default:
+		return nil, fmt.Errorf("unsupported query type: %T", query)
+	}
+
+	req := wasmtypes.QuerySmartContractStateRequest{
+		Address:   contractAddr,
+		QueryData: queryData,
+	}
+
+	bz, err := req.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal wasm query request: %w", err)
+	}
+
+	res, err := c.tmClient.ABCIQueryWithOptions(ctx, "/cosmwasm.wasm.v1.Query/SmartContractState", bz, client.DefaultABCIQueryOptions)
+	if err != nil {
+		return nil, fmt.Errorf("abci query failed: %w", err)
+	}
+	if res.Response.Code != 0 {
+		return nil, fmt.Errorf("query failed: code=%d log=%s", res.Response.Code, res.Response.Log)
+	}
+
+	return res.Response.Value, nil
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.

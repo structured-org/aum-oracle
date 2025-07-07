@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/structured-org/aum-oracle/client/tm"
 	"go.uber.org/zap"
 	"time"
@@ -41,17 +42,16 @@ var jupiterRound = 0
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
 	// TODO: use actual values when the client is implemented
 	return &NextRound{
-		Round:     int64(binanceRound),
+		Round:     uint64(binanceRound),
 		Timestamp: time.Now().Add(time.Second * 10).Unix(),
 	}, nil
 }
 
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
-	//spew.Dump("submitted Binance AUM data:", data)
+	spew.Dump("submitted Binance AUM data:", data)
 	c.logger.Info("submitting binance aum data")
 
-	// === BUILD EXECUTE MSG ===
 	msgPayload := map[string]interface{}{
 		"publish_data": map[string]interface{}{
 			"data": data,
@@ -64,7 +64,6 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 		Msg:      msgBz,
 		Funds:    sdk.NewCoins(),
 	}
-
 	res, err := c.client.SignAndBroadcast(ctx, executeMsg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign and broadcast tx during submit data: %w", err)
@@ -76,16 +75,28 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 
 	binanceRound++
 	return &NextRound{
-		Round:     int64(binanceRound),
+		Round:     uint64(binanceRound),
 		Timestamp: time.Now().Add(time.Minute).Unix(),
 	}, nil
 }
 
 // GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
 func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	// TODO: use actual values when the client is implemented
+	msgPayload := map[string]interface{}{
+		"get_round": map[string]interface{}{},
+	}
+	msgBz, _ := json.Marshal(msgPayload)
+	resBz, err := c.client.QuerySmartContract(ctx, c.jupiterAumContract, msgBz)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query jupiter aum smart contract for next round: %w", err)
+	}
+	var response GetRoundResponse
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal next round response fro jupiter aum contract: %w", err)
+	}
+
 	return &NextRound{
-		Round:     int64(jupiterRound),
+		Round:     response.NextRound.Round,
 		Timestamp: time.Now().Add(time.Second * 10000).Unix(), // Turn off for now
 	}, nil
 }
@@ -95,7 +106,6 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 	//spew.Dump("submitted Jupiter AUM data:", data)
 	c.logger.Info("submitting jupiter aum data")
 
-	// === BUILD EXECUTE MSG ===
 	msgPayload := map[string]interface{}{
 		"publish_data": map[string]interface{}{
 			"data": data,
@@ -120,11 +130,21 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 
 	jupiterRound++
 	return &NextRound{
-		Round:     int64(jupiterRound),
+		Round:     uint64(jupiterRound),
 		Timestamp: time.Now().Add(time.Minute).Unix(),
 	}, nil
 }
 
-// TODO
 type GetRoundResponse struct {
+	/// PendingRound is a currently pending round.
+	PendingRound Round `json:"pending_round"`
+	/// NextRound is the next round.
+	NextRound Round `json:"next_round"`
+}
+
+type Round struct {
+	/// Round is a number of the round.
+	Round uint64 `json:"round"`
+	/// Start is when the round started (UNIX timestamp in seconds).
+	Start uint64 `json:"start"`
 }

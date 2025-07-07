@@ -10,7 +10,7 @@ import (
 // NextRound contains AUM contract's next consensus round information.
 type NextRound struct {
 	// Round is the next consensus round number.
-	Round int64 `json:"round"`
+	Round uint64 `json:"round"`
 	// Timestamp is the timestamp of the next consensus round beginning.
 	Timestamp int64 `json:"timestamp"`
 }
