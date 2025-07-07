@@ -74,7 +74,7 @@ pub fn get_prices(
               "get_prices": {
                 "token_a": {
                   "denom": token_a.clone(), // we don't care about denoms
-                  "Decimal256s": 0, // and we don't care about Decimal256s
+                  "decimals": 0, // and we don't care about decimals
                   "pair": {
                     "base": token_a,
                     "quote": "USD" // both tokens must be in USD
@@ -83,7 +83,7 @@ pub fn get_prices(
                 },
                 "token_b": {
                   "denom": token_b.clone(),
-                  "Decimal256s": 0,
+                  "decimals": 0,
                   "pair": {
                     "base": token_b.clone(),
                     "quote": "USD"
