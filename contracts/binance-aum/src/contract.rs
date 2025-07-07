@@ -91,14 +91,10 @@ fn execute_publish_data(
         res = res.add_attribute("action", "publish_consensus");
     }
 
+    let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([
-        attr(
-            "next_round",
-            pending_round
-                .next_round(consensus_config.round_length)
-                .round
-                .to_string(),
-        ),
+        attr("next_round", next_round.round.to_string()),
+        attr("next_round_timestamp", next_round.start.to_string()),
         attr("round", pending_round.round.to_string()),
     ]);
 
