@@ -40,6 +40,7 @@ type Oracle[T any] interface {
 // specified intervals. It handles the necessary context management for the oracle's operation.
 func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 	nextRound, err := oracle.GetNextRound(ctx)
+	fmt.Printf("err: %s", err)
 	if err != nil {
 		return fmt.Errorf("failed to get initial round: %w", err)
 	}
@@ -47,10 +48,10 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 	for {
 		// TODO: think through fetch/submission error cases
 
-		timeTillNextRound := time.Duration(nextRound.Timestamp-time.Now().Unix()) * time.Second
+		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
 		oracle.Logger().Info("waiting for next round",
 			zap.Uint64("round", nextRound.Round),
-			zap.Int64("round_timestamp", nextRound.Timestamp),
+			zap.Uint64("round_timestamp", nextRound.Timestamp),
 			zap.Duration("time_till_next_round", timeTillNextRound),
 		)
 
@@ -58,7 +59,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 		case <-time.NewTimer(timeTillNextRound).C:
 			oracle.Logger().Info("new round started",
 				zap.Uint64("round", nextRound.Round),
-				zap.Int64("round_timestamp", nextRound.Timestamp),
+				zap.Uint64("round_timestamp", nextRound.Timestamp),
 			)
 
 			data, err := oracle.FetchData(ctx)

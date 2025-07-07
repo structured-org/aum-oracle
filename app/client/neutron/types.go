@@ -12,7 +12,7 @@ type NextRound struct {
 	// Round is the next consensus round number.
 	Round uint64 `json:"round"`
 	// Timestamp is the timestamp of the next consensus round beginning.
-	Timestamp int64 `json:"timestamp"`
+	Timestamp uint64 `json:"timestamp"`
 }
 
 // BinanceAumData contains all Binance data that is a matter of consensus for the Binance AUM contract.
@@ -87,4 +87,22 @@ type JupiterCustodyAsset struct {
 	Decimals uint8 `json:"decimals"`
 	// Denom is the custody asset denomination.
 	Denom string `json:"denom"`
+}
+
+// Smart contract types
+
+// GetRoundResponse is the response of aum smart contracts to the "get_round_info" query
+type GetRoundResponse struct {
+	/// PendingRound is a currently pending round.
+	PendingRound Round `json:"pending_round"`
+	/// NextRound is the next round.
+	NextRound Round `json:"next_round"`
+}
+
+// Round is the round info from aum smart contracts.
+type Round struct {
+	/// Round is a number of the round.
+	Round uint64 `json:"round"`
+	/// Start is when the round started (UNIX timestamp in seconds).
+	Start uint64 `json:"start"`
 }

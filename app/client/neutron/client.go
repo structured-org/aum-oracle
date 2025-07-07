@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+	comettypes "github.com/cometbft/cometbft/abci/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/structured-org/aum-oracle/client/tm"
 	"go.uber.org/zap"
+	"strconv"
 	"time"
 )
 
@@ -34,14 +36,10 @@ func NewClient(conf tm.ClientConfig, jupiterAumContract string, binanceAumContra
 	}, nil
 }
 
-// TODO: use actual values when the client is implemented
-var binanceRound = 0
-var jupiterRound = 0
-
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
 	msgPayload := map[string]interface{}{
-		"get_round": map[string]interface{}{},
+		"get_round_info": map[string]interface{}{},
 	}
 	msgBz, _ := json.Marshal(msgPayload)
 	resBz, err := c.client.QuerySmartContract(ctx, c.jupiterAumContract, msgBz)
@@ -55,13 +53,12 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 
 	return &NextRound{
 		Round:     response.NextRound.Round,
-		Timestamp: time.Now().Add(time.Second * 10).Unix(), // TODO: real data
+		Timestamp: response.NextRound.Start,
 	}, nil
 }
 
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
-	spew.Dump("submitted Binance AUM data:", data)
 	c.logger.Info("submitting binance aum data")
 
 	msgPayload := map[string]interface{}{
@@ -85,17 +82,16 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 		zap.String("hash", res.Hash.String()), // TODO: check that hex output?
 		zap.Int64("height", res.Height))
 
-	binanceRound++
-	return &NextRound{
-		Round:     uint64(binanceRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(), // TODO: real data
-	}, nil
+	events := res.TxResult.GetEvents()
+	spew.Dump("binance events: ", events)
+	nextRound := GetNextRoundFromEvents(events)
+	return &nextRound, nil
 }
 
 // GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
 func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound, error) {
 	msgPayload := map[string]interface{}{
-		"get_round": map[string]interface{}{},
+		"get_round_info": map[string]interface{}{},
 	}
 	msgBz, _ := json.Marshal(msgPayload)
 	resBz, err := c.client.QuerySmartContract(ctx, c.jupiterAumContract, msgBz)
@@ -109,13 +105,12 @@ func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound
 
 	return &NextRound{
 		Round:     response.NextRound.Round,
-		Timestamp: time.Now().Add(time.Second * 10000).Unix(), // Turn off for now
+		Timestamp: response.NextRound.Start,
 	}, nil
 }
 
 // SubmitJupiterAumData submits the Jupiter AUM data to the Jupiter AUM contract.
 func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
-	//spew.Dump("submitted Jupiter AUM data:", data)
 	c.logger.Info("submitting jupiter aum data")
 
 	msgPayload := map[string]interface{}{
@@ -140,23 +135,37 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 		zap.String("hash", res.Hash.String()), // TODO: check that hex output?
 		zap.Int64("height", res.Height))
 
-	jupiterRound++
-	return &NextRound{
-		Round:     uint64(jupiterRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
-	}, nil
+	events := res.TxResult.GetEvents()
+	spew.Dump("jupiter events: ", events)
+	nextRound := GetNextRoundFromEvents(events)
+
+	return &nextRound, nil
 }
 
-type GetRoundResponse struct {
-	/// PendingRound is a currently pending round.
-	PendingRound Round `json:"pending_round"`
-	/// NextRound is the next round.
-	NextRound Round `json:"next_round"`
-}
+func GetNextRoundFromEvents(events []comettypes.Event) NextRound {
+	var nextRoundStr string
 
-type Round struct {
-	/// Round is a number of the round.
-	Round uint64 `json:"round"`
-	/// Start is when the round started (UNIX timestamp in seconds).
-	Start uint64 `json:"start"`
+	for _, evt := range events {
+		if evt.Type != "wasm" {
+			continue
+		}
+
+		for _, attr := range evt.Attributes {
+			switch attr.Key {
+			case "next_round":
+				nextRoundStr = attr.Value
+			}
+		}
+	}
+
+	nextRound, _ := strconv.ParseUint(nextRoundStr, 10, 64)
+
+	// just use current unix time as placeholder — replace with real logic if needed
+	// TODO: write timestamp of next round in the events as well?
+	timestamp := uint64(time.Now().Unix())
+
+	return NextRound{
+		Round:     nextRound,
+		Timestamp: timestamp,
+	}
 }

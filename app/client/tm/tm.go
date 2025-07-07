@@ -195,7 +195,12 @@ func (c *Client) QuerySmartContract(ctx context.Context, contractAddr string, qu
 		return nil, fmt.Errorf("query failed: code=%d log=%s", res.Response.Code, res.Response.Log)
 	}
 
-	return res.Response.Value, nil
+	var response wasmtypes.QuerySmartContractStateResponse
+	if err := response.Unmarshal(res.Response.Value); err != nil {
+		return nil, fmt.Errorf("error unmarshalling QuerySmartContractStateResponse for contractAddr=%s: %w", contractAddr, err)
+	}
+
+	return response.Data, nil
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.
