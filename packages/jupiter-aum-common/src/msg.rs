@@ -34,7 +34,7 @@ pub enum ExecuteMsg {
     UpdateConfig { new_config: UpdateConfig },
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
-    PublishData { data: SolanaData },
+    PublishData { new_data: SolanaData },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

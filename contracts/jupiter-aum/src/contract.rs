@@ -67,7 +67,7 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::UpdateConfig { new_config } => update_config(deps, info, new_config),
-        ExecuteMsg::PublishData { data } => execute_publish_data(deps, env, info, data),
+        ExecuteMsg::PublishData { new_data } => execute_publish_data(deps, env, info, new_data),
     }
 }
 

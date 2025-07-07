@@ -183,14 +183,18 @@ fn test_query_get_aum_behavior() {
         deps.as_mut(),
         env.clone(),
         message_info(&oracle1, &[]),
-        ExecuteMsg::PublishData { data: data.clone() },
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
     )
     .unwrap();
     execute(
         deps.as_mut(),
         env.clone(),
         message_info(&oracle2, &[]),
-        ExecuteMsg::PublishData { data: data.clone() },
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
     )
     .unwrap();
 
@@ -259,7 +263,7 @@ fn test_publish_data_invalid_custody() {
     let mut data = dummy_solana_data();
     data.custody_assets.clear();
 
-    let msg = ExecuteMsg::PublishData { data };
+    let msg = ExecuteMsg::PublishData { new_data: data };
     let res = execute(deps.as_mut(), env, info, msg);
     assert!(matches!(res, Err(ContractError::Std(_))));
 }
@@ -311,14 +315,18 @@ fn test_query_get_aum_data_stale() {
         deps.as_mut(),
         env.clone(),
         message_info(&oracle1, &[]),
-        ExecuteMsg::PublishData { data: data.clone() },
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
     )
     .unwrap();
     execute(
         deps.as_mut(),
         env.clone(),
         message_info(&oracle2, &[]),
-        ExecuteMsg::PublishData { data: data.clone() },
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
     )
     .unwrap();
 
