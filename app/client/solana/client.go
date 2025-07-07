@@ -3,7 +3,9 @@ package solana
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 )
@@ -20,14 +22,28 @@ func NewClient(solanaRpc string) *Client {
 	}
 }
 
+// TODO: use actual values when the client is implemented
+var binanceRound = 0
+
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	return nil, fmt.Errorf("not implemented")
+	// TODO: use actual values when the client is implemented
+	return &NextRound{
+		Round:     int64(binanceRound),
+		Timestamp: time.Now().Add(time.Second).Unix(),
+	}, nil
 }
 
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
-	return nil, fmt.Errorf("not implemented")
+	// print for debug evaluation. TODO: use actual values when the client is implemented
+	spew.Dump("submitted Binance AUM data:", data)
+
+	binanceRound++
+	return &NextRound{
+		Round:     int64(binanceRound),
+		Timestamp: time.Now().Add(time.Minute).Unix(),
+	}, nil
 }
 
 // GetTokenSupply gets the token total supply.

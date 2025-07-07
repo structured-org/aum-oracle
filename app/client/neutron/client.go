@@ -29,7 +29,7 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 	// TODO: use actual values when the client is implemented
 	return &NextRound{
 		Round:     int64(binanceRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
+		Timestamp: time.Now().Add(time.Second).Unix(),
 	}, nil
 }
 
