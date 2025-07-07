@@ -13,7 +13,7 @@ import (
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
 	"github.com/structured-org/aum-oracle/oracle"
-	mock_solana "github.com/structured-org/aum-oracle/testutil/mocks/solana"
+	mock_jupiter "github.com/structured-org/aum-oracle/testutil/mocks/jupiter-oracle"
 	"go.uber.org/zap"
 )
 
@@ -30,9 +30,9 @@ func TestOracleForNeutronRun(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	solanaClient := mock_solana.NewMockSolanaClient(ctrl)
-	neutronClient := mock_solana.NewMockNeutronClient(ctrl)
-	jupiterClient := mock_solana.NewMockJupiterClient(ctrl)
+	solanaClient := mock_jupiter.NewMockSolanaClient(ctrl)
+	neutronClient := mock_jupiter.NewMockNeutronAumContractClient(ctrl)
+	jupiterClient := mock_jupiter.NewMockJupiterClient(ctrl)
 	usdtPubKey := testPubKey1
 	usdcPubKey := testPubKey2
 	btcPubKey := testPubKey3
