@@ -1,6 +1,7 @@
 package clients_mock_controller
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,9 @@ import (
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 )
+
+//go:embed mock_data
+var MockDataFolder embed.FS
 
 // ClientsMockController serves a special HTTP client that can control mock data for the mock clients
 type ClientsMockController struct {

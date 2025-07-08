@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 
 	solana "github.com/gagliardetto/solana-go"
@@ -30,7 +29,7 @@ func (m *MockSolanaClient) loadDefaultData() {
 	defer m.mu.Unlock()
 
 	// Load tokenSupply
-	tokenSupplyData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/solana/tokenSupply.json")
+	tokenSupplyData, err := MockDataFolder.ReadFile("mock_data/solana/tokenSupply.json")
 	if err != nil {
 		panic(fmt.Sprintf("Error loading default tokenSupply: %v\n", err))
 	}
@@ -38,7 +37,7 @@ func (m *MockSolanaClient) loadDefaultData() {
 		panic(fmt.Sprintf("Error parsing default tokenSupply: %v\n", err))
 	}
 
-	tokenAccountBalanceData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/solana/tokenAccountBalance.json")
+	tokenAccountBalanceData, err := MockDataFolder.ReadFile("mock_data/solana/tokenAccountBalance.json")
 	if err != nil {
 		panic(fmt.Sprintf("Error loading default tokenAccountBalance: %v\n", err))
 	}

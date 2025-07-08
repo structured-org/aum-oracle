@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 
 	binance "github.com/adshao/go-binance/v2"
@@ -31,7 +30,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 	defer m.mu.Unlock()
 
 	// Load umPositions
-	umPositionsData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/binance/umPositions.json")
+	umPositionsData, err := MockDataFolder.ReadFile("mock_data/binance/umPositions.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load umPositions.json: %v", err))
 	}
@@ -40,7 +39,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 	}
 
 	// Load pmAccountInfo
-	pmAccountInfoData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/binance/pmAccountInfo.json")
+	pmAccountInfoData, err := MockDataFolder.ReadFile("mock_data/binance/pmAccountInfo.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load pmAccountInfo.json: %v", err))
 	}
@@ -49,7 +48,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 	}
 
 	// Load pmAccountBalance
-	pmAccountBalanceData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/binance/pmAccountBalance.json")
+	pmAccountBalanceData, err := MockDataFolder.ReadFile("mock_data/binance/pmAccountBalance.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load pmAccountBalance.json: %v", err))
 	}
@@ -58,7 +57,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 	}
 
 	// Load spotAccountInfo
-	spotAccountInfoData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/binance/spotAccountInfo.json")
+	spotAccountInfoData, err := MockDataFolder.ReadFile("mock_data/binance/spotAccountInfo.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load spotAccountInfo.json: %v", err))
 	}

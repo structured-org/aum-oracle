@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -31,7 +30,7 @@ func (m *MockJupiterClient) loadDefaultData() {
 	defer m.mu.Unlock()
 
 	// Load poolInfo
-	poolInfoData, err := os.ReadFile("testutil/clients-mock-controller/mock_data/jupiter/pool.json")
+	poolInfoData, err := MockDataFolder.ReadFile("mock_data/jupiter/pool.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to read mock_data/jupiter/pool.json: %v", err))
 	}
@@ -40,15 +39,15 @@ func (m *MockJupiterClient) loadDefaultData() {
 	}
 
 	custodyFiles := []string{
-		"testutil/clients-mock-controller/mock_data/jupiter/custody_4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk.json",
-		"testutil/clients-mock-controller/mock_data/jupiter/custody_5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm.json",
-		"testutil/clients-mock-controller/mock_data/jupiter/custody_7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz.json",
-		"testutil/clients-mock-controller/mock_data/jupiter/custody_AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn.json",
-		"testutil/clients-mock-controller/mock_data/jupiter/custody_G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa.json",
+		"mock_data/jupiter/custody_4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk.json",
+		"mock_data/jupiter/custody_5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm.json",
+		"mock_data/jupiter/custody_7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz.json",
+		"mock_data/jupiter/custody_AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn.json",
+		"mock_data/jupiter/custody_G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa.json",
 	}
 
 	for _, filePath := range custodyFiles {
-		custodyData, err := os.ReadFile(filePath)
+		custodyData, err := MockDataFolder.ReadFile(filePath)
 		if err != nil {
 			panic(fmt.Sprintf("failed to load mock_data/jupiter/custody.json: %v", err.Error()))
 		}
@@ -57,7 +56,7 @@ func (m *MockJupiterClient) loadDefaultData() {
 			panic(fmt.Sprintf("Error loading default custody data from %s: %v\n", filePath, err))
 		}
 
-		fileName := strings.TrimSuffix(strings.SplitAfter(filePath, "testutil/clients-mock-controller/mock_data/jupiter/custody_")[1], ".json")
+		fileName := strings.TrimSuffix(strings.SplitAfter(filePath, "mock_data/jupiter/custody_")[1], ".json")
 		pubKey, err := solana.PublicKeyFromBase58(fileName)
 		if err != nil {
 			fmt.Printf("Error parsing public key from filename %s: %v\n", fileName, err)
