@@ -83,7 +83,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 	}
 	c.logger.Info("submitted binance aum data",
 		zap.Uint32("code", res.TxResult.Code),
-		zap.String("hash", res.Hash.String()), // TODO: check that hex output?
+		zap.String("hash", res.Hash.String()),
 		zap.Int64("height", res.Height))
 
 	events := res.TxResult.GetEvents()
@@ -139,7 +139,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 	}
 	c.logger.Info("submitted jupiter aum data",
 		zap.Uint32("code", res.TxResult.Code),
-		zap.String("hash", res.Hash.String()), // TODO: check that hex output?
+		zap.String("hash", res.Hash.String()),
 		zap.Int64("height", res.Height))
 
 	events := res.TxResult.GetEvents()
