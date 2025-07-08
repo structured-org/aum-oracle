@@ -2,8 +2,6 @@ package jupiter
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
@@ -12,17 +10,6 @@ import (
 // Client is a client for Jupiter.
 type Client struct {
 	client *solanarpc.Client
-}
-
-func writeToFile(path string, data interface{}) {
-	bz, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		panic(err.Error())
-	}
-
-	if err := os.WriteFile(path, bz, 0600); err != nil {
-		panic(err.Error())
-	}
 }
 
 // NewClient creates a new Jupiter client.
@@ -38,8 +25,6 @@ func (c *Client) GetJupiterCustodyInfo(ctx context.Context, custody solana.Publi
 	if err := c.client.GetAccountDataBorshInto(ctx, custody, &resp); err != nil {
 		return nil, err
 	}
-
-	writeToFile("custody_"+custody.String()+".json", &resp)
 
 	return &resp, nil
 }

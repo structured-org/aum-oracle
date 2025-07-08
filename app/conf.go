@@ -49,4 +49,8 @@ type config struct {
 
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
+
+	// MockClients tells does the oracle us mocked Solana, Jupiter and Binance client or real ones
+	MockClients        bool `yaml:"mock_clients"`
+	MockControllerPort int  `yaml:"mock_controller_port"`
 }

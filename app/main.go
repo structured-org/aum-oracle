@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	nlogger "github.com/neutron-org/neutron-logger"
 	binanceclient "github.com/structured-org/aum-oracle/client/binance"
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
@@ -18,7 +18,10 @@ import (
 	"github.com/structured-org/aum-oracle/oracle"
 	binanceoracle "github.com/structured-org/aum-oracle/oracle/binance"
 	jupiteroracle "github.com/structured-org/aum-oracle/oracle/jupiter"
+	clients_mocker "github.com/structured-org/aum-oracle/testutil/clients-mock-controller"
 	"go.uber.org/zap"
+
+	nlogger "github.com/neutron-org/neutron-logger"
 )
 
 var (
@@ -39,13 +42,37 @@ func main() {
 		jupiterCustodies[token] = solana.MustPublicKeyFromBase58(programId)
 	}
 
-	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
-	jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
+	var (
+		binanceClient binanceoracle.BinanceClient
+		jupiterClient jupiteroracle.JupiterClient
+		solanaClient  jupiteroracle.SolanaClient
+	)
+
+	if conf.MockClients {
+		mockController := clients_mocker.NewClientsMockController()
+
+		binanceClient = mockController.GetMockBinanceClient()
+		solanaClient = mockController.GetMockSolanaClient()
+		jupiterClient = mockController.GetMockJupiterClient()
+
+		go func() {
+			if err := mockController.Start(conf.MockControllerPort); err != nil {
+				panic(fmt.Sprintf("failed to start mock controller server: %v", err))
+			}
+		}()
+
+	} else {
+		solanaClient = solanaclient.NewClient(conf.SolanaRpcEndpoint)
+		jupiterClient = jupiterclient.NewClient(conf.SolanaRpcEndpoint)
+		binanceClient = binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
+	}
+
+	solanaRealClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
+
 	neutronClient, err := neutronclient.NewClient(logRegistry.Get(neutronClientContext))
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
-	binanceClient := binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
 
 	binanceOracleConfig := binanceoracle.Config{
 		UmPositionsList: conf.BinanceUmPositionsList,
@@ -59,7 +86,7 @@ func main() {
 	)
 	binanceOracleForSolana := binanceoracle.NewBinanceAumOracleForSolana(
 		binanceClient,
-		solanaClient,
+		solanaRealClient,
 		binanceOracleConfig,
 		logRegistry.Get(binanceAumOracleContext),
 	)
