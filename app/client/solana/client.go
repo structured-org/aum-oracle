@@ -29,8 +29,8 @@ var binanceRound = 0
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
 	// TODO: use actual values when the client is implemented
 	return &NextRound{
-		Round:     int64(binanceRound),
-		Timestamp: time.Now().Add(time.Second).Unix(),
+		Round:     uint64(binanceRound),
+		Timestamp: uint64(time.Now().Add(time.Second).Unix()),
 	}, nil
 }
 
@@ -41,8 +41,8 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 
 	binanceRound++
 	return &NextRound{
-		Round:     int64(binanceRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
+		Round:     uint64(binanceRound),
+		Timestamp: uint64(time.Now().Add(time.Minute).Unix()),
 	}, nil
 }
 
