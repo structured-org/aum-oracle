@@ -2,6 +2,7 @@
 members = [
     "contracts/binance-aum",
     "contracts/jupiter-aum",
+    "contracts/aum",
     "packages/*"
 ]
 

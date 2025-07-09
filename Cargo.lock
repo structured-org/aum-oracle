@@ -148,6 +148,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aum-oracle-contract"
+version = "0.1.0"
+dependencies = [
+ "consensus",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw2",
+ "neutron-std",
+ "serde",
+ "serde-json-wasm 0.5.2",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -348,7 +364,7 @@ dependencies = [
  "rmp-serde",
  "schemars",
  "serde",
- "serde-json-wasm",
+ "serde-json-wasm 1.0.1",
  "sha2",
  "static_assertions",
  "thiserror",
@@ -781,7 +797,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde-cw-value",
- "serde-json-wasm",
+ "serde-json-wasm 1.0.1",
  "serde_json",
  "speedate",
  "tendermint-proto",
@@ -1122,6 +1138,15 @@ name = "serde-cw-value"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a75d32da6b8ed758b7d850b6c3c08f1d7df51a4df3cb201296e63e34a78e99d4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde-json-wasm"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e9213a07d53faa0b8dd81e767a54a8188a242fdb9be99ab75ec576a774bfdd7"
 dependencies = [
  "serde",
 ]
