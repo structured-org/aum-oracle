@@ -1,0 +1,25 @@
+[package]
+authors = []
+description = "Neutron Jupiter AUM Oracle Receiver contract"
+edition = "2021"
+name = "jupiter-aum-receiver"
+repository = "https://github.com/structured-org/aum-oracle"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw2 = { workspace = true }
+neutron-std = { workspace = true }
+
+jupiter-aum-common = { workspace = true }
+consensus = { workspace = true }
+cw-ownable = { workspace = true } //"2.1.0"

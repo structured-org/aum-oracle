@@ -1,0 +1,29 @@
+[workspace]
+members = ["contracts/*", "packages/*"]
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+panic = 'abort'
+incremental = false
+# Please do not disable these. Doing so will cause overflow checks in
+# all workspace members to stop working. Overflows should be errors.
+overflow-checks = true
+
+[workspace.dependencies]
+cosmwasm-schema = { version = "2.2.0" }
+cosmwasm-std = { version = "2.2.2" }
+cw-storage-plus = "2.0.0"
+cw2 = "2.0.0"
+neutron-std = { git = "https://github.com/neutron-org/neutron-std.git", branch = "main" }
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "1"
+serde_json = "1.0.140"
+serde-json-wasm = "0.5.1"
+
+jupiter-aum-common = { path = "./packages/jupiter-aum-common" }
+consensus = {path = "./packages/consensus" }

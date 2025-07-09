@@ -1,0 +1,57 @@
+solana_rpc_endpoint: "http://solana:8899"
+solana_keypair_path: "./keypair.json"
+
+binance_um_positions_list:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+binance_spot_assets_list:
+  - USDT
+  - BTC
+  - ETH
+  - SOL
+
+jupiter_custodies:
+  SOL: "7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz"
+  WETH: "AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn"
+  WBTC: "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm"
+  USDC: "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa"
+  USDT: "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
+jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
+jupiter_strategy_address: "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf"
+
+binance_aum_contract: "neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm"
+jupiter_aum_contract: "neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj"
+
+operational_config:
+  failure_delay: 10s
+  pre_submit_delay: 5s
+  fetch_data_timeout: 3s
+  
+neutron_contracts_queries:
+  - neutron_contract_address: "neutron1ujy2u79apcd67xe7ee9d5glqzkcp43yltjf096mytf05lacr8qjqxnjv2v"
+    query: "{\"get_test_data\":{}}"
+    solana_program_id: "6GwFiXmSWfh4eY7eZsAFVfm1p2uZgrrkXNUU8epWK29B"
+    solana_instance_key: "J7zNEt88LUzGhHchZwUnggd1axJmFiWJ8rqeM1QmfzqD"
+    oracles_alt_pubkey: "6N712hyy7HF2WFuhd9ZwKErn7PT3KQb2ZNFK9cCbwXb2"
+
+clients:
+  neutron:
+    mnemonic: "limb desk rib destroy valid unusual core useful hotel toward brisk hope prefer angry visa faint nature split team tent ask type obscure outdoor"
+    gas_prices: "0.5untrn"
+    gas_adjustment: 1.5
+    chain_id: "ntrntest"
+    node: "http://neutron_val1:26657"
+    node_conn_retries: 50
+    node_conn_retry_delay: "3s"
+  solana:
+    rpc_endpoint: ""
+  binance:
+    api_key: ""
+    api_secret: ""
+
+mock_clients: true
+mock_controller_port: 3000
+
+logger_level: debug

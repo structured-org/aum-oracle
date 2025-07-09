@@ -61,12 +61,13 @@ describe('Mock controller', () => {
     await context.park.stop();
   });
 
-  describe('Mock Controller Integration Tests', async () => {
-    const sampleCustodyPublicKey = '5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm';
+  describe('Mock Controller Integration Tests', () => {
+    const sampleCustodyPublicKey =
+      '5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm';
     const sampleTokenPublicKey = '11111111111111111111111111111111';
     const mockController = new MockController(3001);
 
-    let initialData: {
+    const initialData: {
       umPositions?: BinanceUMPosition[];
       pmAccountInfo?: BinancePmAccountInfo;
       pmAccountBalance?: BinancePmAccountBalance[];
@@ -91,19 +92,23 @@ describe('Mock controller', () => {
       });
 
       it('should fetch initial Binance PM account balance', async () => {
-        const pmAccountBalance = await mockController.getBinancePMAccountBalance();
+        const pmAccountBalance =
+          await mockController.getBinancePMAccountBalance();
         expect(pmAccountBalance).toBeTruthy();
         initialData.pmAccountBalance = pmAccountBalance;
       });
 
       it('should fetch initial Binance spot account info', async () => {
-        const spotAccountInfo = await mockController.getBinanceSpotAccountInfo();
+        const spotAccountInfo =
+          await mockController.getBinanceSpotAccountInfo();
         expect(spotAccountInfo).toBeTruthy();
         initialData.spotAccountInfo = spotAccountInfo;
       });
 
       it('should fetch initial Jupiter perps custody info', async () => {
-        const custodyInfo = await mockController.getJupiterPerpsCustodyInfo(sampleCustodyPublicKey);
+        const custodyInfo = await mockController.getJupiterPerpsCustodyInfo(
+          sampleCustodyPublicKey,
+        );
         expect(custodyInfo).toBeTruthy();
         initialData.custodyInfo = custodyInfo;
       });
@@ -121,13 +126,16 @@ describe('Mock controller', () => {
       });
 
       it('should fetch initial Solana token account balance', async () => {
-        const tokenAccountBalance = await mockController.getSolanaTokenAccountBalance(sampleTokenPublicKey);
+        const tokenAccountBalance =
+          await mockController.getSolanaTokenAccountBalance(
+            sampleTokenPublicKey,
+          );
         expect(tokenAccountBalance).toBeTruthy();
         initialData.tokenAccountBalance = tokenAccountBalance;
       });
     });
 
-    let modifiedData: {
+    const modifiedData: {
       umPositions?: BinanceUMPosition[];
       pmAccountInfo?: BinancePmAccountInfo;
       pmAccountBalance?: BinancePmAccountBalance[];
@@ -139,40 +147,60 @@ describe('Mock controller', () => {
     } = {};
 
     describe('POST - Set modified mock data', () => {
-      beforeAll(async () => {
-        modifiedData.umPositions = initialData.umPositions.map(position => ({
+      beforeAll(() => {
+        modifiedData.umPositions = initialData.umPositions.map((position) => ({
           ...position,
           positionAmt: (parseFloat(position.positionAmt) + 0.5).toString(),
           entryPrice: (parseFloat(position.entryPrice) + 100).toString(),
           markPrice: (parseFloat(position.markPrice) + 200).toString(),
-          unrealizedProfit: (parseFloat(position.unrealizedProfit) + 50).toString(),
+          unrealizedProfit: (
+            parseFloat(position.unrealizedProfit) + 50
+          ).toString(),
           leverage: (parseInt(position.leverage) + 1).toString(),
           updateTime: Date.now(),
         }));
 
         modifiedData.pmAccountInfo = {
           ...initialData.pmAccountInfo,
-          accountEquity: (parseFloat(initialData.pmAccountInfo.accountEquity) + 5000).toString(),
-          actualEquity: (parseFloat(initialData.pmAccountInfo.actualEquity) + 4800).toString(),
-          accountInitialMargin: (parseFloat(initialData.pmAccountInfo.accountInitialMargin) + 1000).toString(),
-          totalAvailableBalance: (parseFloat(initialData.pmAccountInfo.totalAvailableBalance) + 3800).toString(),
+          accountEquity: (
+            parseFloat(initialData.pmAccountInfo.accountEquity) + 5000
+          ).toString(),
+          actualEquity: (
+            parseFloat(initialData.pmAccountInfo.actualEquity) + 4800
+          ).toString(),
+          accountInitialMargin: (
+            parseFloat(initialData.pmAccountInfo.accountInitialMargin) + 1000
+          ).toString(),
+          totalAvailableBalance: (
+            parseFloat(initialData.pmAccountInfo.totalAvailableBalance) + 3800
+          ).toString(),
           updateTime: Date.now(),
         };
 
-        modifiedData.pmAccountBalance = initialData.pmAccountBalance.map(balance => ({
-          ...balance,
-          totalWalletBalance: (parseFloat(balance.totalWalletBalance) + 1000).toString(),
-          crossMarginFree: (parseFloat(balance.crossMarginFree) + 800).toString(),
-          umWalletBalance: (parseFloat(balance.umWalletBalance) + 500).toString(),
-          umUnrealizedPNL: (parseFloat(balance.umUnrealizedPNL) + 100).toString(),
-          updateTime: Date.now(),
-        }));
+        modifiedData.pmAccountBalance = initialData.pmAccountBalance.map(
+          (balance) => ({
+            ...balance,
+            totalWalletBalance: (
+              parseFloat(balance.totalWalletBalance) + 1000
+            ).toString(),
+            crossMarginFree: (
+              parseFloat(balance.crossMarginFree) + 800
+            ).toString(),
+            umWalletBalance: (
+              parseFloat(balance.umWalletBalance) + 500
+            ).toString(),
+            umUnrealizedPNL: (
+              parseFloat(balance.umUnrealizedPNL) + 100
+            ).toString(),
+            updateTime: Date.now(),
+          }),
+        );
 
         modifiedData.spotAccountInfo = {
           ...initialData.spotAccountInfo,
           makerCommission: initialData.spotAccountInfo.makerCommission + 1,
           takerCommission: initialData.spotAccountInfo.takerCommission + 1,
-          balances: initialData.spotAccountInfo.balances.map(balance => ({
+          balances: initialData.spotAccountInfo.balances.map((balance) => ({
             ...balance,
             free: (parseFloat(balance.free) + 10).toString(),
             locked: (parseFloat(balance.locked) + 1).toString(),
@@ -200,7 +228,10 @@ describe('Mock controller', () => {
         modifiedData.poolInfo = {
           ...initialData.poolInfo,
           name: initialData.poolInfo.name + ' (Modified)',
-          aumUsd: (BigInt(initialData.poolInfo.aumUsd) + BigInt('1000000000000000000000000')).toString(),
+          aumUsd: (
+            BigInt(initialData.poolInfo.aumUsd) +
+            BigInt('1000000000000000000000000')
+          ).toString(),
           fees: {
             ...initialData.poolInfo.fees,
             swapBps: initialData.poolInfo.fees.swapBps + 5,
@@ -210,19 +241,24 @@ describe('Mock controller', () => {
           poolApr: {
             ...initialData.poolInfo.poolApr,
             feeAprBps: initialData.poolInfo.poolApr.feeAprBps + 50,
-            realizedFeeUsd: initialData.poolInfo.poolApr.realizedFeeUsd + 1000000,
+            realizedFeeUsd:
+              initialData.poolInfo.poolApr.realizedFeeUsd + 1000000,
             lastUpdated: Date.now(),
           },
         };
 
         modifiedData.tokenSupply = {
           ...initialData.tokenSupply,
-          amount: (BigInt(initialData.tokenSupply.amount) + BigInt('1000000000')).toString(),
+          amount: (
+            BigInt(initialData.tokenSupply.amount) + BigInt('1000000000')
+          ).toString(),
         };
 
         modifiedData.tokenAccountBalance = {
           ...initialData.tokenAccountBalance,
-          amount: (BigInt(initialData.tokenAccountBalance.amount) + BigInt('500000000')).toString(),
+          amount: (
+            BigInt(initialData.tokenAccountBalance.amount) + BigInt('500000000')
+          ).toString(),
         };
       });
 
@@ -231,19 +267,28 @@ describe('Mock controller', () => {
       });
 
       it('should set modified Binance PM account info', async () => {
-        await mockController.setBinancePMAccountInfo(modifiedData.pmAccountInfo);
+        await mockController.setBinancePMAccountInfo(
+          modifiedData.pmAccountInfo,
+        );
       });
 
       it('should set modified Binance PM account balance', async () => {
-        await mockController.setBinancePMAccountBalance(modifiedData.pmAccountBalance);
+        await mockController.setBinancePMAccountBalance(
+          modifiedData.pmAccountBalance,
+        );
       });
 
       it('should set modified Binance spot account info', async () => {
-        await mockController.setBinanceSpotAccountInfo(modifiedData.spotAccountInfo);
+        await mockController.setBinanceSpotAccountInfo(
+          modifiedData.spotAccountInfo,
+        );
       });
 
       it('should set modified Jupiter perps custody info', async () => {
-        await mockController.setJupiterPerpsCustodyInfo(sampleCustodyPublicKey, modifiedData.custodyInfo);
+        await mockController.setJupiterPerpsCustodyInfo(
+          sampleCustodyPublicKey,
+          modifiedData.custodyInfo,
+        );
       });
 
       it('should set modified Jupiter pool info', async () => {
@@ -255,7 +300,10 @@ describe('Mock controller', () => {
       });
 
       it('should set modified Solana token account balance', async () => {
-        await mockController.setSolanaTokenAccountBalance(sampleTokenPublicKey, modifiedData.tokenAccountBalance);
+        await mockController.setSolanaTokenAccountBalance(
+          sampleTokenPublicKey,
+          modifiedData.tokenAccountBalance,
+        );
       });
     });
 
@@ -266,22 +314,28 @@ describe('Mock controller', () => {
       });
 
       it('should verify modified Binance PM account info', async () => {
-        const updatedPmAccountInfo = await mockController.getBinancePMAccountInfo();
+        const updatedPmAccountInfo =
+          await mockController.getBinancePMAccountInfo();
         expect(updatedPmAccountInfo).toEqual(modifiedData.pmAccountInfo);
       });
 
       it('should verify modified Binance PM account balance', async () => {
-        const updatedPmAccountBalance = await mockController.getBinancePMAccountBalance();
+        const updatedPmAccountBalance =
+          await mockController.getBinancePMAccountBalance();
         expect(updatedPmAccountBalance).toEqual(modifiedData.pmAccountBalance);
       });
 
       it('should verify modified Binance spot account info', async () => {
-        const updatedSpotAccountInfo = await mockController.getBinanceSpotAccountInfo();
+        const updatedSpotAccountInfo =
+          await mockController.getBinanceSpotAccountInfo();
         expect(updatedSpotAccountInfo).toEqual(modifiedData.spotAccountInfo);
       });
 
       it('should verify modified Jupiter perps custody info', async () => {
-        const updatedCustodyInfo = await mockController.getJupiterPerpsCustodyInfo(sampleCustodyPublicKey);
+        const updatedCustodyInfo =
+          await mockController.getJupiterPerpsCustodyInfo(
+            sampleCustodyPublicKey,
+          );
         expect(updatedCustodyInfo).toEqual(modifiedData.custodyInfo);
       });
 
@@ -296,7 +350,10 @@ describe('Mock controller', () => {
       });
 
       it('should verify modified Solana token account balance', async () => {
-        const updatedTokenBalance = await mockController.getSolanaTokenAccountBalance(sampleTokenPublicKey);
+        const updatedTokenBalance =
+          await mockController.getSolanaTokenAccountBalance(
+            sampleTokenPublicKey,
+          );
         expect(updatedTokenBalance).toEqual(modifiedData.tokenAccountBalance);
       });
     });

@@ -1,3 +1,6 @@
+solana_rpc_endpoint: "https://api.mainnet-beta.solana.com"
+solana_keypair_path: "./keypair.json"
+
 binance_um_positions_list:
   - BTCUSDT
   - ETHUSDT
@@ -25,6 +28,15 @@ operational_config:
   failure_delay: 1s
   pre_submit_delay: 3s
   fetch_data_timeout: 3s
+
+
+neutron_contracts_queries:
+  - neutron_contract_address: "neutron1ujy2u79apcd67xe7ee9d5glqzkcp43yltjf096mytf05lacr8qjqxnjv2v"
+    query: "{\"get_test_data\":{}}"
+    solana_program_id: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin"
+    solana_instance_key: "J7zNEt88LUzGhHchZwUnggd1axJmFiWJ8rqeM1QmfzqD"
+    oracles_list_contract: "neutron contract address"
+
 
 clients:
   neutron:

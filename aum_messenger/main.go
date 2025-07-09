@@ -17,6 +17,7 @@ import (
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 	msgr "github.com/structured-org/aum-messenger/messenger"
+	arbitrarydatamsgr "github.com/structured-org/aum-messenger/messenger/arbitrary_data"
 	binancemsgr "github.com/structured-org/aum-messenger/messenger/binance"
 	jupitermsgr "github.com/structured-org/aum-messenger/messenger/jupiter"
 	clients_mocker "github.com/structured-org/aum-messenger/testutil/clients-mock-controller"
@@ -24,10 +25,12 @@ import (
 )
 
 const (
-	mainContext           = "main"
-	jupiterAumMsgrContext = "jupiter_aum_messenger"
-	binanceAumMsgrContext = "binance_aum_messenger"
-	neutronClientContext  = "neutron_client"
+	mainContext              = "main"
+	jupiterAumMsgrContext    = "jupiter_aum_messenger"
+	binanceAumMsgrContext    = "binance_aum_messenger"
+	arbitraryDataMsgrContext = "arbitrary_data_messenger"
+	neutronClientContext     = "neutron_client"
+	solanaClientContext      = "solana_client"
 
 	chainBechAddressPrefix = "neutron"
 	chainBechPubPrefix     = "neutronpub"
@@ -59,6 +62,10 @@ func main() {
 		neutronClient jupitermsgr.NeutronAumReceiverClient
 		jupiterClient jupitermsgr.JupiterClient
 	}
+	var arbitraryDataMsgrForSolanaDeps struct {
+		solanaClient  arbitrarydatamsgr.SolanaClient
+		neutronClient arbitrarydatamsgr.NeutronClient
+	}
 
 	// real unmockable clients
 	neutronClient, err := neutronclient.NewClient(
@@ -70,7 +77,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
-	solanaClient := solanaclient.NewClient(conf.Clients.Solana.RpcEndpoint)
+	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint, conf.SolanaKeypairPath, logRegistry.Get(solanaClientContext))
 
 	switch conf.MockClients {
 	case true: // test run. populate deps with mock clients and run mock controller server
@@ -89,6 +96,9 @@ func main() {
 		jupiterMsgrForNeutronDeps.solanaClient = solanaMockClient
 		jupiterMsgrForNeutronDeps.neutronClient = neutronClient
 		jupiterMsgrForNeutronDeps.jupiterClient = jupiterMockClient
+
+		arbitraryDataMsgrForSolanaDeps.solanaClient = solanaMockClient
+		arbitraryDataMsgrForSolanaDeps.neutronClient = neutronClient
 
 		go func() {
 			if err := mockController.Start(conf.MockControllerPort); err != nil {
@@ -109,6 +119,9 @@ func main() {
 		jupiterMsgrForNeutronDeps.solanaClient = solanaClient
 		jupiterMsgrForNeutronDeps.neutronClient = neutronClient
 		jupiterMsgrForNeutronDeps.jupiterClient = jupiterClient
+
+		arbitraryDataMsgrForSolanaDeps.solanaClient = solanaClient
+		arbitraryDataMsgrForSolanaDeps.neutronClient = neutronClient
 	}
 
 	// Binance messengers
@@ -148,6 +161,13 @@ func main() {
 		logRegistry.Get(jupiterAumMsgrContext),
 	)
 
+	arbitraryDataMsgr := arbitrarydatamsgr.NewArbitraryNeutronDataMessengerForSolana(
+		arbitraryDataMsgrForSolanaDeps.solanaClient,
+		arbitraryDataMsgrForSolanaDeps.neutronClient,
+		conf.NeutronContracstQueries[0],
+		logRegistry.Get(arbitraryDataMsgrContext),
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 
@@ -170,6 +190,13 @@ func main() {
 		defer wg.Done()
 		logger.Info("running jupiter messenger for neutron")
 		msgr.RunMessenger(ctx, jupiterMsgrForNeutron, conf.OperationalConfig)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		logger.Info("running arbitrary data messenger for solana")
+		msgr.RunMessenger(ctx, arbitraryDataMsgr, conf.OperationalConfig)
 	}()
 
 	go func() {
@@ -197,6 +224,8 @@ func initLogRegistry(logLevel string) *nlogger.Registry {
 		jupiterAumMsgrContext,
 		binanceAumMsgrContext,
 		neutronClientContext,
+		arbitraryDataMsgrContext,
+		solanaClientContext,
 	)
 	if err != nil {
 		log.Fatalf("couldn't initialize loggers registry: %s", err)

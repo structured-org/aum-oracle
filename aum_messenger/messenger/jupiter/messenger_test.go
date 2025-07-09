@@ -10,6 +10,7 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/golang/mock/gomock"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	msgr "github.com/structured-org/aum-messenger/messenger"
@@ -54,7 +55,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 		},
 	}
 
-	neutronAumRecv.EXPECT().GetJupiterAumReceiverNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+	neutronAumRecv.EXPECT().GetJupiterAumReceiverNextRound(gomock.Any()).Return(&msgrclient.NextRound{
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
@@ -100,7 +101,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 		StrategyJlpBalanceDecimals: 6,
 	}
 	expectedData.SortCustodyAssets()
-	neutronAumRecv.EXPECT().SubmitJupiterAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
+	neutronAumRecv.EXPECT().SubmitJupiterAumData(gomock.Any(), expectedData).Return(&msgrclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 

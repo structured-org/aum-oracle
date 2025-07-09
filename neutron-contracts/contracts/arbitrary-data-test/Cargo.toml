@@ -1,0 +1,25 @@
+[package]
+authors = ["Albert Andrejev <albert.andrejev@gmail.com>"]
+description = "Arbitrary data test contract"
+edition = "2021"
+name = "arbitrary-data-test"
+version = "1.0.0"
+
+exclude = [
+    "contract.wasm",
+    "hash.txt",
+]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = []
+library = []
+
+[dependencies]
+cw2 = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+
+

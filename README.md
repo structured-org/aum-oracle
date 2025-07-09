@@ -16,16 +16,18 @@ The AUM Oracle consists of multiple components working together to collect, vali
 ```
 aum-oracle/
 ├── aum_messenger/           # Go daemon for data collection
-├── packages/
-│   ├── consensus/           # Rust consensus mechanism library
-│   └── jupiter-aum-common/  # Common utilities for Jupiter AUM data
-├── contracts/
-│   ├── binance-aum-receiver/    # CosmWasm contract for Binance data
-│   └── jupiter-aum-receiver/    # CosmWasm contract for Jupiter data
-├── integration_tests/       # End-to-end system tests
-├── scripts/                # Deployment and utility scripts
-├── Makefile                # Build and test automation
-└── README.md               # This file
+├── neutron-contracts/       # Neutron related contracts and packages
+|   ├── contracts/           # CosmWasm contracts for Neutron data
+|   │   ├── binance-aum-receiver/    # CosmWasm contract for Binance data
+|   │   └── jupiter-aum-receiver/    # CosmWasm contract for Jupiter data
+|   ├── packages/                    # Rust packages for Neutron data
+|   |   ├── consensus/               # Rust consensus mechanism library
+|   |   └── jupiter-aum-common/      # Common utilities for Jupiter AUM data
+|   ├── scripts/           # Deployment and utility scripts
+|   └── Makefile           # Build and test automation
+├── solana-contracts/      # Solana related contracts
+├── integration_tests/     # End-to-end system tests
+└── README.md              # This file
 ```
 
 ## Components

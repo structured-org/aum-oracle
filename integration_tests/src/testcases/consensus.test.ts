@@ -233,10 +233,6 @@ describe('Consensus', () => {
           context.client,
         );
 
-        const resultBeforeBefore = await queryLastPublishedData<any>(
-          BINANCE_CONTRACT,
-          context.client,
-        );
         // wait for the possible next round in case some messengers already submitted data for this round
         await waitFor(
           async () => {

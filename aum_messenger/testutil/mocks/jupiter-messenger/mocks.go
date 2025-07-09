@@ -11,6 +11,7 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	rpc "github.com/gagliardetto/solana-go/rpc"
 	gomock "github.com/golang/mock/gomock"
+	client "github.com/structured-org/aum-messenger/client"
 	jupiter "github.com/structured-org/aum-messenger/client/jupiter"
 	neutron "github.com/structured-org/aum-messenger/client/neutron"
 )
@@ -145,10 +146,10 @@ func (m *MockNeutronAumReceiverClient) EXPECT() *MockNeutronAumReceiverClientMoc
 }
 
 // GetJupiterAumReceiverNextRound mocks base method.
-func (m *MockNeutronAumReceiverClient) GetJupiterAumReceiverNextRound(ctx context.Context) (*neutron.NextRound, error) {
+func (m *MockNeutronAumReceiverClient) GetJupiterAumReceiverNextRound(ctx context.Context) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetJupiterAumReceiverNextRound", ctx)
-	ret0, _ := ret[0].(*neutron.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -160,10 +161,10 @@ func (mr *MockNeutronAumReceiverClientMockRecorder) GetJupiterAumReceiverNextRou
 }
 
 // SubmitJupiterAumData mocks base method.
-func (m *MockNeutronAumReceiverClient) SubmitJupiterAumData(ctx context.Context, data *neutron.JupiterAumData) (*neutron.NextRound, error) {
+func (m *MockNeutronAumReceiverClient) SubmitJupiterAumData(ctx context.Context, data *neutron.JupiterAumData) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubmitJupiterAumData", ctx, data)
-	ret0, _ := ret[0].(*neutron.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

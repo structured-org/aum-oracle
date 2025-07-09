@@ -71,7 +71,7 @@ export class MockController {
   /**
    * Get current mock Binance USD-margined perpetual futures positions
    */
-  async getBinanceUmPositions(): Promise<BinanceUMPosition[]> {
+  getBinanceUmPositions(): Promise<BinanceUMPosition[]> {
     return this.getFromMockController<BinanceUMPosition[]>(
       '/mock/binance/umpositions',
     );
@@ -87,7 +87,7 @@ export class MockController {
   /**
    * Get current mock Binance Portfolio Margin account info
    */
-  async getBinancePMAccountInfo(): Promise<BinancePmAccountInfo> {
+  getBinancePMAccountInfo(): Promise<BinancePmAccountInfo> {
     return this.getFromMockController<BinancePmAccountInfo>(
       '/mock/binance/pmaccountinfo',
     );
@@ -105,7 +105,7 @@ export class MockController {
   /**
    * Get current mock Binance Portfolio Margin account balance
    */
-  async getBinancePMAccountBalance(): Promise<BinancePmAccountBalance[]> {
+  getBinancePMAccountBalance(): Promise<BinancePmAccountBalance[]> {
     return this.getFromMockController<BinancePmAccountBalance[]>(
       '/mock/binance/pmaccountbalance',
     );
@@ -123,7 +123,7 @@ export class MockController {
   /**
    * Get current mock Binance spot account info
    */
-  async getBinanceSpotAccountInfo(): Promise<BinanceSpotAccountInfo> {
+  getBinanceSpotAccountInfo(): Promise<BinanceSpotAccountInfo> {
     return this.getFromMockController<BinanceSpotAccountInfo>(
       '/mock/binance/spotaccountinfo',
     );
@@ -147,7 +147,7 @@ export class MockController {
    * Get current mock Jupiter perps custody info
    * @param custodyPublicKey - The custody account public key (base58 string)
    */
-  async getJupiterPerpsCustodyInfo(
+  getJupiterPerpsCustodyInfo(
     custodyPublicKey: string,
   ): Promise<JupiterPerpsCustodyAccount> {
     return this.getFromMockController<JupiterPerpsCustodyAccount>(
@@ -168,7 +168,7 @@ export class MockController {
   /**
    * Get current mock Jupiter pool info
    */
-  async getJupiterPoolInfo(): Promise<JupiterPoolAccount> {
+  getJupiterPoolInfo(): Promise<JupiterPoolAccount> {
     return this.getFromMockController<JupiterPoolAccount>(
       '/mock/jupiter/poolinfo',
     );
@@ -184,7 +184,7 @@ export class MockController {
   /**
    * Get current mock Solana token supply
    */
-  async getSolanaTokenSupply(): Promise<SolanaUiTokenAmount> {
+  getSolanaTokenSupply(): Promise<SolanaUiTokenAmount> {
     return this.getFromMockController<SolanaUiTokenAmount>(
       '/mock/solana/tokensupply',
     );
@@ -211,7 +211,7 @@ export class MockController {
    * Get current mock Solana token account balance
    * @param tokenPublicKey - The token account public key (base58 string)
    */
-  async getSolanaTokenAccountBalance(
+  getSolanaTokenAccountBalance(
     tokenPublicKey: string,
   ): Promise<SolanaUiTokenAmount> {
     return this.getFromMockController<SolanaUiTokenAmount>(
