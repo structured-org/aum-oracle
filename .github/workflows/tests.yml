@@ -20,7 +20,9 @@ jobs:
           profile: minimal
           override: true
       - run: cargo fetch --verbose
+        working-directory: neutron-contracts
       - run: cargo clippy --all --all-targets -- -D warnings
+        working-directory: neutron-contracts
 
   rustfmt:
     name: Actions - rustfmt
@@ -36,6 +38,7 @@ jobs:
           profile: minimal
           override: true
       - run: cargo fmt -- --check
+        working-directory: neutron-contracts
 
   unit-test:
     name: Actions - unit test
@@ -49,7 +52,10 @@ jobs:
           toolchain: 1.81.0
           profile: minimal
       - run: cargo fetch --verbose
+        working-directory: neutron-contracts
       - run: cargo build
+        working-directory: neutron-contracts
       - run: cargo test --verbose --all
+        working-directory: neutron-contracts
         env:
           RUST_BACKTRACE: 1

@@ -5,6 +5,7 @@ import (
 
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 )
@@ -19,12 +20,12 @@ type BinanceClient interface {
 
 // NeutronAumReceiverClient is the definition of the expected Neutron AUM receiver client.
 type NeutronAumReceiverClient interface {
-	GetBinanceAumReceiverNextRound(ctx context.Context) (*neutronclient.NextRound, error)
-	SubmitBinanceAumData(ctx context.Context, data *neutronclient.BinanceAumData) (*neutronclient.NextRound, error)
+	GetBinanceAumReceiverNextRound(ctx context.Context) (*msgrclient.NextRound, error)
+	SubmitBinanceAumData(ctx context.Context, data *neutronclient.BinanceAumData) (*msgrclient.NextRound, error)
 }
 
 // SolanaAumReceiverClient is the definition of the expected Solana AUM receiver client.
 type SolanaAumReceiverClient interface {
-	GetBinanceAumReceiverNextRound(ctx context.Context) (*solanaclient.NextRound, error)
-	SubmitBinanceAumData(ctx context.Context, data *solanaclient.BinanceAumData) (*solanaclient.NextRound, error)
+	GetBinanceAumReceiverNextRound(ctx context.Context) (*msgrclient.NextRound, error)
+	SubmitBinanceAumData(ctx context.Context, data *solanaclient.BinanceAumData) (*msgrclient.NextRound, error)
 }

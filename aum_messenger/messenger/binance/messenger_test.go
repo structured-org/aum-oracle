@@ -9,6 +9,7 @@ import (
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	"github.com/golang/mock/gomock"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 	msgr "github.com/structured-org/aum-messenger/messenger"
@@ -30,7 +31,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 	binanceClient := mock_binance.NewMockBinanceClient(ctrl)
 	neutronAumRecv := mock_binance.NewMockNeutronAumReceiverClient(ctrl)
 
-	neutronAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+	neutronAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&msgrclient.NextRound{
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
@@ -67,7 +68,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 		PmAccountActualEquity: math.LegacyMustNewDecFromStr("8.16774569"),
 		WithdrawableUsdt:      math.LegacyMustNewDecFromStr("32.69173084"),
 	}
-	neutronAumRecv.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
+	neutronAumRecv.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedData).Return(&msgrclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 
@@ -92,7 +93,7 @@ func TestMessengerForSolanaRun(t *testing.T) {
 	binanceClient := mock_binance.NewMockBinanceClient(ctrl)
 	solanaAumRecv := mock_binance.NewMockSolanaAumReceiverClient(ctrl)
 
-	solanaAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&solanaclient.NextRound{
+	solanaAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&msgrclient.NextRound{
 		Round: 1, Timestamp: start + 2,
 	}, nil)
 
@@ -130,7 +131,7 @@ func TestMessengerForSolanaRun(t *testing.T) {
 		PmAccountActualEquity: 8.16774569,
 		WithdrawableUsdt:      32.69173084,
 	}
-	solanaAumRecv.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedData).Return(&solanaclient.NextRound{
+	solanaAumRecv.EXPECT().SubmitBinanceAumData(gomock.Any(), expectedData).Return(&msgrclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)
 

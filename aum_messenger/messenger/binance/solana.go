@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	solanaclient "github.com/structured-org/aum-messenger/client/solana"
-	msgr "github.com/structured-org/aum-messenger/messenger"
 	"go.uber.org/zap"
 )
 
@@ -34,12 +34,12 @@ func NewBinanceAumMessengerForSolana(
 }
 
 // GetNextRound retrieves the next round for the Binance AUM receiver contract.
-func (o *BinanceAumMessengerForSolana) GetNextRound(ctx context.Context) (*msgr.NextRound, error) {
+func (o *BinanceAumMessengerForSolana) GetNextRound(ctx context.Context) (*msgrclient.NextRound, error) {
 	nextRound, err := o.solanaClient.GetBinanceAumReceiverNextRound(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AUM receiver next round: %w", err)
 	}
-	return &msgr.NextRound{
+	return &msgrclient.NextRound{
 		Round:     nextRound.Round,
 		Timestamp: nextRound.Timestamp,
 	}, nil
@@ -60,12 +60,12 @@ func (o *BinanceAumMessengerForSolana) Logger() *zap.Logger {
 }
 
 // SubmitData submits the AUM data to the Solana AUM receiver contract.
-func (o *BinanceAumMessengerForSolana) SubmitData(ctx context.Context, data *solanaclient.BinanceAumData) (*msgr.NextRound, error) {
+func (o *BinanceAumMessengerForSolana) SubmitData(ctx context.Context, data *solanaclient.BinanceAumData) (*msgrclient.NextRound, error) {
 	nextRound, err := o.solanaClient.SubmitBinanceAumData(ctx, data)
 	if err != nil {
 		return nil, err
 	}
-	return &msgr.NextRound{
+	return &msgrclient.NextRound{
 		Round:     nextRound.Round,
 		Timestamp: nextRound.Timestamp,
 	}, nil

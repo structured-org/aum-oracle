@@ -9,6 +9,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 )
 
 type MockSolanaClient struct {
@@ -125,4 +126,28 @@ func (m *MockSolanaClient) DisableTimeout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.timeoutEnabled = false
+}
+
+func (c *MockSolanaClient) GetArbitraryNeutronContractDataNextRound(ctx context.Context, programId string, instanceKey solana.PublicKey) (*msgrclient.NextRound, error) {
+	roundTime := int64(100)
+	currentTime := time.Now().Unix()
+
+	nextRoundTime := currentTime - (currentTime % roundTime) + roundTime
+
+	return &msgrclient.NextRound{
+		Round:     uint64(0),
+		Timestamp: uint64(nextRoundTime),
+	}, nil
+}
+
+func (c *MockSolanaClient) SubmitArbitraryNeutronContractData(ctx context.Context, programID solana.PublicKey, instanceKey solana.PublicKey, oraclesList *[]string, data *[]byte) (*msgrclient.NextRound, error) {
+	roundTime := int64(100)
+	currentTime := time.Now().Unix()
+
+	nextRoundTime := currentTime - (currentTime % roundTime) + roundTime
+
+	return &msgrclient.NextRound{
+		Round:     uint64(0),
+		Timestamp: uint64(nextRoundTime),
+	}, nil
 }

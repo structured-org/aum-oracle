@@ -7,7 +7,7 @@ cd $DIR
 VERSION=$(cat ../../package.json | jq -r '.version')
 if [[ "$CI" == "true" ]]; then
     VERSION="_$VERSION"
-    ORG=neutronorg/lionco-contracts:
+    ORG=structured:
 else
     VERSION=":$VERSION"
 fi

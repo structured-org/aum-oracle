@@ -10,6 +10,7 @@ import (
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
 	"go.uber.org/zap"
 )
@@ -43,31 +44,31 @@ func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumCo
 }
 
 // GetBinanceAumReceiverNextRound gets the next consensus round for the Binance AUM receiver contract.
-func (c *Client) GetBinanceAumReceiverNextRound(ctx context.Context) (*NextRound, error) {
+func (c *Client) GetBinanceAumReceiverNextRound(ctx context.Context) (*msgrclient.NextRound, error) {
 	resp, err := c.queryRoundInfo(ctx, c.binanceAumContract)
 	if err != nil {
 		return nil, fmt.Errorf("can't query round info for Binance contract: %w", err)
 	}
-	return &NextRound{
+	return &msgrclient.NextRound{
 		Round:     resp.NextRound.Round,
 		Timestamp: resp.NextRound.Start,
 	}, nil
 }
 
 // GetJupiterAumReceiverNextRound gets the next consensus round for the Jupiter AUM receiver contract.
-func (c *Client) GetJupiterAumReceiverNextRound(ctx context.Context) (*NextRound, error) {
+func (c *Client) GetJupiterAumReceiverNextRound(ctx context.Context) (*msgrclient.NextRound, error) {
 	resp, err := c.queryRoundInfo(ctx, c.jupiterAumContract)
 	if err != nil {
 		return nil, fmt.Errorf("can't query round info for Jupiter contract: %w", err)
 	}
-	return &NextRound{
+	return &msgrclient.NextRound{
 		Round:     resp.NextRound.Round,
 		Timestamp: resp.NextRound.Start,
 	}, nil
 }
 
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM receiver contract.
-func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
+func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*msgrclient.NextRound, error) {
 	c.logger.Info("submitting binance aum data")
 	msg := map[string]interface{}{
 		"publish_data": map[string]interface{}{
@@ -95,10 +96,10 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 }
 
 // SubmitJupiterAumData submits the Jupiter AUM data to the Jupiter AUM receiver contract.
-func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
+func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*msgrclient.NextRound, error) {
 	c.logger.Info("submitting jupiter aum data")
-	msg := map[string]interface{}{
-		"publish_data": map[string]interface{}{
+	msg := map[string]any{
+		"publish_data": map[string]any{
 			"new_data": data,
 		},
 	}
@@ -122,10 +123,35 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 	return nextRound, nil
 }
 
+// GetOraclesList queries the list of the oracles.
+func (c *Client) GetOraclesList(ctx context.Context, contractAddress string) (*[]string, error) {
+	c.logger.Info("querying list of oracles")
+
+	return &[]string{
+		"5S5XGJEdACDzf5dq1Sk6jSRixr17qFGVri7nFuL8z3HB",
+		"DC4nxhuAvqovLFx6bsMLdaszjmuUt39AE4YmsGvCzQSW",
+		"8age5THyyHh91L2PHd2ZMH9NxDN14AQ87zAkgbniqX6e",
+	}, nil
+}
+
+// QueryArbitraryNeutronContract queries the arbitrary Neutron contract with the given query.
+func (c *Client) QueryArbitraryNeutronContract(ctx context.Context, contract string, queryStr string) (*[]byte, error) {
+	c.logger.Info("querying arbitrary neutron contract",
+		zap.String("contract", contract),
+		zap.String("query", queryStr),
+	)
+
+	resBz, err := c.client.QuerySmartContract(ctx, contract, []byte(queryStr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
+	}
+
+	return &resBz, nil
+}
+
 // internal: query round info from smart contract
 func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRoundResponse, error) {
-	msg := map[string]interface{}{"get_round_info": struct{}{}}
-	resBz, err := c.client.QuerySmartContract(ctx, contract, msg)
+	resBz, err := c.client.QuerySmartContract(ctx, contract, []byte("{\"get_round_info\":{}}"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query smart contract: %w", err)
 	}
@@ -156,7 +182,7 @@ func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (
 }
 
 // GetNextRoundFromEvents parses wasm events to extract next round info.
-func GetNextRoundFromEvents(events []comettypes.Event) (*NextRound, error) {
+func GetNextRoundFromEvents(events []comettypes.Event) (*msgrclient.NextRound, error) {
 	var nextRoundStr, nextRoundTimestampStr string
 
 	for _, evt := range events {
@@ -182,7 +208,7 @@ func GetNextRoundFromEvents(events []comettypes.Event) (*NextRound, error) {
 		return nil, fmt.Errorf("failed to parse %q from events: %w", attrNextRoundTimestamp, err)
 	}
 
-	return &NextRound{
+	return &msgrclient.NextRound{
 		Round:     nextRound,
 		Timestamp: nextRoundTimestamp,
 	}, nil
