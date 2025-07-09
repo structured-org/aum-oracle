@@ -7,9 +7,11 @@ use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
 use crate::utils::{btc_in_spot_balance_asset, get_prices};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    SignedDecimal256, StdError, StdResult,
+    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
+    Response, SignedDecimal256, StdError, StdResult,
 };
+
+const WBTC_DECIMALS: u32 = 8; // WBTC via Eurika has 8 decimals
 
 #[entry_point]
 pub fn instantiate(
@@ -214,5 +216,15 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
 
     let aum_in_btc = (d.data.pm_account_actual_equity / btc_price_in_usd) + spot_total_balance_btc;
 
-    Ok(GetAumResponse { aum_in_btc })
+    // here we convert the AUM in BTC to WBTC (uwBTC specifically)
+    // since WBTC has 8 decimals, we need to adjust the decimal places accordingly
+    // We get atomics value, which has 18 decimal places and divided it by 10^(18 - WBTC_DECIMALS),
+    // which 10^10
+    // In result we get AUM in uwBTC
+    let aum_in_wbtc = aum_in_btc.atomics()
+        / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
+
+    Ok(GetAumResponse {
+        aum_in_btc: aum_in_wbtc,
+    })
 }

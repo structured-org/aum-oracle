@@ -1,6 +1,6 @@
 use crate::state::BinanceData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_std::SignedDecimal256;
+use cosmwasm_std::Int256;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -92,5 +92,6 @@ pub struct GetDataResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles
-    pub aum_in_btc: SignedDecimal256,
+    /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
+    pub aum_in_btc: Int256,
 }

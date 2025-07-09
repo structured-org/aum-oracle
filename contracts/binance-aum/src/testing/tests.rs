@@ -11,7 +11,8 @@ use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env},
-    to_json_binary, Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal256, Timestamp,
+    to_json_binary, Addr, Coin, Deps, DepsMut, Env, Int256, MessageInfo, SignedDecimal256,
+    Timestamp,
 };
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
@@ -1601,8 +1602,8 @@ fn test_query_get_aum_basic() {
     //    - 2.5 BTC = 2.5 BTC
     //    - 20 ETH = 20 / 50 = 0.4 BTC
     //    - 10000 USDT = 10000 / 100000 = 0.1 BTC
-    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
-    let expected_aum = SignedDecimal256::from_str("3.8").unwrap();
+    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC = 380000000 uwBTC
+    let expected_aum: Int256 = Int256::from_str("380000000").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
@@ -1745,7 +1746,7 @@ fn test_query_get_aum_with_negative_equity() {
     // 2. Spot balances in BTC:
     //    - 10 ETH = 10 / 20 = 0.5 BTC
     // 3. Total AUM = -0.5 + 0.5 = 0 BTC
-    let expected_aum = SignedDecimal256::zero();
+    let expected_aum = Int256::zero();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
@@ -2180,8 +2181,8 @@ fn test_query_get_aum_with_large_values() {
     // 2. Spot balances in BTC:
     //    - 1000 BTC = 1000 BTC
     //    - 20000 ETH = 20000 / 40 = 500 BTC
-    // 3. Total AUM = 400 + 1000 + 500 = 1900 BTC
-    let expected_aum = SignedDecimal256::from_str("1900").unwrap();
+    // 3. Total AUM = 400 + 1000 + 500 = 1900 BTC = 190000000000
+    let expected_aum: Int256 = Int256::from_str("190000000000").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
@@ -2319,8 +2320,8 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     //    - 2.5 BTC = 2.5 BTC
     //    - 20 ETH = 20 / 50 = 0.4 BTC
     //    - 10000 USDT = 10000 / 100000 = 0.1 BTC
-    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC
-    let expected_aum = SignedDecimal256::from_str("3.8").unwrap();
+    // 3. Total AUM = 0.8 + 2.5 + 0.4 + 0.1 = 3.8 BTC = 380000000 uwBTC
+    let expected_aum = Int256::from_str("380000000").unwrap();
 
     // Execute query
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
