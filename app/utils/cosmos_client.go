@@ -11,7 +11,7 @@ import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/rpc/client"
 	rpcclienthttp "github.com/cometbft/cometbft/rpc/client/http"
-	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	jsonrpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdkcodec "github.com/cosmos/cosmos-sdk/codec"
@@ -53,7 +53,7 @@ type CosmosClientConfig struct {
 
 // New creates a new instance of CosmosClient.
 func New(cfg *CosmosClientConfig, logger *zap.Logger) (*CosmosClient, error) {
-	tmClient, err := createRpcClient(cfg.Node, cfg.NodeConnRetries, cfg.NodeConnRetryDelay, logger)
+	rpcClient, err := createRpcClient(cfg.Node, cfg.NodeConnRetries, cfg.NodeConnRetryDelay, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func New(cfg *CosmosClientConfig, logger *zap.Logger) (*CosmosClient, error) {
 	c := &CosmosClient{
 		mu:           &sync.Mutex{},
 		txEncoder:    txConfig.TxEncoder(),
-		tmClient:     tmClient,
+		rpcClient:    rpcClient,
 		subClientsMu: &sync.Mutex{},
 		subClients:   make(map[string]client.Client),
 		logger:       logger,
@@ -98,7 +98,7 @@ type CosmosClient struct {
 	mu            *sync.Mutex
 	txEncoder     types.TxEncoder
 	baseTxFactory tx.Factory
-	tmClient      client.Client
+	rpcClient     client.Client
 	subClientsMu  *sync.Mutex
 	// subClients stores dedicated clients for each subscription. Dedicated clients are needed
 	// because tendermint RPC client doesn't allow multiple subscriptions from a single instance.
@@ -114,7 +114,7 @@ func (c *CosmosClient) GetAddress() string {
 
 // SignAndBroadcast signs and broadcasts the msg. It locks the client mutex to keep the tx
 // sequence value right.
-func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultBroadcastTxCommit, error) {
+func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*cometcoretypes.ResultBroadcastTxCommit, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -139,7 +139,7 @@ func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tm
 		return nil, fmt.Errorf("failed to encode signed msg: %w", err)
 	}
 
-	res, err := c.tmClient.BroadcastTxCommit(ctx, encodedMsg)
+	res, err := c.rpcClient.BroadcastTxCommit(ctx, encodedMsg)
 	if err != nil {
 		return nil, fmt.Errorf("send msg broadcast error: %w", err)
 	}
@@ -181,7 +181,7 @@ func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr stri
 		return nil, fmt.Errorf("failed to marshal wasm query request: %w", err)
 	}
 
-	res, err := c.tmClient.ABCIQueryWithOptions(ctx, "/cosmwasm.wasm.v1.Query/SmartContractState", bz, client.DefaultABCIQueryOptions)
+	res, err := c.rpcClient.ABCIQueryWithOptions(ctx, "/cosmwasm.wasm.v1.Query/SmartContractState", bz, client.DefaultABCIQueryOptions)
 	if err != nil {
 		return nil, fmt.Errorf("abci query failed: %w", err)
 	}
@@ -198,7 +198,7 @@ func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr stri
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.
-func (c *CosmosClient) Subscribe(ctx context.Context, subscriberName, query string) (<-chan tmcoretypes.ResultEvent, error) {
+func (c *CosmosClient) Subscribe(ctx context.Context, subscriberName, query string) (<-chan cometcoretypes.ResultEvent, error) {
 	c.subClientsMu.Lock()
 	defer c.subClientsMu.Unlock()
 
@@ -256,7 +256,7 @@ func (c *CosmosClient) queryAccount(ctx context.Context, address string) (*autht
 		return nil, fmt.Errorf("error marshalling query account request for account=%s: %w", address, err)
 	}
 
-	res, err := c.tmClient.ABCIQueryWithOptions(ctx, accountQueryPath, req, client.DefaultABCIQueryOptions)
+	res, err := c.rpcClient.ABCIQueryWithOptions(ctx, accountQueryPath, req, client.DefaultABCIQueryOptions)
 	if err != nil {
 		return nil, fmt.Errorf("error making abci query for account=%s: %w", address, err)
 	}
