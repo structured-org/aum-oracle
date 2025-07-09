@@ -2,10 +2,11 @@ use crate::state::{CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    Response, StdResult, Uint128,
+    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
+    Response, SignedDecimal256, StdResult, Uint128,
 };
 use cw2::set_contract_version;
+use jupiter_aum_common::constants::WBTC_DECIMALS;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
@@ -229,7 +230,11 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     })
 }
 
-fn query_btc_price_in_usd(deps: Deps, env: Env, config: Config) -> Result<Decimal, ContractError> {
+fn query_btc_price_in_usd(
+    deps: Deps,
+    env: Env,
+    config: Config,
+) -> Result<SignedDecimal256, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let response = querier.get_price(Some(CurrencyPair {
         base: BTC_DENOM.to_string(),
@@ -251,60 +256,32 @@ fn query_btc_price_in_usd(deps: Deps, env: Env, config: Config) -> Result<Decima
             error: e.to_string(),
         })?;
 
-    let btc_price_in_usd = Decimal::from_atomics(btc_price_in_usd, response.decimals as u32)
-        .map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
-        })?;
+    let btc_price_in_usd =
+        SignedDecimal256::from_atomics(btc_price_in_usd, response.decimals as u32).map_err(
+            |e| ContractError::DecimalError {
+                error: e.to_string(),
+            },
+        )?;
     Ok(btc_price_in_usd)
 }
 
 pub fn calculate_aum_in_btc(
     data: SolanaData,
-    btc_price_in_usd: Decimal,
-) -> Result<Uint128, ContractError> {
-    let aum_usd =
-        Decimal::from_atomics(data.aum_usd, data.jlp_token_decimals as u32).map_err(|e| {
-            ContractError::DecimalError {
-                error: e.to_string(),
-            }
-        })?;
+    btc_price_in_usd: SignedDecimal256,
+) -> Result<Int256, ContractError> {
+    let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, data.jlp_token_decimals as u32)?;
     let total_jlp_supply =
-        Decimal::from_atomics(data.total_jlp_supply, data.jlp_token_decimals as u32).map_err(
-            |e| ContractError::DecimalError {
-                error: e.to_string(),
-            },
-        )?;
+        SignedDecimal256::from_atomics(data.total_jlp_supply, data.jlp_token_decimals as u32)?;
+    // TODO: use other field decimals (not yet added to go client)
     let strategy_jlp_balance =
-        Decimal::from_atomics(data.strategy_jlp_balance, data.jlp_token_decimals as u32).map_err(
-            |e| ContractError::DecimalError {
-                error: e.to_string(),
-            },
-        )?;
-    let jlp_virtual_price =
-        aum_usd
-            .checked_div(total_jlp_supply)
-            .map_err(|e| ContractError::DecimalError {
-                error: e.to_string(),
-            })?;
-    let jlp_balance_in_usd = jlp_virtual_price
-        .checked_mul(strategy_jlp_balance)
-        .map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
-        })?;
-    let aum_in_btc = jlp_balance_in_usd
-        .checked_div(btc_price_in_usd)
-        .map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
-        })?;
-    // convert to multiplier to make it integer with decimal places
-    let multiplier = Decimal::pow(
-        Decimal::from_atomics(Uint128::new(10), 0).map_err(|e| ContractError::DecimalError {
-            error: e.to_string(),
-        })?,
-        data.jlp_token_decimals as u32,
-    );
-    let result = (aum_in_btc * multiplier).to_uint_floor();
-    Ok(result)
+        SignedDecimal256::from_atomics(data.strategy_jlp_balance, data.jlp_token_decimals as u32)?;
+    let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)?;
+    let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
+    let aum_in_btc = jlp_balance_in_usd.checked_div(btc_price_in_usd)?;
+    let aum_in_wbtc = aum_in_btc.atomics()
+        / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
+
+    Ok(aum_in_wbtc)
 }
 
 // ----------------------------------------

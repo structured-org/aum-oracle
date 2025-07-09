@@ -1,6 +1,6 @@
 use crate::types::SolanaData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_std::Uint128;
+use cosmwasm_std::Int256;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -96,11 +96,12 @@ pub struct GetDataResponse {
     pub last_published_data: Option<OracleData<SolanaData>>,
 }
 
-/// GetAumResponse contains the calculated AUM value in BTC.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+// GetAumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GetAumResponse {
-    /// The calculated AUM value in BTC, represented as a Uint128 with `U128_PRECISION`.
-    pub aum_in_btc: Uint128,
+    /// The latest AUM in Binance reported by oracles
+    /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
+    pub aum_in_btc: Int256,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

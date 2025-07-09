@@ -39,4 +39,31 @@ pub enum ContractError {
 
     #[error("Slinky BTC/USD price is too old: {price_height}")]
     SlinkyBTCPriceTooOld { price_height: u64 },
+
+    #[error("Decimal range exceeded")]
+    DecimalRangeError(cosmwasm_std::SignedDecimal256RangeExceeded),
+
+    #[error("Division error")]
+    CheckedDiv(cosmwasm_std::CheckedFromRatioError),
+
+    #[error("Overflow error")]
+    OverflowError(cosmwasm_std::OverflowError),
+}
+
+impl From<cosmwasm_std::SignedDecimal256RangeExceeded> for ContractError {
+    fn from(err: cosmwasm_std::SignedDecimal256RangeExceeded) -> Self {
+        ContractError::DecimalRangeError(err)
+    }
+}
+
+impl From<cosmwasm_std::CheckedFromRatioError> for ContractError {
+    fn from(err: cosmwasm_std::CheckedFromRatioError) -> Self {
+        ContractError::CheckedDiv(err)
+    }
+}
+
+impl From<cosmwasm_std::OverflowError> for ContractError {
+    fn from(err: cosmwasm_std::OverflowError) -> Self {
+        ContractError::OverflowError(err)
+    }
 }

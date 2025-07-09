@@ -2,7 +2,7 @@ use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{from_json, Decimal, Timestamp, Uint128};
+use cosmwasm_std::{from_json, Int256, SignedDecimal256, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
@@ -93,14 +93,14 @@ fn test_calculate_aum_in_btc() {
         total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
         strategy_jlp_balance: Uint128::new(10_000_000_000u128), // 10,000 JLP balance
     };
-    let btc_price_in_usd1 = Decimal::from_str("25000.0").unwrap(); // $25,000 per BTC
-                                                                   // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
-                                                                   // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
-                                                                   // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
+    let btc_price_in_usd1 = SignedDecimal256::from_str("25000.0").unwrap(); // $25,000 per BTC
+                                                                            // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
+                                                                            // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
+                                                                            // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
     let res1 = calculate_aum_in_btc(data1, btc_price_in_usd1);
     assert_eq!(
         res1.unwrap(),
-        Uint128::new(200_000_000),
+        Int256::from(200_000_000_00i128),
         "Test Case 1 Failed"
     );
 
@@ -112,14 +112,14 @@ fn test_calculate_aum_in_btc() {
         total_jlp_supply: Uint128::new(50_000_000_000u128), // 50,000 JLP total
         strategy_jlp_balance: Uint128::new(20_000_000_000u128), // 20,000 JLP balance
     };
-    let btc_price_in_usd2 = Decimal::from_str("50000.0").unwrap(); // $50,000 per BTC
-                                                                   // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
-                                                                   // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
-                                                                   // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
+    let btc_price_in_usd2 = SignedDecimal256::from_str("50000.0").unwrap(); // $50,000 per BTC
+                                                                            // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
+                                                                            // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
+                                                                            // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
     let res2 = calculate_aum_in_btc(data2, btc_price_in_usd2);
     assert_eq!(
         res2.unwrap(),
-        Uint128::new(8_000_000_000),
+        Int256::from(8_000_000_000_00i128),
         "Test Case 2 Failed"
     );
 
@@ -131,10 +131,10 @@ fn test_calculate_aum_in_btc() {
         total_jlp_supply: Uint128::zero(), // Zero supply
         strategy_jlp_balance: Uint128::new(10),
     };
-    let btc_price_in_usd3 = Decimal::from_str("1.0").unwrap();
+    let btc_price_in_usd3 = SignedDecimal256::from_str("1.0").unwrap();
     let err3 = calculate_aum_in_btc(data3, btc_price_in_usd3).unwrap_err();
     assert!(
-        matches!(&err3, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
+        matches!(&err3, ContractError::CheckedDiv(_)),
         "Test Case 3 Failed: {:?}",
         err3
     );
@@ -147,10 +147,10 @@ fn test_calculate_aum_in_btc() {
         total_jlp_supply: Uint128::new(10),
         strategy_jlp_balance: Uint128::new(5),
     };
-    let btc_price_in_usd4 = Decimal::from_str("0.0").unwrap(); // Zero BTC price
+    let btc_price_in_usd4 = SignedDecimal256::from_str("0.0").unwrap(); // Zero BTC price
     let err4 = calculate_aum_in_btc(data4, btc_price_in_usd4).unwrap_err();
     assert!(
-        matches!(&err4, ContractError::DecimalError { error } if error.contains("Denominator must not be zero")),
+        matches!(&err4, ContractError::CheckedDiv(_)),
         "Test Case 4 Failed: {:?}",
         err4
     );
@@ -242,7 +242,7 @@ fn test_query_get_aum_behavior() {
     // jlp_balance_in_usd = 500 * 10_000 = 5_000_000
     // aum_in_btc = 5_000_000 / 25_000 = 200
     // scaled by 1_000_000 (due to jlp_token_decimals): 200_000_000
-    assert_eq!(parsed.aum_in_btc, Uint128::new(200_000_000));
+    assert_eq!(parsed.aum_in_btc, Int256::from(200_000_000_00i128));
 }
 
 #[test]
