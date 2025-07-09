@@ -13,7 +13,7 @@ pub enum ContractError {
     ConsensusError(#[from] ConsensusError),
 
     #[error("Failed to convert value to SignedDecimal256: {msg:?}")]
-    SignedDecimal256RangeExceeded{msg: String},
+    SignedDecimal256RangeExceeded { msg: String },
 
     #[error("Invalid Binance data: {msg:?}")]
     InvalidBinanceData { msg: String },
@@ -62,7 +62,7 @@ pub enum ContractError {
     Overflow(cosmwasm_std::OverflowError),
 
     #[error("Division error")]
-    CheckedDiv(cosmwasm_std::CheckedFromRatioError)
+    CheckedDiv(cosmwasm_std::CheckedFromRatioError),
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {
@@ -73,7 +73,9 @@ impl From<cosmwasm_std::OverflowError> for ContractError {
 
 impl From<SignedDecimal256RangeExceeded> for ContractError {
     fn from(err: SignedDecimal256RangeExceeded) -> Self {
-        ContractError::SignedDecimal256RangeExceeded{msg: err.to_string()}
+        ContractError::SignedDecimal256RangeExceeded {
+            msg: err.to_string(),
+        }
     }
 }
 

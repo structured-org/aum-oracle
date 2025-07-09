@@ -1,5 +1,3 @@
-use cosmwasm_schema::schemars;
-use cosmwasm_std::Int256;
 use crate::contract::*;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
@@ -8,11 +6,17 @@ use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
 use consensus::error::ConsensusError;
-use cosmwasm_std::{from_json, testing::{mock_dependencies, mock_env}, to_json_binary, Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal256, Timestamp};
-use std::str::FromStr;
+use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
+use cosmwasm_std::Int256;
+use cosmwasm_std::{
+    from_json,
+    testing::{mock_dependencies, mock_env},
+    to_json_binary, Addr, Coin, Deps, DepsMut, Env, MessageInfo, SignedDecimal256, Timestamp,
+};
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // Helper function to create a MessageInfo object for testing
 fn message_info(sender: &str, funds: &[Coin]) -> MessageInfo {
@@ -460,7 +464,10 @@ fn test_try_consensus() {
 
         let result = consensus.unwrap();
         assert_eq!(result.unimmr, SignedDecimal256::from_ratio(5025, 10000)); // median of 0.5 and 0.505
-        assert_eq!(result.um_balance_usdt, SignedDecimal256::from_ratio(10025, 10)); // median of 1000 and 1005
+        assert_eq!(
+            result.um_balance_usdt,
+            SignedDecimal256::from_ratio(10025, 10)
+        ); // median of 1000 and 1005
         assert_eq!(
             result.pm_account_actual_equity,
             SignedDecimal256::from_ratio(2005, 1)
@@ -532,12 +539,18 @@ fn test_try_consensus() {
 
         let result = consensus.unwrap();
         assert_eq!(result.unimmr, SignedDecimal256::from_ratio(503, 1000));
-        assert_eq!(result.um_balance_usdt, SignedDecimal256::from_ratio(1003, 1));
+        assert_eq!(
+            result.um_balance_usdt,
+            SignedDecimal256::from_ratio(1003, 1)
+        );
         assert_eq!(
             result.pm_account_actual_equity,
             SignedDecimal256::from_ratio(2005, 1)
         );
-        assert_eq!(result.withdrawable_usdt, SignedDecimal256::from_ratio(503, 1));
+        assert_eq!(
+            result.withdrawable_usdt,
+            SignedDecimal256::from_ratio(503, 1)
+        );
     }
 
     // Test 6: Consensus with some outliers
@@ -1478,43 +1491,47 @@ fn test_query_get_aum_basic() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "BTC".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("100000.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ), // BTC/USD price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("2000.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("50").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/USDT price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USDT".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("100000").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -1656,22 +1673,24 @@ fn test_query_get_aum_with_negative_equity() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("40000.0").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("40000.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("40000.0").unwrap(),
                 token_1_price: PrecDec::from_str("2000.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("20").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -2075,33 +2094,36 @@ fn test_query_get_aum_with_large_values() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "BTC".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("100000.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/USD price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            to_json_binary( &CombinedPriceResponse {
+            to_json_binary(&CombinedPriceResponse {
                 token_0_price: PrecDec::from_str("100000").unwrap(),
                 token_1_price: PrecDec::from_str("2500.0").unwrap(),
                 price_0_to_1: SignedDecimal256::from_str("40").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 
@@ -2186,44 +2208,48 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "BTC".to_string(),
-            to_json_binary( &CombinedPriceResponseWithPrecDec {
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("100000.0").unwrap(),
                 price_0_to_1: PrecDec::from_str("1.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ), // BTC/USD price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USD".to_string(),
-            to_json_binary( &CombinedPriceResponseWithPrecDec {
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: PrecDec::from_str("100000.0").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/ETH price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "ETH".to_string(),
-            to_json_binary( &CombinedPriceResponseWithPrecDec {
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
                 token_0_price: PrecDec::from_str("100000.0").unwrap(),
                 token_1_price: PrecDec::from_str("2000.0").unwrap(),
                 // this must be parsed successfully and the precision must be dropped just to 50.0
                 price_0_to_1: PrecDec::from_str("50.00000000000000000000001").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
         // BTC/USDT price
         (
             price_oracle_addr.to_string(),
             "BTC".to_string(),
             "USDT".to_string(),
-            to_json_binary( &CombinedPriceResponseWithPrecDec {
+            to_json_binary(&CombinedPriceResponseWithPrecDec {
                 token_0_price: PrecDec::from_str("100000").unwrap(),
                 token_1_price: PrecDec::from_str("1.0").unwrap(),
                 price_0_to_1: PrecDec::from_str("100000").unwrap(),
-            }).unwrap(),
+            })
+            .unwrap(),
         ),
     ];
 

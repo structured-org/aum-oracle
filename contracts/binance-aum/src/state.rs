@@ -123,7 +123,8 @@ impl ConsensusData for BinanceData {
         // Vec<Position> consensus (safe because of checks above)
         let mut consensus_positions = Vec::with_capacity(positions_len);
         for i in 0..positions_len {
-            let amounts: Vec<SignedDecimal256> = data.iter().map(|d| d.positions[i].amount).collect();
+            let amounts: Vec<SignedDecimal256> =
+                data.iter().map(|d| d.positions[i].amount).collect();
             let pnls: Vec<SignedDecimal256> = data.iter().map(|d| d.positions[i].pnl).collect();
 
             consensus_positions.push(Position {

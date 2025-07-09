@@ -1,5 +1,8 @@
 use cosmwasm_std::testing::{MockApi, MockQuerier, MockStorage};
-use cosmwasm_std::{from_json, Binary, ContractResult, OwnedDeps, Querier, QuerierResult, QueryRequest, SystemError, SystemResult, WasmQuery};
+use cosmwasm_std::{
+    from_json, Binary, ContractResult, OwnedDeps, Querier, QuerierResult, QueryRequest,
+    SystemError, SystemResult, WasmQuery,
+};
 use std::marker::PhantomData;
 
 // Custom MockQuerier that can respond to price oracle queries
@@ -46,7 +49,7 @@ impl Querier for CustomMockQuerier {
                                     && token_b == response_token_b
                                 {
                                     return SystemResult::Ok(ContractResult::Ok(
-                                        price_response.clone()
+                                        price_response.clone(),
                                     ));
                                 }
                             }

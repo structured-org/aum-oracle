@@ -1,6 +1,6 @@
 use crate::state::BinanceData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_std::{Int256};
+use cosmwasm_std::Int256;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

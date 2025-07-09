@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use crate::error::{ContractError, ContractResult};
 use crate::state::SpotBalance;
 use cosmwasm_schema::schemars;
@@ -6,12 +5,16 @@ use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{Deps, Int256, SignedDecimal256};
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::str::FromStr;
 
 /// Converts PrecDec to Decimal256
 fn prec_dec_to_decimal256(p: PrecDec) -> ContractResult<SignedDecimal256> {
     let atomic = Int256::from_str(&p.atomics().to_string())?;
 
-    Ok(SignedDecimal256::from_atomics(atomic, PrecDec::DECIMAL_PLACES)?)
+    Ok(SignedDecimal256::from_atomics(
+        atomic,
+        PrecDec::DECIMAL_PLACES,
+    )?)
 }
 
 /// Deserialize PrecDec string value as SignedDecimal256
