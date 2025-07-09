@@ -7,8 +7,7 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/structured-org/aum-oracle/client/tm"
+	"github.com/structured-org/aum-oracle/utils"
 	"go.uber.org/zap"
 	"strconv"
 )
@@ -21,20 +20,20 @@ const (
 // Client is the Neutron client.
 type Client struct {
 	logger             *zap.Logger
-	client             *tm.Client
+	client             *utils.CosmosClient
 	jupiterAumContract string
 	binanceAumContract string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(conf tm.ClientConfig, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
-	tmClient, err := tm.New(&conf, logger)
+func NewClient(conf utils.CosmosClientConfig, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
+	client, err := utils.New(&conf, logger)
 	if err != nil {
-		return nil, fmt.Errorf("could not instantiate tm client: %w", err)
+		return nil, fmt.Errorf("could not instantiate cosmos client: %w", err)
 	}
 	return &Client{
 		logger:             logger,
-		client:             tmClient,
+		client:             client,
 		jupiterAumContract: jupiterAumContract,
 		binanceAumContract: binanceAumContract,
 	}, nil
@@ -70,7 +69,11 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 			"new_data": data,
 		},
 	}
-	msgBz, _ := json.Marshal(msgPayload)
+	msgBz, err := json.Marshal(msgPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal publish data message: %w", err)
+	}
+
 	executeMsg := &types.MsgExecuteContract{
 		Sender:   c.client.GetAddress(),
 		Contract: c.binanceAumContract,
@@ -79,7 +82,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 	}
 	res, err := c.client.SignAndBroadcast(ctx, executeMsg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign and broadcast tx during submit data: %w", err)
+		return nil, fmt.Errorf("failed to sign and broadcast binance publish tx during publish_data: %w", err)
 	}
 	c.logger.Info("submitted binance aum data",
 		zap.Uint32("code", res.TxResult.Code),
@@ -87,11 +90,11 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 		zap.Int64("height", res.Height))
 
 	events := res.TxResult.GetEvents()
-	spew.Dump("binance events: ", events)
 	nextRound, err := GetNextRoundFromEvents(events)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch next data from events")
+		return nil, fmt.Errorf("failed to fetch next data from events: %w", err)
 	}
+	c.logger.Info("got next round for binance oracle from publish data response events")
 	return nextRound, nil
 }
 
@@ -125,7 +128,11 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 			"new_data": data,
 		},
 	}
-	msgBz, _ := json.Marshal(msgPayload)
+	msgBz, err := json.Marshal(msgPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal jupiter publish data message: %w", err)
+	}
+
 	executeMsg := &types.MsgExecuteContract{
 		Sender:   c.client.GetAddress(),
 		Contract: c.jupiterAumContract,
@@ -135,7 +142,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 
 	res, err := c.client.SignAndBroadcast(ctx, executeMsg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign and broadcast tx during submit data: %w", err)
+		return nil, fmt.Errorf("failed to sign and broadcast jupiter publish tx during publish_data: %w", err)
 	}
 	c.logger.Info("submitted jupiter aum data",
 		zap.Uint32("code", res.TxResult.Code),
@@ -143,11 +150,12 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 		zap.Int64("height", res.Height))
 
 	events := res.TxResult.GetEvents()
-	spew.Dump("jupiter events: ", events)
 	nextRound, err := GetNextRoundFromEvents(events)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch next data from events")
+		return nil, fmt.Errorf("failed to fetch next round for jupiter from events: %w", err)
 	}
+	c.logger.Info("got next round for jupiter oracle from publish data response events")
+
 	return nextRound, nil
 }
 
@@ -171,11 +179,11 @@ func GetNextRoundFromEvents(events []comettypes.Event) (*NextRound, error) {
 
 	nextRound, err := strconv.ParseUint(nextRoundStr, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse next_round from events")
+		return nil, fmt.Errorf("failed to parse next_round from events: %w", err)
 	}
 	nextRoundTimestamp, err := strconv.ParseUint(nextRoundTimestampStr, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse next_round_timestamp from events")
+		return nil, fmt.Errorf("failed to parse next_round_timestamp from events: %w", err)
 	}
 
 	return &NextRound{

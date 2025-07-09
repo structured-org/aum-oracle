@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/structured-org/aum-oracle/client/tm"
+	"github.com/structured-org/aum-oracle/utils"
 	"log"
 	"os"
 
@@ -60,5 +60,5 @@ type config struct {
 }
 
 type ClientsConfig struct {
-	Neutron tm.ClientConfig `yaml:"neutron"`
+	Neutron utils.CosmosClientConfig `yaml:"neutron"`
 }

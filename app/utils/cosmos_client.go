@@ -1,9 +1,8 @@
-package tm
+package utils
 
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
@@ -28,10 +27,6 @@ import (
 )
 
 const (
-	// NewBlocksSubscriptionQuery is the query to be used in the Subscribe to receive events
-	// on each new block.
-	NewBlocksSubscriptionQuery = "tm.event='NewBlockHeader'"
-
 	// keyName is the name of the client's key pair in the keybase.
 	keyName = "client"
 	// bip39Passphrase is an additional phrase used in key pair creation along with mnemonic.
@@ -45,8 +40,8 @@ var (
 	hdPath = hd.CreateHDPath(types.GetConfig().GetCoinType(), 0, 0).String()
 )
 
-// ClientConfig represents configuration for Client.
-type ClientConfig struct {
+// CosmosClientConfig represents configuration for CosmosClient.
+type CosmosClientConfig struct {
 	Mnemonic           string        `yaml:"mnemonic"`
 	GasPrices          string        `yaml:"gas_prices"`
 	Gas                uint64        `yaml:"gas"`
@@ -56,16 +51,16 @@ type ClientConfig struct {
 	NodeConnRetryDelay time.Duration `yaml:"node_conn_retry_delay"`
 }
 
-// New creates a new instance of Client.
-func New(cfg *ClientConfig, logger *zap.Logger) (*Client, error) {
-	tmClient, err := createTmHttp(cfg.Node, cfg.NodeConnRetries, cfg.NodeConnRetryDelay, logger)
+// New creates a new instance of CosmosClient.
+func New(cfg *CosmosClientConfig, logger *zap.Logger) (*CosmosClient, error) {
+	tmClient, err := createRpcClient(cfg.Node, cfg.NodeConnRetries, cfg.NodeConnRetryDelay, logger)
 	if err != nil {
 		return nil, err
 	}
 	cdc := sdkcodec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	txConfig := authtxtypes.NewTxConfig(cdc, authtxtypes.DefaultSignModes)
 
-	c := &Client{
+	c := &CosmosClient{
 		mu:           &sync.Mutex{},
 		txEncoder:    txConfig.TxEncoder(),
 		tmClient:     tmClient,
@@ -95,8 +90,8 @@ func New(cfg *ClientConfig, logger *zap.Logger) (*Client, error) {
 	return c, nil
 }
 
-// Client is an interface to tendermint API.
-type Client struct {
+// CosmosClient is an interface to tendermint API.
+type CosmosClient struct {
 	// address is the address of the client used in messages broadcasting.
 	address types.AccAddress
 	// mu controls sequence number for client txs
@@ -109,17 +104,17 @@ type Client struct {
 	// because tendermint RPC client doesn't allow multiple subscriptions from a single instance.
 	subClients map[string]client.Client
 	logger     *zap.Logger
-	cfg        *ClientConfig
+	cfg        *CosmosClientConfig
 }
 
 // GetAddress returns the client's network address.
-func (c *Client) GetAddress() string {
+func (c *CosmosClient) GetAddress() string {
 	return c.address.String()
 }
 
 // SignAndBroadcast signs and broadcasts the msg. It locks the client mutex to keep the tx
 // sequence value right.
-func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultBroadcastTxCommit, error) {
+func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcoretypes.ResultBroadcastTxCommit, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -145,23 +140,22 @@ func (c *Client) SignAndBroadcast(ctx context.Context, msg types.Msg) (*tmcorety
 	}
 
 	res, err := c.tmClient.BroadcastTxCommit(ctx, encodedMsg)
-	spew.Dump("============= \nresult of tx: ", res)
 	if err != nil {
 		return nil, fmt.Errorf("send msg broadcast error: %w", err)
 	}
 	if res.CheckTx.Code != abcitypes.CodeTypeOK {
-		return nil, fmt.Errorf("check tx failed: code %d, %s", res.CheckTx.Code, res.CheckTx.Log)
+		return nil, fmt.Errorf("check tx failed: code %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
 	}
 
 	if res.TxResult.Code != abcitypes.CodeTypeOK {
-		return nil, fmt.Errorf("submit tx failed: code %d, %s", res.TxResult.Code, res.TxResult.Log)
+		return nil, fmt.Errorf("submit tx failed: code %d\nLog: %s", res.TxResult.Code, res.TxResult.Log)
 	}
 
 	return res, nil
 }
 
 // QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
-func (c *Client) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
+func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
 	var queryData []byte
 	switch q := query.(type) {
 	case string:
@@ -204,15 +198,15 @@ func (c *Client) QuerySmartContract(ctx context.Context, contractAddr string, qu
 }
 
 // Subscribe subscribes to events using the given query and returns a stream of events.
-func (c *Client) Subscribe(ctx context.Context, subscriberName, query string) (<-chan tmcoretypes.ResultEvent, error) {
+func (c *CosmosClient) Subscribe(ctx context.Context, subscriberName, query string) (<-chan tmcoretypes.ResultEvent, error) {
 	c.subClientsMu.Lock()
 	defer c.subClientsMu.Unlock()
 
-	subClient, err := createTmHttp(c.cfg.Node, c.cfg.NodeConnRetries, c.cfg.NodeConnRetryDelay, c.logger)
+	subClient, err := createRpcClient(c.cfg.Node, c.cfg.NodeConnRetries, c.cfg.NodeConnRetryDelay, c.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a tm http client: %w", err)
+		return nil, fmt.Errorf("failed to create a cosmos http client: %w", err)
 	}
-	c.logger.Debug("subscribing to tm events",
+	c.logger.Debug("subscribing to cosmos events",
 		zap.String("query", query),
 		zap.String("subscriber", subscriberName),
 	)
@@ -225,13 +219,13 @@ func (c *Client) Subscribe(ctx context.Context, subscriberName, query string) (<
 }
 
 // Unsubscribe unsubscribes from events stream on the given query.
-func (c *Client) Unsubscribe(ctx context.Context, subscriberName, query string) {
+func (c *CosmosClient) Unsubscribe(ctx context.Context, subscriberName, query string) {
 	c.subClientsMu.Lock()
 	defer c.subClientsMu.Unlock()
 
 	subClient, ex := c.subClients[subscriberName]
 	if !ex {
-		c.logger.Error("failed to Unsubscribe from tm events",
+		c.logger.Error("failed to Unsubscribe from cosmos events",
 			zap.Error(fmt.Errorf("no subscription client defined for the subscriber")),
 			zap.String("query", query),
 			zap.String("subscriber", subscriberName),
@@ -239,13 +233,13 @@ func (c *Client) Unsubscribe(ctx context.Context, subscriberName, query string) 
 		return
 	}
 	if err := subClient.Unsubscribe(ctx, subscriberName, query); err != nil {
-		c.logger.Error("failed to Unsubscribe from tm events",
+		c.logger.Error("failed to Unsubscribe from cosmos events",
 			zap.Error(err),
 			zap.String("query", query),
 			zap.String("subscriber", subscriberName),
 		)
 	} else {
-		c.logger.Debug("unsubscribed from tm events",
+		c.logger.Debug("unsubscribed from cosmos events",
 			zap.String("query", query),
 			zap.String("subscriber", subscriberName),
 		)
@@ -254,8 +248,8 @@ func (c *Client) Unsubscribe(ctx context.Context, subscriberName, query string) 
 }
 
 // queryAccount retrieves the given account info using tendermint RPC.
-func (c *Client) queryAccount(ctx context.Context, address string) (*authtypes.BaseAccount, error) {
-	c.logger.Debug("querying tm client account info", zap.String("address", address))
+func (c *CosmosClient) queryAccount(ctx context.Context, address string) (*authtypes.BaseAccount, error) {
+	c.logger.Debug("querying cosmos client account info", zap.String("address", address))
 	request := authtypes.QueryAccountRequest{Address: address}
 	req, err := request.Marshal()
 	if err != nil {
@@ -278,7 +272,7 @@ func (c *Client) queryAccount(ctx context.Context, address string) (*authtypes.B
 	if err := account.Unmarshal(response.Account.Value); err != nil {
 		return nil, fmt.Errorf("error unmarshalling BaseAccount for account=%s: %w", address, err)
 	}
-	c.logger.Debug("got tm client account info",
+	c.logger.Debug("got cosmos client account info",
 		zap.String("address", address),
 		zap.Uint64("account_number", account.AccountNumber),
 		zap.Uint64("sequence_number", account.Sequence),
@@ -286,15 +280,15 @@ func (c *Client) queryAccount(ctx context.Context, address string) (*authtypes.B
 	return &account, nil
 }
 
-// createTmHttp connects to a node by the given addr and returns the client.
-func createTmHttp(addr string, retries uint, delay time.Duration, logger *zap.Logger) (client.Client, error) {
+// createRpcClient connects to a node by the given addr and returns the client.
+func createRpcClient(addr string, retries uint, delay time.Duration, logger *zap.Logger) (client.Client, error) {
 	httpClient, err := jsonrpcclient.DefaultHTTPClient(addr)
 	if err != nil {
 		return nil, fmt.Errorf("could not create http client with address=%s: %w", addr, err)
 	}
 	httpClient.Timeout = 10 * time.Second
 
-	tmClient, err := rpcclienthttp.NewWithClient(addr, "/websocket", httpClient)
+	rpcClient, err := rpcclienthttp.NewWithClient(addr, "/websocket", httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize rpc client from http client with address=%s: %w", addr, err)
 	}
@@ -303,7 +297,7 @@ func createTmHttp(addr string, retries uint, delay time.Duration, logger *zap.Lo
 	logger.Info("establishing connection to neutron node...", zap.String("node_address", addr))
 	if err := retry.Do(func() error {
 		attempt++
-		if err = tmClient.Start(); err != nil {
+		if err = rpcClient.Start(); err != nil {
 			logger.Debug("connection to node error",
 				zap.Error(err),
 				zap.String("attempt", fmt.Sprintf("%d/%d", attempt, attempts)),
@@ -315,7 +309,7 @@ func createTmHttp(addr string, retries uint, delay time.Duration, logger *zap.Lo
 		return nil, fmt.Errorf("failed to establish connection to node %s in %d attempts with delay of %.0f seconds: %w", addr, attempts, delay.Seconds(), err)
 	}
 	logger.Debug("connection to node successful", zap.String("node_address", addr))
-	return tmClient, nil
+	return rpcClient, nil
 }
 
 func getCryptoCodec() *sdkcodec.ProtoCodec {
