@@ -12,7 +12,7 @@ import (
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
 	solanaclient "github.com/structured-org/aum-oracle/client/solana"
 	"github.com/structured-org/aum-oracle/oracle"
-	mock_binance "github.com/structured-org/aum-oracle/testutil/mocks/binance"
+	mock_binance "github.com/structured-org/aum-oracle/testutil/mocks/binance-oracle"
 	"go.uber.org/zap"
 )
 

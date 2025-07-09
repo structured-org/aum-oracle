@@ -5,3 +5,5 @@ app/aum-oracle
 
 artifacts
 target
+
+.DS_Store
