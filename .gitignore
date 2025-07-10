@@ -10,3 +10,5 @@ target/
 .DS_Store
 
 artifacts/
+app/aum-oracle
+app/config.yaml

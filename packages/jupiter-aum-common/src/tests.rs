@@ -16,9 +16,10 @@ fn make_data(aum: u128, jlp: u128, strat: u128, denom: &str, val: u64) -> Solana
     SolanaData {
         custody_assets: vec![sample_asset(denom, val)],
         aum_usd: Uint128::new(aum),
-        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(jlp),
         strategy_jlp_balance: Uint128::new(strat),
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     }
 }
 

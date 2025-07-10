@@ -34,10 +34,10 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let config = Config {
-        admin: deps.api.addr_validate(&msg.admin)?,
-        valid_period: msg.valid_period,
+        owner: deps.api.addr_validate(&msg.owner)?,
+        consensus_data_validity_period: msg.consensus_data_validity_period,
         required_custody_assets: msg.required_custody_assets,
-        price_max_blocks_old: msg.price_max_blocks_old,
+        price_data_validity_period: msg.price_data_validity_period,
     };
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
@@ -56,7 +56,7 @@ pub fn instantiate(
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
-        .add_attribute("admin", config.admin.to_string()))
+        .add_attribute("owner", config.owner.to_string()))
 }
 
 #[entry_point]
@@ -73,7 +73,7 @@ pub fn execute(
 }
 
 /// Updates configuration parameters for the contract.
-/// Only admin can call this method.
+/// Only owner can call this method.
 #[allow(clippy::too_many_arguments)]
 fn update_config(
     deps: DepsMut,
@@ -82,25 +82,25 @@ fn update_config(
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
-    // ensure only the contract admin can update the configuration
-    if info.sender != config.admin {
+    // ensure only the contract owner can update the configuration
+    if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
-    if let Some(new_admin) = new_config.admin {
-        config.admin = deps.api.addr_validate(&new_admin)?;
+    if let Some(new_owner) = new_config.owner {
+        config.owner = deps.api.addr_validate(&new_owner)?;
     }
 
-    if let Some(new_valid_period) = new_config.valid_period {
-        config.valid_period = new_valid_period;
+    if let Some(new_consensus_data_validity_period) = new_config.consensus_data_validity_period {
+        config.consensus_data_validity_period = new_consensus_data_validity_period;
     }
 
     if let Some(new_required_custody_assets) = new_config.required_custody_assets {
         config.required_custody_assets = new_required_custody_assets;
     }
 
-    if let Some(new_price_max_blocks_old) = new_config.price_max_blocks_old {
-        config.price_max_blocks_old = new_price_max_blocks_old;
+    if let Some(new_price_data_validity_period) = new_config.price_data_validity_period {
+        config.price_data_validity_period = new_price_data_validity_period;
     }
 
     config.validate()?;
@@ -191,9 +191,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
 /// Returns the current contract configuration.
 fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     Ok(ConfigResponse {
-        admin: config.admin.to_string(),
-        valid_period: config.valid_period,
+        owner: config.owner.to_string(),
+        consensus_data_validity_period: config.consensus_data_validity_period,
+        required_custody_assets: config.required_custody_assets,
+        price_data_validity_period: config.price_data_validity_period,
+        oracles: consensus_config.oracles,
+        threshold: consensus_config.threshold,
+        data_delta_ppm: consensus_config.data_delta_ppm,
+        round_length: consensus_config.round_length,
     })
 }
 
@@ -210,7 +217,8 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> 
     let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
         .ok_or(ContractError::NoDataPublished {})?;
-    if env.block.time.seconds() > published_state.timestamp + config.valid_period {
+    if env.block.time.seconds() > published_state.timestamp + config.consensus_data_validity_period
+    {
         return Err(ContractError::DataNotValid {});
     }
 
@@ -244,7 +252,7 @@ fn query_btc_price_in_usd(
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
 
-    if quote.block_height + config.price_max_blocks_old < env.block.height {
+    if quote.block_height + config.price_data_validity_period < env.block.height {
         return Err(ContractError::SlinkyBTCPriceTooOld {
             price_height: quote.block_height,
         });
@@ -269,12 +277,15 @@ pub fn calculate_aum_in_btc(
     data: SolanaData,
     btc_price_in_usd: SignedDecimal256,
 ) -> Result<Int256, ContractError> {
-    let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, data.jlp_token_decimals as u32)?;
-    let total_jlp_supply =
-        SignedDecimal256::from_atomics(data.total_jlp_supply, data.jlp_token_decimals as u32)?;
-    // TODO: use other field decimals (not yet added to go client)
-    let strategy_jlp_balance =
-        SignedDecimal256::from_atomics(data.strategy_jlp_balance, data.jlp_token_decimals as u32)?;
+    let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, 0)?;
+    let total_jlp_supply = SignedDecimal256::from_atomics(
+        data.total_jlp_supply,
+        data.total_jlp_supply_decimals as u32,
+    )?;
+    let strategy_jlp_balance = SignedDecimal256::from_atomics(
+        data.strategy_jlp_balance,
+        data.strategy_jlp_balance_decimals as u32,
+    )?;
     let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)?;
     let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
     let aum_in_btc = jlp_balance_in_usd.checked_div(btc_price_in_usd)?;

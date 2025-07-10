@@ -13,7 +13,7 @@ use std::str::FromStr;
 // Helper to create a default instantiate message
 fn default_init_msg(api: &MockApi) -> InstantiateMsg {
     InstantiateMsg {
-        admin: api.addr_make("admin").to_string(),
+        owner: api.addr_make("owner").to_string(),
         oracles: vec![
             api.addr_make("oracle1").to_string(),
             api.addr_make("oracle2").to_string(),
@@ -22,9 +22,9 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         threshold: 2,
         data_delta_ppm: 1000,
         round_length: 100,
-        valid_period: 1_000,
+        consensus_data_validity_period: 1_000,
         required_custody_assets: vec!["USDC".to_string()],
-        price_max_blocks_old: 100,
+        price_data_validity_period: 100,
     }
 }
 
@@ -33,18 +33,18 @@ fn test_update_config() {
     let mut deps = mock_dependencies();
 
     let env = mock_env();
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg).unwrap();
 
     let config = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(config.admin, admin_info.sender);
+    assert_eq!(config.owner, owner_info.sender);
 
     let update = msg::UpdateConfig {
-        admin: Some(deps.api.addr_make("admin2").to_string()),
-        valid_period: Some(50_000),
+        owner: Some(deps.api.addr_make("owner2").to_string()),
+        consensus_data_validity_period: Some(50_000),
         required_custody_assets: Some(vec!["BTC".to_string()]),
-        price_max_blocks_old: Some(999),
+        price_data_validity_period: Some(999),
         oracles: Some(vec![deps.api.addr_make("oracle1").to_string()]),
         threshold: Some(1),
         data_delta_ppm: Some(1234),
@@ -66,15 +66,15 @@ fn test_update_config() {
     assert_eq!(unauthorized.unwrap_err(), ContractError::Unauthorized {});
 
     // Authorized
-    let authorized = execute(deps.as_mut(), env.clone(), admin_info.clone(), update_msg);
+    let authorized = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
     assert!(authorized.is_ok());
 
     // Assert config updated
     let config = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(config.admin, deps.api.addr_make("admin2"));
-    assert_eq!(config.valid_period, 50_000);
+    assert_eq!(config.owner, deps.api.addr_make("owner2"));
+    assert_eq!(config.consensus_data_validity_period, 50_000);
     assert_eq!(config.required_custody_assets, vec!["BTC"]);
-    assert_eq!(config.price_max_blocks_old, 999);
+    assert_eq!(config.price_data_validity_period, 999);
 
     let consensus = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
     assert_eq!(consensus.threshold, 1);
@@ -88,10 +88,11 @@ fn test_calculate_aum_in_btc() {
     // Test case 1: Standard calculation
     let data1 = SolanaData {
         custody_assets: vec![],
-        aum_usd: Uint128::new(500_000_000_000u128), // $500,000 AUM USD
-        jlp_token_decimals: 6,
+        aum_usd: Uint128::new(500_000), // $500,000 AUM USD
         total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
         strategy_jlp_balance: Uint128::new(10_000_000_000u128), // 10,000 JLP balance
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd1 = SignedDecimal256::from_str("25000.0").unwrap(); // $25,000 per BTC
                                                                             // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
@@ -100,17 +101,18 @@ fn test_calculate_aum_in_btc() {
     let res1 = calculate_aum_in_btc(data1, btc_price_in_usd1);
     assert_eq!(
         res1.unwrap(),
-        Int256::from(200_000_000_00i128),
+        Int256::from(20_000_000_000_i128),
         "Test Case 1 Failed"
     );
 
     // Test case 2: Different values
     let data2 = SolanaData {
         custody_assets: vec![],
-        aum_usd: Uint128::new(1_000_000_000_000_000u128), // $1 Billion AUM
-        jlp_token_decimals: 6,
+        aum_usd: Uint128::new(1_000_000_000u128), // $1 Billion AUM
         total_jlp_supply: Uint128::new(50_000_000_000u128), // 50,000 JLP total
         strategy_jlp_balance: Uint128::new(20_000_000_000u128), // 20,000 JLP balance
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd2 = SignedDecimal256::from_str("50000.0").unwrap(); // $50,000 per BTC
                                                                             // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
@@ -119,7 +121,7 @@ fn test_calculate_aum_in_btc() {
     let res2 = calculate_aum_in_btc(data2, btc_price_in_usd2);
     assert_eq!(
         res2.unwrap(),
-        Int256::from(8_000_000_000_00i128),
+        Int256::from(800_000_000_000_i128),
         "Test Case 2 Failed"
     );
 
@@ -127,9 +129,10 @@ fn test_calculate_aum_in_btc() {
     let data3 = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
-        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::zero(), // Zero supply
         strategy_jlp_balance: Uint128::new(10),
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd3 = SignedDecimal256::from_str("1.0").unwrap();
     let err3 = calculate_aum_in_btc(data3, btc_price_in_usd3).unwrap_err();
@@ -143,9 +146,10 @@ fn test_calculate_aum_in_btc() {
     let data4 = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
-        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(10),
         strategy_jlp_balance: Uint128::new(5),
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd4 = SignedDecimal256::from_str("0.0").unwrap(); // Zero BTC price
     let err4 = calculate_aum_in_btc(data4, btc_price_in_usd4).unwrap_err();
@@ -163,15 +167,15 @@ fn test_query_get_aum_behavior() {
     let mut env = mock_env();
 
     let api = deps.api;
-    let admin_info = message_info(&api.addr_make("admin"), &[]);
+    let owner_info = message_info(&api.addr_make("owner"), &[]);
     let oracle1 = api.addr_make("oracle1");
     let oracle2 = api.addr_make("oracle2");
 
     let mut msg = default_init_msg(&api);
-    msg.valid_period = 1_000;
-    msg.price_max_blocks_old = 100;
+    msg.consensus_data_validity_period = 1_000;
+    msg.price_data_validity_period = 100;
 
-    instantiate(deps.as_mut(), env.clone(), admin_info, msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
 
     // 1. error: no data published yet
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
@@ -238,11 +242,11 @@ fn test_query_get_aum_behavior() {
     let parsed: msg::GetAumResponse = from_json(bin).unwrap();
 
     // expected: aum_usd = 500_000, strategy_jlp_balance = 10_000, total_jlp_supply = 1_000
-    // virtual price = 500_000 / 1_000 = 500
-    // jlp_balance_in_usd = 500 * 10_000 = 5_000_000
-    // aum_in_btc = 5_000_000 / 25_000 = 200
-    // scaled by 1_000_000 (due to jlp_token_decimals): 200_000_000
-    assert_eq!(parsed.aum_in_btc, Int256::from(200_000_000_00i128));
+    // virtual price = 500_000_000 / 1_000 = 500
+    // jlp_balance_in_usd = 500_000_000 * 10_000 = 5_000_000_000_000
+    // aum_in_btc = 5_000_000_000_000 / 25_000 = 200_000_000
+    // scaled by 8 decimals (wbtc precision): 200_000_000_000_000_00
+    assert_eq!(parsed.aum_in_btc, Int256::from(20_000_000_000_000_000_i128));
 }
 
 #[test]
@@ -250,11 +254,11 @@ fn test_publish_data_invalid_custody() {
     let mut deps = mock_dependencies();
     let env = mock_env();
     let api = deps.api;
-    let admin_info = message_info(&api.addr_make("admin"), &[]);
+    let owner_info = message_info(&api.addr_make("owner"), &[]);
     instantiate(
         deps.as_mut(),
         env.clone(),
-        admin_info,
+        owner_info,
         default_init_msg(&api),
     )
     .unwrap();
@@ -272,9 +276,9 @@ fn test_publish_data_invalid_custody() {
 fn test_query_get_data_and_config() {
     let mut deps = mock_dependencies();
     let env = mock_env();
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let init_msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
 
     let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
     assert!(res.len() > 0);
@@ -287,10 +291,10 @@ fn test_query_get_data_and_config() {
 fn test_query_round_info() {
     let mut deps = mock_dependencies();
     let env = mock_env();
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let init_msg = default_init_msg(&deps.api);
 
-    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
 
     let res = query(deps.as_ref(), env, QueryMsg::GetRoundInfo {}).unwrap();
     assert!(res.len() > 0);
@@ -303,12 +307,12 @@ fn test_query_get_aum_data_stale() {
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    let admin_info = message_info(&deps.api.addr_make("admin"), &[]);
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let oracle1 = deps.api.addr_make("oracle1");
     let oracle2 = deps.api.addr_make("oracle2");
     let init_msg = default_init_msg(&deps.api);
 
-    instantiate(deps.as_mut(), env.clone(), admin_info, init_msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
 
     let data = dummy_solana_data();
     execute(
@@ -345,8 +349,9 @@ fn dummy_solana_data() -> SolanaData {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(500_000),
-        jlp_token_decimals: 6,
         total_jlp_supply: Uint128::new(1_000),
         strategy_jlp_balance: Uint128::new(10_000),
+        total_jlp_supply_decimals: 6,
+        strategy_jlp_balance_decimals: 6,
     }
 }
