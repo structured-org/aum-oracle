@@ -108,9 +108,9 @@ pub struct GetDataResponse {
     pub last_published_data: Option<OracleData<SolanaData>>,
 }
 
-// GetAumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
+// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct GetAumResponse {
+pub struct AumResponse {
     /// The latest AUM in Binance reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,

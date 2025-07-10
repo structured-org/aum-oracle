@@ -9,8 +9,8 @@ use cw2::set_contract_version;
 use jupiter_aum_common::constants::WBTC_DECIMALS;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
-    ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg, RoundInfoResponse, UpdateConfig,
+    AumResponse, ConfigResponse, ExecuteMsg, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    RoundInfoResponse, UpdateConfig,
 };
 use jupiter_aum_common::types::{Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
@@ -20,10 +20,10 @@ use std::str::FromStr;
 const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// BTC/USD oracle query constants
 const BTC_DENOM: &str = "BTC";
 const USD_DENOM: &str = "USD";
 
+/// Instantiates the contract with initial configuration and oracle consensus settings.
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -59,6 +59,7 @@ pub fn instantiate(
         .add_attribute("owner", config.owner.to_string()))
 }
 
+/// Entry point for executing contract messages.
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
@@ -72,9 +73,8 @@ pub fn execute(
     }
 }
 
-/// Updates configuration parameters for the contract.
-/// Only owner can call this method.
-#[allow(clippy::too_many_arguments)]
+/// Updates both general and consensus-related contract configuration.
+/// Only callable by the current contract owner.
 fn update_config(
     deps: DepsMut,
     info: MessageInfo,
@@ -82,7 +82,6 @@ fn update_config(
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
 
-    // ensure only the contract owner can update the configuration
     if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
@@ -108,7 +107,6 @@ fn update_config(
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-    // Update consensus config fields
     if let Some(ref oracles) = new_config.oracles {
         let validated_oracles: Vec<Addr> = oracles
             .iter()
@@ -126,17 +124,13 @@ fn update_config(
         consensus_config.round_length = round_length;
     }
 
-    // Save updated consensus config
     CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-/// Allows an oracle to publish Solana data.
-/// Only registered oracles can call this.
-/// Oracle can only publish once per slot.
-/// If consensus is reached, the `LAST_PUBLISHED_DATA` is updated
-/// and old pending slots are removed.
+/// Allows a registered oracle to publish Solana data for the current round.
+/// If consensus is reached, finalizes the data and returns next round info in events.
 fn execute_publish_data(
     deps: DepsMut,
     env: Env,
@@ -146,7 +140,6 @@ fn execute_publish_data(
     let contract_config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-    // permission check: only registered oracles can publish data
     if !consensus_config.oracles.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
@@ -158,11 +151,13 @@ fn execute_publish_data(
 
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
-    // If we have new published data for the current round, consensus was reached
-    if let PublishResult::ConsensusReached(_) = result {
-        res = res.add_attribute("consensus_reached", "true");
-    } else {
-        res = res.add_attribute("consensus_reached", "false");
+    match result {
+        PublishResult::ConsensusReached(_) => {
+            res = res.add_attribute("consensus_reached", "true");
+        }
+        PublishResult::ConsensusNotReached => {
+            res = res.add_attribute("consensus_reached", "false");
+        }
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
@@ -175,9 +170,7 @@ fn execute_publish_data(
     Ok(res)
 }
 
-// ----------------------------------------
-//  Queries
-// ----------------------------------------
+/// Dispatches query messages to appropriate query handlers.
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
@@ -188,7 +181,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
     }
 }
 
-/// Returns the current contract configuration.
+/// Returns combined general and consensus configuration of the contract.
 fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
@@ -204,30 +197,32 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     })
 }
 
-/// Returns the last successfully published and finalized Solana data.
+/// Returns the last finalized Solana data.
 fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError> {
     Ok(GetDataResponse {
         last_published_data: CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?,
     })
 }
 
-/// Returns Jupiter AUM value represented in BTC.
-fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> {
+/// Calculates and returns the current AUM value in wBTC.
+fn query_get_aum(deps: Deps, env: Env) -> Result<AumResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
         .ok_or(ContractError::NoDataPublished {})?;
+
     if env.block.time.seconds() > published_state.timestamp + config.consensus_data_validity_period
     {
         return Err(ContractError::DataNotValid {});
     }
 
-    let btc_price_in_usd = query_btc_price_in_usd(deps, env, config)?;
+    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
-    Ok(GetAumResponse { aum_in_btc })
+    Ok(AumResponse { aum_in_btc })
 }
 
+/// Returns pending and next round info.
 fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, ContractError> {
     let pending_round = CONSENSUS_STATE.get_pending_round(deps.storage)?;
 
@@ -238,16 +233,18 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     })
 }
 
+/// Fetches the BTC/USD price from the oracle and ensures freshness.
 fn query_btc_price_in_usd(
     deps: Deps,
     env: Env,
-    config: Config,
+    config: &Config,
 ) -> Result<SignedDecimal256, ContractError> {
     let querier = OracleQuerier::new(&deps.querier);
     let response = querier.get_price(Some(CurrencyPair {
         base: BTC_DENOM.to_string(),
         quote: USD_DENOM.to_string(),
     }))?;
+
     let quote = response
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
@@ -270,9 +267,11 @@ fn query_btc_price_in_usd(
                 error: e.to_string(),
             },
         )?;
+
     Ok(btc_price_in_usd)
 }
 
+/// Computes the AUM in wBTC units using Solana data and BTC/USD price.
 pub fn calculate_aum_in_btc(
     data: SolanaData,
     btc_price_in_usd: SignedDecimal256,
@@ -295,12 +294,9 @@ pub fn calculate_aum_in_btc(
     Ok(aum_in_wbtc)
 }
 
-// ----------------------------------------
-//  Migration
-// ----------------------------------------
+/// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    // Set contract to version to latest
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
 }
