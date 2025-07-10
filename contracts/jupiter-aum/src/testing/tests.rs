@@ -205,7 +205,7 @@ fn test_query_get_aum_behavior() {
     // 2. error: data published, but too old (time-based expiration)
     env.block.time = env.block.time.plus_seconds(10_000);
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
-    assert!(matches!(res, Err(ContractError::DataNotValid {})));
+    assert!(matches!(res, Err(ContractError::PublishedDataTooOld {})));
 
     // reset time
     env.block.time = env.block.time.minus_seconds(9_900);
@@ -336,7 +336,7 @@ fn test_query_get_aum_data_stale() {
 
     env.block.time = env.block.time.plus_seconds(10_000);
     let res = query(deps.as_ref(), env, QueryMsg::GetAum {});
-    assert!(matches!(res, Err(ContractError::DataNotValid {})));
+    assert!(matches!(res, Err(ContractError::PublishedDataTooOld {})));
 }
 
 fn dummy_solana_data() -> SolanaData {

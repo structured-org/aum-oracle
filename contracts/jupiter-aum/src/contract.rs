@@ -213,7 +213,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<AumResponse, ContractError> {
 
     if env.block.time.seconds() > published_state.timestamp + config.consensus_data_validity_period
     {
-        return Err(ContractError::DataNotValid {});
+        return Err(ContractError::PublishedDataTooOld {});
     }
 
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;

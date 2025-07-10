@@ -25,8 +25,8 @@ pub enum ContractError {
     #[error("No data published yet")]
     NoDataPublished {},
 
-    #[error("Data is not valid anymore")]
-    DataNotValid {},
+    #[error("Data is too old to be used")]
+    PublishedDataTooOld {},
 
     #[error("Oracle already published data for this slot")]
     AlreadyPublished {},
