@@ -82,6 +82,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 		zap.String("tx_hash", resp.Hash.String()),
 		zap.Int64("height", resp.Height),
 		zap.String("contract", "binance"),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
 	)
 
 	nextRound, err := GetNextRoundFromEvents(resp.TxResult.GetEvents())
@@ -109,6 +110,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 		zap.String("tx_hash", resp.Hash.String()),
 		zap.Int64("height", resp.Height),
 		zap.String("contract", "jupiter"),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
 	)
 
 	nextRound, err := GetNextRoundFromEvents(resp.TxResult.GetEvents())
