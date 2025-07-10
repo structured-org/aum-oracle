@@ -59,13 +59,15 @@ type JupiterAumData struct {
 	CustodyAssets []JupiterCustodyAsset `json:"custody_assets"`
 	// AumUsd is the total Jupiter protocol AUM in USD.
 	AumUsd math.Uint `json:"aum_usd"`
-	// JlpTokenDecimals is the number of decimals of the JLP token.
-	JlpTokenDecimals uint8 `json:"jlp_token_decimals"`
 	// TotalJlpSupply is the total supply of the JLP token.
 	TotalJlpSupply math.Uint `json:"total_jlp_supply"`
+	// TotalJlpSupplyDecimals is the number of decimals of the JLP token supply.
+	TotalJlpSupplyDecimals uint8 `json:"total_jlp_supply_decimals"`
 	// StrategyJlpBalance is the amount of the JLP token that is held by the Jupiter strategy
 	// address.
 	StrategyJlpBalance math.Uint `json:"strategy_jlp_balance"`
+	// StrategyJlpBalanceDecimals is the number of decimals of the strategy jlp balance
+	StrategyJlpBalanceDecimals uint8 `json:"strategy_jlp_balance_decimals"`
 }
 
 // SortCustodyAssets sorts the custody assets by their denomination.

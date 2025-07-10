@@ -91,7 +91,7 @@ func fetchJupiterAumData(
 		}
 
 		data.TotalJlpSupply = math.NewUintFromString(supply.Amount)
-		data.JlpTokenDecimals = supply.Decimals
+		data.TotalJlpSupplyDecimals = supply.Decimals
 	}()
 
 	wg.Add(1)
@@ -107,7 +107,7 @@ func fetchJupiterAumData(
 		}
 
 		data.StrategyJlpBalance = math.NewUintFromString(supply.Amount)
-		// Why not use decimals here?
+		data.StrategyJlpBalanceDecimals = supply.Decimals
 	}()
 
 	wg.Wait()

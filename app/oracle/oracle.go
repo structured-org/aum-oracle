@@ -40,7 +40,6 @@ type Oracle[T any] interface {
 // specified intervals. It handles the necessary context management for the oracle's operation.
 func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 	nextRound, err := oracle.GetNextRound(ctx)
-	fmt.Printf("err: %s", err)
 	if err != nil {
 		return fmt.Errorf("failed to get initial round: %w", err)
 	}
