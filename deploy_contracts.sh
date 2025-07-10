@@ -5,7 +5,7 @@ NODE=http://localhost:26657
 CHAIN_ID=test-1
 FROM=demo
 KEYRING=test
-ADMIN=neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2
+OWNER=neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2
 GAS_PRICES=0.5untrn
 
 extract_tx_hash() {
@@ -27,20 +27,20 @@ HASH=$(extract_tx_hash "$TX")
 JUPITER_CODE_ID=$(get_code_id "$HASH")
 sleep 2
 
-JUPITER_INIT_MSG=$(jq -nc --arg admin "$ADMIN" '{
-  admin: $admin,
-  oracles: [$admin],
+JUPITER_INIT_MSG=$(jq -nc --arg owner "$OWNER" '{
+  owner: $owner,
+  oracles: [$owner],
   threshold: 1,
   data_delta_ppm: 10000,
   round_length: 5,
-  valid_period: 60,
+  consensus_data_validity_period: 60,
   required_custody_assets: ["SOL", "USDC", "USDT", "WBTC", "WETH"],
-  price_max_blocks_old: 100
+  price_data_validity_period: 100
 }')
 echo ">>> instantiating jupiter aum with msg:"
 echo "$JUPITER_INIT_MSG"
 
-TX=$(neutrond tx wasm instantiate $JUPITER_CODE_ID "$JUPITER_INIT_MSG" --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y --label jupiter_aum --admin $ADMIN)
+TX=$(neutrond tx wasm instantiate $JUPITER_CODE_ID "$JUPITER_INIT_MSG" --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y --label jupiter_aum --admin $OWNER)
 sleep 2
 HASH=$(extract_tx_hash "$TX")
 JUPITER_CONTRACT_ADDR=$(get_contract_addr "$HASH" | tr -d '\n')
@@ -60,13 +60,13 @@ SLINKY_CODE_ID=$(get_code_id "$HASH2")
 sleep 2
 
 echo ">>> instantiating slinky oracle with msg: {}"
-TX=$(neutrond tx wasm instantiate $SLINKY_CODE_ID '{}' --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y --label slinky_oracle --admin $ADMIN)
+TX=$(neutrond tx wasm instantiate $SLINKY_CODE_ID '{}' --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y --label slinky_oracle --admin $OWNER)
 sleep 2
 HASH=$(extract_tx_hash "$TX")
 SLINKY_CONTRACT_ADDR=$(get_contract_addr "$HASH" | tr -d '\n')
 sleep 2
 
-BINANCE_INIT_MSG=$(jq -nc --arg owner "$ADMIN" \
+BINANCE_INIT_MSG=$(jq -nc --arg owner "$OWNER" \
   --arg addr "$SLINKY_CONTRACT_ADDR" \
   '{
     owner: $owner,
@@ -88,7 +88,7 @@ echo ">>> using slinky oracle addr: [$SLINKY_CONTRACT_ADDR]"
 TX=$(neutrond tx wasm instantiate $BINANCE_CODE_ID "$BINANCE_INIT_MSG" \
   --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID \
   --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 \
-  -y --label binance_aum --admin $ADMIN)
+  -y --label binance_aum --admin $OWNER)
 HASH=$(extract_tx_hash "$TX")
 sleep 2
 BINANCE_CONTRACT_ADDR=$(get_contract_addr "$HASH" | tr -d '\n')
@@ -97,4 +97,3 @@ echo
 echo "==== summary ===="
 echo "jupiter aum contract:  $JUPITER_CONTRACT_ADDR"
 echo "binance aum contract:  $BINANCE_CONTRACT_ADDR"
-echo "slinky oracle:         $SLINKY_CONTRACT_ADDR"
