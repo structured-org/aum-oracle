@@ -1,1 +1,12 @@
-{"uniMMR":"76.77211871","accountEquity":"7749.50086872","actualEquity":"8042.50063086","accountInitialMargin":"2372.86149494","accountMaintMargin":"100.94160482","accountStatus":"NORMAL","virtualMaxWithdrawAmount":"5376.11608172","totalAvailableBalance":"5376.11608172","totalMarginOpenLoss":"0.0","updateTime":1751885392422}
+{
+    "uniMMR": "76.77211871",
+    "accountEquity": "7749.50086872",
+    "actualEquity": "8042.50063086",
+    "accountInitialMargin": "2372.86149494",
+    "accountMaintMargin": "100.94160482",
+    "accountStatus": "NORMAL",
+    "virtualMaxWithdrawAmount": "5376.11608172",
+    "totalAvailableBalance": "5376.11608172",
+    "totalMarginOpenLoss": "0.0",
+    "updateTime": 1751885392422
+}

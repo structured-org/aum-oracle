@@ -1,1 +1,83 @@
-{"Discriminator":[241,154,109,4,17,177,109,188],"Name":"Pool","Custodies":["7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz","AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn","5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm","G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa","4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"],"AumUsd":"1531381751507034","Limit":{"MaxAumUsd":"1750000000000000","TokenWeightageBufferBps":"2000","Buffer":0},"Fees":{"SwapMultiplier":100,"StableSwapMultiplier":100,"AddRemoveLiquidityBps":10,"SwapBps":10,"TaxBps":100,"StableSwapBps":2,"StableSwapTaxBps":5,"LiquidationRewardBps":150,"ProtocolShareBps":2500},"PoolApr":{"LastUpdated":1751580000,"FeeAprBps":1351,"RealizedFeeUsd":945255297149},"MaxRequestExecutionSec":45,"Bump":252,"LpTokenBump":254,"InceptionTime":1689677832,"ParameterUpdateOracle":{"Prefix":2,"Key":[81,186,187,169,123,155,81,29,179,83,117,14,44,57,230,19,66,46,133,49,33,164,138,181,32,132,12,0,39,52,40,92]}}
+{
+    "Discriminator": [
+        241,
+        154,
+        109,
+        4,
+        17,
+        177,
+        109,
+        188
+    ],
+    "Name": "Pool",
+    "Custodies": [
+        "7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz",
+        "AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn",
+        "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm",
+        "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa",
+        "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
+    ],
+    "AumUsd": "1531381751507034",
+    "Limit": {
+        "MaxAumUsd": "1750000000000000",
+        "TokenWeightageBufferBps": "2000",
+        "Buffer": 0
+    },
+    "Fees": {
+        "SwapMultiplier": 100,
+        "StableSwapMultiplier": 100,
+        "AddRemoveLiquidityBps": 10,
+        "SwapBps": 10,
+        "TaxBps": 100,
+        "StableSwapBps": 2,
+        "StableSwapTaxBps": 5,
+        "LiquidationRewardBps": 150,
+        "ProtocolShareBps": 2500
+    },
+    "PoolApr": {
+        "LastUpdated": 1751580000,
+        "FeeAprBps": 1351,
+        "RealizedFeeUsd": 945255297149
+    },
+    "MaxRequestExecutionSec": 45,
+    "Bump": 252,
+    "LpTokenBump": 254,
+    "InceptionTime": 1689677832,
+    "ParameterUpdateOracle": {
+        "Prefix": 2,
+        "Key": [
+            81,
+            186,
+            187,
+            169,
+            123,
+            155,
+            81,
+            29,
+            179,
+            83,
+            117,
+            14,
+            44,
+            57,
+            230,
+            19,
+            66,
+            46,
+            133,
+            49,
+            33,
+            164,
+            138,
+            181,
+            32,
+            132,
+            12,
+            0,
+            39,
+            52,
+            40,
+            92
+        ]
+    }
+}
