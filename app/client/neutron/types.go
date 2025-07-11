@@ -95,16 +95,16 @@ type JupiterCustodyAsset struct {
 
 // GetRoundResponse is the response of aum smart contracts to the "get_round_info" query
 type GetRoundResponse struct {
-	/// PendingRound is a currently pending round.
+	// PendingRound is a currently pending round.
 	PendingRound Round `json:"pending_round"`
-	/// NextRound is the next round.
+	// NextRound is the next round.
 	NextRound Round `json:"next_round"`
 }
 
 // Round is the round info from aum smart contracts.
 type Round struct {
-	/// Round is a number of the round.
+	// Round is a number of the round.
 	Round uint64 `json:"round"`
-	/// Start is when the round started (UNIX timestamp in seconds).
+	// Start is when the round started (UNIX timestamp in seconds).
 	Start uint64 `json:"start"`
 }

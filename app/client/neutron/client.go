@@ -43,9 +43,9 @@ func NewClient(conf utils.CosmosClientConfig, jupiterAumContract string, binance
 
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	resp, err := c.queryRoundInfo(ctx, c.binanceAumContract, "binance")
+	resp, err := c.queryRoundInfo(ctx, c.binanceAumContract)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("can't query round info for Binance contract: %w", err)
 	}
 	return &NextRound{
 		Round:     resp.NextRound.Round,
@@ -55,9 +55,9 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 
 // GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
 func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	resp, err := c.queryRoundInfo(ctx, c.jupiterAumContract, "jupiter")
+	resp, err := c.queryRoundInfo(ctx, c.jupiterAumContract)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("can't query round info for Jupiter contract: %w", err)
 	}
 	return &NextRound{
 		Round:     resp.NextRound.Round,
@@ -73,7 +73,7 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 			"new_data": data,
 		},
 	}
-	resp, err := c.sendExecuteMsg(ctx, c.binanceAumContract, msg, "binance")
+	resp, err := c.sendExecuteMsg(ctx, c.binanceAumContract, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 			"new_data": data,
 		},
 	}
-	resp, err := c.sendExecuteMsg(ctx, c.jupiterAumContract, msg, "jupiter")
+	resp, err := c.sendExecuteMsg(ctx, c.jupiterAumContract, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -122,28 +122,24 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 }
 
 // internal: query round info from smart contract
-func (c *Client) queryRoundInfo(ctx context.Context, contract string, label string) (*GetRoundResponse, error) {
+func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRoundResponse, error) {
 	msg := map[string]interface{}{"get_round_info": struct{}{}}
-	msgBz, err := json.Marshal(msg)
+	resBz, err := c.client.QuerySmartContract(ctx, contract, msg)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to marshal get_round_info: %w", label, err)
-	}
-	resBz, err := c.client.QuerySmartContract(ctx, contract, msgBz)
-	if err != nil {
-		return nil, fmt.Errorf("%s: failed to query smart contract: %w", label, err)
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
 	}
 	var response GetRoundResponse
 	if err := json.Unmarshal(resBz, &response); err != nil {
-		return nil, fmt.Errorf("%s: failed to unmarshal get_round_info response: %w", label, err)
+		return nil, fmt.Errorf("failed to unmarshal get_round_info response: %w", err)
 	}
 	return &response, nil
 }
 
 // internal: execute smart contract message
-func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any, label string) (*cometcoretypes.ResultBroadcastTxCommit, error) {
+func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (*cometcoretypes.ResultBroadcastTxCommit, error) {
 	msgBz, err := json.Marshal(msg)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to marshal execute message: %w", label, err)
+		return nil, fmt.Errorf("failed to marshal execute message: %w", err)
 	}
 	execute := &types.MsgExecuteContract{
 		Sender:   c.client.GetAddress(),
@@ -153,7 +149,7 @@ func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any, l
 	}
 	resp, err := c.client.SignAndBroadcast(ctx, execute)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to sign and broadcast transaction: %w", label, err)
+		return nil, fmt.Errorf("failed to sign and broadcast transaction: %w", err)
 	}
 	return resp, nil
 }

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -156,24 +157,14 @@ func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*co
 
 // QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
 func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
-	var queryData []byte
-	switch q := query.(type) {
-	case string:
-		// assume it's a JSON string
-		//var raw json.RawMessage
-		//if err := json.Unmarshal([]byte(q), &raw); err != nil {
-		//	return nil, fmt.Errorf("invalid JSON string: %w", err)
-		//}
-		queryData = []byte(q)
-	case []byte:
-		queryData = q
-	default:
-		return nil, fmt.Errorf("unsupported query type: %T", query)
+	queryBz, err := json.Marshal(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal query into json: %w", err)
 	}
 
 	req := wasmtypes.QuerySmartContractStateRequest{
 		Address:   contractAddr,
-		QueryData: queryData,
+		QueryData: queryBz,
 	}
 
 	bz, err := req.Marshal()

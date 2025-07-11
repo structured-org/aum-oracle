@@ -25,6 +25,7 @@ jupiter_strategy_address: ""
 logger_level: info
 
 jupiter_aum_contract: ""
+binance_aum_contract: ""
 
 clients:
   neutron:
