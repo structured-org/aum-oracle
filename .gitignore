@@ -1,3 +1,4 @@
 app/config.yaml
 app/aum-oracle
 .DS_Store
+target/
