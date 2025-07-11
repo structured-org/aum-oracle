@@ -35,7 +35,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 		panic(fmt.Sprintf("failed to load umPositions.json: %v", err))
 	}
 	if err = json.Unmarshal(umPositionsData, &m.umPositions); err != nil {
-		panic(fmt.Sprintf("failed to load umPositions.json: %v", err))
+		panic(fmt.Sprintf("failed to unmarshal umPositions.json: %v", err))
 	}
 
 	// Load pmAccountInfo
@@ -44,7 +44,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 		panic(fmt.Sprintf("failed to load pmAccountInfo.json: %v", err))
 	}
 	if err = json.Unmarshal(pmAccountInfoData, &m.pmAccountInfo); err != nil {
-		panic(fmt.Sprintf("failed to load pmAccountInfo.json: %v", err))
+		panic(fmt.Sprintf("failed to unmarshal pmAccountInfo.json: %v", err))
 	}
 
 	// Load pmAccountBalance
@@ -53,7 +53,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 		panic(fmt.Sprintf("failed to load pmAccountBalance.json: %v", err))
 	}
 	if err = json.Unmarshal(pmAccountBalanceData, &m.pmAccountBalance); err != nil {
-		panic(fmt.Sprintf("failed to load pmAccountBalance.json: %v", err))
+		panic(fmt.Sprintf("failed to unmarshal pmAccountBalance.json: %v", err))
 	}
 
 	// Load spotAccountInfo
@@ -62,7 +62,7 @@ func (m *MockBinanceClient) loadDefaultData() {
 		panic(fmt.Sprintf("failed to load spotAccountInfo.json: %v", err))
 	}
 	if err = json.Unmarshal(spotAccountInfoData, &m.spotAccountInfo); err != nil {
-		panic(fmt.Sprintf("failed to load spotAccountInfo.json: %v", err))
+		panic(fmt.Sprintf("failed to unmarshal spotAccountInfo.json: %v", err))
 	}
 }
 

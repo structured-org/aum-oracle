@@ -31,20 +31,20 @@ func (m *MockSolanaClient) loadDefaultData() {
 	// Load tokenSupply
 	tokenSupplyData, err := MockDataFolder.ReadFile("mock_data/solana/tokenSupply.json")
 	if err != nil {
-		panic(fmt.Sprintf("Error loading default tokenSupply: %v\n", err))
+		panic(fmt.Sprintf("failed to load default tokenSupply: %v", err))
 	}
 	if err := json.Unmarshal(tokenSupplyData, &m.tokenSupply); err != nil {
-		panic(fmt.Sprintf("Error parsing default tokenSupply: %v\n", err))
+		panic(fmt.Sprintf("failed to unmarshal default tokenSupply: %v", err))
 	}
 
 	tokenAccountBalanceData, err := MockDataFolder.ReadFile("mock_data/solana/tokenAccountBalance.json")
 	if err != nil {
-		panic(fmt.Sprintf("Error loading default tokenAccountBalance: %v\n", err))
+		panic(fmt.Sprintf("failed to load default tokenAccountBalance: %v", err))
 	}
 
 	var tokenAccountBalance solanarpc.UiTokenAmount
 	if err := json.Unmarshal(tokenAccountBalanceData, &tokenAccountBalance); err != nil {
-		panic(fmt.Sprintf("Error marshalling tokenAccountBalance: %v\n", err))
+		panic(fmt.Sprintf("failed to unmarshal default tokenAccountBalance: %v", err))
 	}
 	dummyTokenKey, _ := solana.PublicKeyFromBase58("11111111111111111111111111111111") // Placeholder
 	m.tokenAccountBalance[dummyTokenKey] = &tokenAccountBalance

@@ -35,7 +35,7 @@ func (m *MockJupiterClient) loadDefaultData() {
 		panic(fmt.Sprintf("failed to read mock_data/jupiter/pool.json: %v", err))
 	}
 	if err = json.Unmarshal(poolInfoData, &m.poolInfo); err != nil {
-		panic(fmt.Sprintf("failed to load mock_data/jupiter/pool.json: %v", err.Error()))
+		panic(fmt.Sprintf("failed to unmarshal mock_data/jupiter/pool.json: %v", err.Error()))
 	}
 
 	custodyFiles := []string{
@@ -53,14 +53,13 @@ func (m *MockJupiterClient) loadDefaultData() {
 		}
 		var custodyAccount jupiterclient.JupiterPerpsCustodyAccount
 		if err := json.Unmarshal(custodyData, &custodyAccount); err != nil {
-			panic(fmt.Sprintf("Error loading default custody data from %s: %v\n", filePath, err))
+			panic(fmt.Sprintf("failed to unmarshal custody data from %s: %v", filePath, err))
 		}
 
 		fileName := strings.TrimSuffix(strings.SplitAfter(filePath, "mock_data/jupiter/custody_")[1], ".json")
 		pubKey, err := solana.PublicKeyFromBase58(fileName)
 		if err != nil {
-			fmt.Printf("Error parsing public key from filename %s: %v\n", fileName, err)
-			continue
+			panic(fmt.Sprintf("failed to parse public key from filename %s: %v", fileName, err))
 		}
 		m.custodyInfo[pubKey] = &custodyAccount
 	}
