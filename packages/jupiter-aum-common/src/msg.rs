@@ -110,7 +110,7 @@ pub struct GetDataResponse {
 
 // AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct AumResponse {
+pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,

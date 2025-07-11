@@ -9,8 +9,8 @@ use cw2::set_contract_version;
 use jupiter_aum_common::constants::WBTC_DECIMALS;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
-    AumResponse, ConfigResponse, ExecuteMsg, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg,
-    RoundInfoResponse, UpdateConfig,
+    ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
+    QueryMsg, RoundInfoResponse, UpdateConfig,
 };
 use jupiter_aum_common::types::{Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
@@ -205,7 +205,7 @@ fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError
 }
 
 /// Calculates and returns the current AUM value in wBTC.
-fn query_get_aum(deps: Deps, env: Env) -> Result<AumResponse, ContractError> {
+fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let published_state = CONSENSUS_STATE
         .get_last_published_data(&env, deps.storage)?
@@ -219,7 +219,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<AumResponse, ContractError> {
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
-    Ok(AumResponse { aum_in_btc })
+    Ok(GetAumResponse { aum_in_btc })
 }
 
 /// Returns pending and next round info.

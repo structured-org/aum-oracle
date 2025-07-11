@@ -239,7 +239,7 @@ fn test_query_get_aum_behavior() {
     deps.querier.with_price_and_height("25000", 150); // still fresh: 150 + 100 > 200
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     let bin = res.unwrap();
-    let parsed: msg::AumResponse = from_json(bin).unwrap();
+    let parsed: msg::GetAumResponse = from_json(bin).unwrap();
 
     // expected: aum_usd = 500_000, strategy_jlp_balance = 10_000, total_jlp_supply = 1_000
     // virtual price = 500_000_000 / 1_000 = 500
