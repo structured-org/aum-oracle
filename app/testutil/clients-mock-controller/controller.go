@@ -70,7 +70,7 @@ func (cm *ClientsMockController) handleBinanceUmPositions(w http.ResponseWriter,
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var positions []*binanceportfolio.UMPosition
@@ -90,7 +90,7 @@ func (cm *ClientsMockController) handleBinanceCmPositions(w http.ResponseWriter,
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var positions []*binanceportfolio.CMPosition
@@ -110,7 +110,7 @@ func (cm *ClientsMockController) handleBinancePMAccountInfo(w http.ResponseWrite
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var account binanceportfolio.Account
@@ -130,7 +130,7 @@ func (cm *ClientsMockController) handleBinancePMAccountBalance(w http.ResponseWr
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var balances []*binanceportfolio.Balance
@@ -150,7 +150,7 @@ func (cm *ClientsMockController) handleBinanceSpotAccountInfo(w http.ResponseWri
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var account binance.Account
@@ -170,7 +170,7 @@ func (cm *ClientsMockController) handleJupiterCustodyInfo(w http.ResponseWriter,
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var req struct {
@@ -198,7 +198,7 @@ func (cm *ClientsMockController) handleJupiterPoolInfo(w http.ResponseWriter, r 
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var poolInfo jupiterclient.JupiterPoolAccount
@@ -218,7 +218,7 @@ func (cm *ClientsMockController) handleSolanaTokenSupply(w http.ResponseWriter, 
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var tokenSupply solanarpc.UiTokenAmount
@@ -238,7 +238,7 @@ func (cm *ClientsMockController) handleSolanaTokenAccountBalance(w http.Response
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 	var req struct {
