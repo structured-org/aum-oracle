@@ -47,24 +47,24 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 	for {
 		// TODO: think through fetch/submission error cases
 
-		timeTillNextRound := time.Duration(nextRound.Timestamp-time.Now().Unix()) * time.Second
+		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
 		oracle.Logger().Info("waiting for next round",
-			zap.Int64("round", nextRound.Round),
-			zap.Int64("round_timestamp", nextRound.Timestamp),
+			zap.Uint64("round", nextRound.Round),
+			zap.Uint64("round_timestamp", nextRound.Timestamp),
 			zap.Duration("time_till_next_round", timeTillNextRound),
 		)
 
 		select {
 		case <-time.NewTimer(timeTillNextRound).C:
 			oracle.Logger().Info("new round started",
-				zap.Int64("round", nextRound.Round),
-				zap.Int64("round_timestamp", nextRound.Timestamp),
+				zap.Uint64("round", nextRound.Round),
+				zap.Uint64("round_timestamp", nextRound.Timestamp),
 			)
 
 			data, err := oracle.FetchData(ctx)
 			if err != nil {
 				oracle.Logger().Error("failed to fetch data",
-					zap.Int64("round", nextRound.Round),
+					zap.Uint64("round", nextRound.Round),
 					zap.Error(err),
 				)
 				continue
@@ -73,7 +73,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 			nextRound, err = oracle.SubmitData(ctx, data)
 			if err != nil {
 				oracle.Logger().Error("failed to submit AUM data",
-					zap.Int64("round", nextRound.Round),
+					zap.Uint64("round", nextRound.Round),
 					zap.Any("data", data),
 					zap.Error(err),
 				)
@@ -81,7 +81,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
 			}
 
 			oracle.Logger().Info("AUM data submitted",
-				zap.Int64("round", nextRound.Round),
+				zap.Uint64("round", nextRound.Round),
 				zap.Any("data", data),
 			)
 

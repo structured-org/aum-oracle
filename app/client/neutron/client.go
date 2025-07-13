@@ -2,66 +2,187 @@ package neutron
 
 import (
 	"context"
-	"time"
-
-	"github.com/davecgh/go-spew/spew"
+	"encoding/json"
+	"fmt"
+	"github.com/CosmWasm/wasmd/x/wasm/types"
+	comettypes "github.com/cometbft/cometbft/abci/types"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/structured-org/aum-oracle/utils"
 	"go.uber.org/zap"
+	"strconv"
+)
+
+const (
+	eventTypeWasm          = "wasm"
+	attrNextRound          = "next_round"
+	attrNextRoundTimestamp = "next_round_timestamp"
 )
 
 // Client is the Neutron client.
 type Client struct {
-	logger *zap.Logger
+	logger             *zap.Logger
+	client             *utils.CosmosClient
+	jupiterAumContract string
+	binanceAumContract string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(logger *zap.Logger) (*Client, error) {
+func NewClient(conf utils.CosmosClientConfig, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
+	client, err := utils.New(&conf, logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not instantiate cosmos client: %w", err)
+	}
 	return &Client{
-		logger: logger,
+		logger:             logger,
+		client:             client,
+		jupiterAumContract: jupiterAumContract,
+		binanceAumContract: binanceAumContract,
 	}, nil
 }
-
-// TODO: use actual values when the client is implemented
-var binanceRound = 0
-var jupiterRound = 0
 
 // GetBinanceAumContractNextRound gets the next consensus round for the Binance AUM contract.
 func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	// TODO: use actual values when the client is implemented
+	resp, err := c.queryRoundInfo(ctx, c.binanceAumContract)
+	if err != nil {
+		return nil, fmt.Errorf("can't query round info for Binance contract: %w", err)
+	}
 	return &NextRound{
-		Round:     int64(binanceRound),
-		Timestamp: time.Now().Add(time.Second).Unix(),
-	}, nil
-}
-
-// SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
-func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
-	// print for debug evaluation. TODO: use actual values when the client is implemented
-	spew.Dump("submitted Binance AUM data:", data)
-
-	binanceRound++
-	return &NextRound{
-		Round:     int64(binanceRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
+		Round:     resp.NextRound.Round,
+		Timestamp: resp.NextRound.Start,
 	}, nil
 }
 
 // GetJupiterAumContractNextRound gets the next consensus round for the Jupiter AUM contract.
 func (c *Client) GetJupiterAumContractNextRound(ctx context.Context) (*NextRound, error) {
-	// TODO: use actual values when the client is implemented
+	resp, err := c.queryRoundInfo(ctx, c.jupiterAumContract)
+	if err != nil {
+		return nil, fmt.Errorf("can't query round info for Jupiter contract: %w", err)
+	}
 	return &NextRound{
-		Round:     int64(jupiterRound),
-		Timestamp: time.Now().Add(time.Second).Unix(),
+		Round:     resp.NextRound.Round,
+		Timestamp: resp.NextRound.Start,
 	}, nil
+}
+
+// SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
+func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
+	c.logger.Info("submitting binance aum data")
+	msg := map[string]interface{}{
+		"publish_data": map[string]interface{}{
+			"new_data": data,
+		},
+	}
+	resp, err := c.sendExecuteMsg(ctx, c.binanceAumContract, msg)
+	if err != nil {
+		return nil, err
+	}
+	c.logger.Info("submitted binance aum data",
+		zap.Uint32("code", resp.TxResult.Code),
+		zap.String("tx_hash", resp.Hash.String()),
+		zap.Int64("height", resp.Height),
+		zap.String("contract", "binance"),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
+	)
+
+	nextRound, err := GetNextRoundFromEvents(resp.TxResult.GetEvents())
+	if err != nil {
+		return nil, fmt.Errorf("binance: failed to extract next round from events: %w", err)
+	}
+	c.logger.Info("got next round for binance oracle from events")
+	return nextRound, nil
 }
 
 // SubmitJupiterAumData submits the Jupiter AUM data to the Jupiter AUM contract.
 func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
-	// print for debug evaluation. TODO: use actual values when the client is implemented
-	spew.Dump("submitted Jupiter AUM data:", data)
+	c.logger.Info("submitting jupiter aum data")
+	msg := map[string]interface{}{
+		"publish_data": map[string]interface{}{
+			"new_data": data,
+		},
+	}
+	resp, err := c.sendExecuteMsg(ctx, c.jupiterAumContract, msg)
+	if err != nil {
+		return nil, err
+	}
+	c.logger.Info("submitted jupiter aum data",
+		zap.Uint32("code", resp.TxResult.Code),
+		zap.String("tx_hash", resp.Hash.String()),
+		zap.Int64("height", resp.Height),
+		zap.String("contract", "jupiter"),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
+	)
 
-	jupiterRound++
+	nextRound, err := GetNextRoundFromEvents(resp.TxResult.GetEvents())
+	if err != nil {
+		return nil, fmt.Errorf("jupiter: failed to extract next round from events: %w", err)
+	}
+	c.logger.Info("got next round for jupiter oracle from events")
+	return nextRound, nil
+}
+
+// internal: query round info from smart contract
+func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRoundResponse, error) {
+	msg := map[string]interface{}{"get_round_info": struct{}{}}
+	resBz, err := c.client.QuerySmartContract(ctx, contract, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
+	}
+	var response GetRoundResponse
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal get_round_info response: %w", err)
+	}
+	return &response, nil
+}
+
+// internal: execute smart contract message
+func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (*cometcoretypes.ResultBroadcastTxCommit, error) {
+	msgBz, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal execute message: %w", err)
+	}
+	execute := &types.MsgExecuteContract{
+		Sender:   c.client.GetAddress(),
+		Contract: contract,
+		Msg:      msgBz,
+		Funds:    sdk.NewCoins(),
+	}
+	resp, err := c.client.SignAndBroadcast(ctx, execute)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign and broadcast transaction: %w", err)
+	}
+	return resp, nil
+}
+
+// GetNextRoundFromEvents parses wasm events to extract next round info.
+func GetNextRoundFromEvents(events []comettypes.Event) (*NextRound, error) {
+	var nextRoundStr, nextRoundTimestampStr string
+
+	for _, evt := range events {
+		if evt.Type != eventTypeWasm {
+			continue
+		}
+		for _, attr := range evt.Attributes {
+			switch attr.Key {
+			case attrNextRound:
+				nextRoundStr = attr.Value
+			case attrNextRoundTimestamp:
+				nextRoundTimestampStr = attr.Value
+			}
+		}
+	}
+
+	nextRound, err := strconv.ParseUint(nextRoundStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %q from events: %w", attrNextRound, err)
+	}
+	nextRoundTimestamp, err := strconv.ParseUint(nextRoundTimestampStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %q from events: %w", attrNextRoundTimestamp, err)
+	}
+
 	return &NextRound{
-		Round:     int64(jupiterRound),
-		Timestamp: time.Now().Add(time.Minute).Unix(),
+		Round:     nextRound,
+		Timestamp: nextRoundTimestamp,
 	}, nil
 }

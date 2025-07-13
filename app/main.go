@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go"
+	nlogger "github.com/neutron-org/neutron-logger"
 	binanceclient "github.com/structured-org/aum-oracle/client/binance"
 	jupiterclient "github.com/structured-org/aum-oracle/client/jupiter"
 	neutronclient "github.com/structured-org/aum-oracle/client/neutron"
@@ -20,16 +22,23 @@ import (
 	jupiteroracle "github.com/structured-org/aum-oracle/oracle/jupiter"
 	clients_mocker "github.com/structured-org/aum-oracle/testutil/clients-mock-controller"
 	"go.uber.org/zap"
-
-	nlogger "github.com/neutron-org/neutron-logger"
 )
 
-var (
+const (
 	mainContext             = "main"
 	jupiterAumOracleContext = "jupiter_aum_oracle"
 	binanceAumOracleContext = "binance_aum_oracle"
 	neutronClientContext    = "neutron_client"
+
+	chainBechAddressPrefix = "neutron"
+	chainBechPubPrefix     = "neutronpub"
 )
+
+func init() {
+	config := sdk.GetConfig()
+	config.SetBech32PrefixForAccount(chainBechAddressPrefix, chainBechPubPrefix)
+	config.Seal()
+}
 
 func main() {
 	conf := readConfig()
@@ -54,7 +63,12 @@ func main() {
 	}
 
 	// real unmockable clients
-	neutronClient, err := neutronclient.NewClient(logRegistry.Get(neutronClientContext))
+	neutronClient, err := neutronclient.NewClient(
+		conf.Clients.Neutron,
+		conf.JupiterAumContract,
+		conf.BinanceAumContract,
+		logRegistry.Get(neutronClientContext),
+	)
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}

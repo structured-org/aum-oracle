@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/structured-org/aum-oracle/utils"
 	"log"
 	"os"
 
@@ -47,10 +48,21 @@ type config struct {
 	// JupiterStrategyAddress is the Jupiter strategy address pubkey.
 	JupiterStrategyAddress string `yaml:"jupiter_strategy_address"`
 
+	Clients ClientsConfig `yaml:"clients"`
+
+	// Jupiter AUM oracle contract address.
+	JupiterAumContract string `yaml:"jupiter_aum_contract"`
+	// Binance AUM oracle contract address.
+	BinanceAumContract string `yaml:"binance_aum_contract"`
+
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
 
 	// MockClients tells does the oracle us mocked Solana, Jupiter and Binance client or real ones
 	MockClients        bool `yaml:"mock_clients"`
 	MockControllerPort int  `yaml:"mock_controller_port"`
+}
+
+type ClientsConfig struct {
+	Neutron utils.CosmosClientConfig `yaml:"neutron"`
 }
