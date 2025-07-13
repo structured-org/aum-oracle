@@ -23,3 +23,6 @@ jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
 jupiter_strategy_address: ""
 
 logger_level: info
+
+mock_clients: true
+mock_controller_port: 3000
