@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go"
 	nlogger "github.com/neutron-org/neutron-logger"
 	binanceclient "github.com/structured-org/aum-oracle/client/binance"
@@ -19,16 +20,18 @@ import (
 	"github.com/structured-org/aum-oracle/oracle"
 	binanceoracle "github.com/structured-org/aum-oracle/oracle/binance"
 	jupiteroracle "github.com/structured-org/aum-oracle/oracle/jupiter"
+	clients_mocker "github.com/structured-org/aum-oracle/testutil/clients-mock-controller"
 	"go.uber.org/zap"
 )
 
-var (
+const (
 	mainContext             = "main"
 	jupiterAumOracleContext = "jupiter_aum_oracle"
 	binanceAumOracleContext = "binance_aum_oracle"
 	neutronClientContext    = "neutron_client"
-	chainBechAddressPrefix  = "neutron"
-	chainBechPubPrefix      = "neutronpub"
+
+	chainBechAddressPrefix = "neutron"
+	chainBechPubPrefix     = "neutronpub"
 )
 
 func init() {
@@ -43,36 +46,96 @@ func main() {
 	logger := logRegistry.Get(mainContext)
 	logger.Info("app config", zap.Any("config", conf))
 
-	jupiterCustodies := make(map[string]solana.PublicKey)
-	for token, programId := range conf.JupiterCustodies {
-		jupiterCustodies[token] = solana.MustPublicKeyFromBase58(programId)
+	// auxiliary structs holding client definitions for DI into oracles
+	// are populated with either real or mock clients depending on config
+	var binanceOracleForNeutronDeps struct {
+		binanceClient binanceoracle.BinanceClient
+		neutronClient binanceoracle.NeutronAumContractClient
+	}
+	var binanceOracleForSolanaDeps struct {
+		binanceClient binanceoracle.BinanceClient
+		solanaClient  binanceoracle.SolanaAumContractClient
+	}
+	var jupiterOracleForNeutronDeps struct {
+		solanaClient  jupiteroracle.SolanaClient
+		neutronClient jupiteroracle.NeutronAumContractClient
+		jupiterClient jupiteroracle.JupiterClient
 	}
 
-	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
-	jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
-	neutronClient, err := neutronclient.NewClient(conf.Clients.Neutron, conf.JupiterAumContract, conf.BinanceAumContract, logRegistry.Get(neutronClientContext))
+	// real unmockable clients
+	neutronClient, err := neutronclient.NewClient(
+		conf.Clients.Neutron,
+		conf.JupiterAumContract,
+		conf.BinanceAumContract,
+		logRegistry.Get(neutronClientContext),
+	)
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
-	binanceClient := binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
+	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
 
+	switch conf.MockClients {
+	case true: // test run. populate deps with mock clients and run mock controller server
+		mockController := clients_mocker.NewClientsMockController()
+
+		binanceMockClient := mockController.GetMockBinanceClient()
+		solanaMockClient := mockController.GetMockSolanaClient()
+		jupiterMockClient := mockController.GetMockJupiterClient()
+
+		binanceOracleForNeutronDeps.binanceClient = binanceMockClient
+		binanceOracleForNeutronDeps.neutronClient = neutronClient
+
+		binanceOracleForSolanaDeps.binanceClient = binanceMockClient
+		binanceOracleForSolanaDeps.solanaClient = solanaClient
+
+		jupiterOracleForNeutronDeps.solanaClient = solanaMockClient
+		jupiterOracleForNeutronDeps.neutronClient = neutronClient
+		jupiterOracleForNeutronDeps.jupiterClient = jupiterMockClient
+
+		go func() {
+			if err := mockController.Start(conf.MockControllerPort); err != nil {
+				panic(fmt.Sprintf("failed to start mock controller server: %v", err))
+			}
+		}()
+
+	case false: // prod run. populate deps with real clients
+		jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
+		binanceClient := binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
+
+		binanceOracleForNeutronDeps.binanceClient = binanceClient
+		binanceOracleForNeutronDeps.neutronClient = neutronClient
+
+		binanceOracleForSolanaDeps.binanceClient = binanceClient
+		binanceOracleForSolanaDeps.solanaClient = solanaClient
+
+		jupiterOracleForNeutronDeps.solanaClient = solanaClient
+		jupiterOracleForNeutronDeps.neutronClient = neutronClient
+		jupiterOracleForNeutronDeps.jupiterClient = jupiterClient
+	}
+
+	// Binance oracles
 	binanceOracleConfig := binanceoracle.Config{
 		UmPositionsList: conf.BinanceUmPositionsList,
 		SpotAssetsList:  conf.BinanceSpotAssetsList,
 	}
 	binanceOracleForNeutron := binanceoracle.NewBinanceAumOracleForNeutron(
-		binanceClient,
-		neutronClient,
+		binanceOracleForNeutronDeps.binanceClient,
+		binanceOracleForNeutronDeps.neutronClient,
 		binanceOracleConfig,
 		logRegistry.Get(binanceAumOracleContext),
 	)
 	binanceOracleForSolana := binanceoracle.NewBinanceAumOracleForSolana(
-		binanceClient,
-		solanaClient,
+		binanceOracleForSolanaDeps.binanceClient,
+		binanceOracleForSolanaDeps.solanaClient,
 		binanceOracleConfig,
 		logRegistry.Get(binanceAumOracleContext),
 	)
 
+	// Jupiter oracles
+	jupiterCustodies := make(map[string]solana.PublicKey)
+	for token, programId := range conf.JupiterCustodies {
+		jupiterCustodies[token] = solana.MustPublicKeyFromBase58(programId)
+	}
 	jupiterConfig := jupiteroracle.JupiterConfig{
 		Custodies: jupiterCustodies,
 		Token:     solana.MustPublicKeyFromBase58(conf.JupiterJlpToken),
@@ -80,9 +143,9 @@ func main() {
 		Strategy:  solana.MustPublicKeyFromBase58(conf.JupiterStrategyAddress),
 	}
 	jupiterOracleForNeutron := jupiteroracle.NewJupiterAumOracleForNeutron(
-		solanaClient,
-		neutronClient,
-		jupiterClient,
+		jupiterOracleForNeutronDeps.solanaClient,
+		jupiterOracleForNeutronDeps.neutronClient,
+		jupiterOracleForNeutronDeps.jupiterClient,
 		jupiterConfig,
 		logRegistry.Get(jupiterAumOracleContext),
 	)
