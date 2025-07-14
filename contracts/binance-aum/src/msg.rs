@@ -15,9 +15,9 @@ pub struct InstantiateMsg {
     pub data_delta_ppm: u64,
     /// Consensus round length in seconds
     pub round_length: u64,
-    /// Initial valid period for data in seconds
+    /// Initial validity period for data in seconds
     pub consensus_data_valid_period: u64,
-    /// Initial valid period for data in blocks
+    /// Initial validity period for data in blocks
     pub price_data_valid_period: u64,
     /// Required binance positions that oracles must provide
     pub required_binance_positions: Vec<String>,

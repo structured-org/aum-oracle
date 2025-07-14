@@ -4,7 +4,7 @@ use crate::msg::{
     UpdateConfig,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
-use crate::utils::{btc_in_spot_balance_asset, get_prices};
+use crate::utils::{get_prices, spot_balance_asset_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
@@ -121,35 +121,28 @@ fn execute_update_config(
     contract_config.update_config(deps.as_ref(), &new_config)?;
     CONFIG.save(deps.storage, &contract_config)?;
 
-    // Update consensus configuration if any consensus fields are provided
-    if new_config.oracles.is_some()
-        || new_config.threshold.is_some()
-        || new_config.data_delta_ppm.is_some()
-        || new_config.round_length.is_some()
-    {
-        let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-        // Update consensus config fields
-        if let Some(ref oracles) = new_config.oracles {
-            let validated_oracles: Vec<Addr> = oracles
-                .iter()
-                .map(|addr| deps.api.addr_validate(addr))
-                .collect::<StdResult<_>>()?;
-            consensus_config.oracles = validated_oracles;
-        }
-        if let Some(threshold) = new_config.threshold {
-            consensus_config.threshold = threshold;
-        }
-        if let Some(data_delta_ppm) = new_config.data_delta_ppm {
-            consensus_config.data_delta_ppm = data_delta_ppm;
-        }
-        if let Some(round_length) = new_config.round_length {
-            consensus_config.round_length = round_length;
-        }
-
-        // Save updated consensus config
-        CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
+    // Update consensus config fields
+    if let Some(ref oracles) = new_config.oracles {
+        let validated_oracles: Vec<Addr> = oracles
+            .iter()
+            .map(|addr| deps.api.addr_validate(addr))
+            .collect::<StdResult<_>>()?;
+        consensus_config.oracles = validated_oracles;
     }
+    if let Some(threshold) = new_config.threshold {
+        consensus_config.threshold = threshold;
+    }
+    if let Some(data_delta_ppm) = new_config.data_delta_ppm {
+        consensus_config.data_delta_ppm = data_delta_ppm;
+    }
+    if let Some(round_length) = new_config.round_length {
+        consensus_config.round_length = round_length;
+    }
+
+    // Save updated consensus config
+    CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -181,24 +174,25 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
 
 pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let d = CONSENSUS_STATE
+    let last_published_data = CONSENSUS_STATE
         .last_published_data
         .may_load(deps.storage)?
         .ok_or_else(|| StdError::generic_err("No published data"))?;
-    if d.timestamp + config.consensus_data_valid_period < env.block.time.seconds() {
+    if last_published_data.timestamp + config.consensus_data_valid_period < env.block.time.seconds()
+    {
         return Err(ContractError::PublishedDataTooOld {});
     }
 
-    let spot_total_balance_btc = d
+    let spot_total_balance_btc = last_published_data
         .data
         .spot_balances
         .iter()
-        .map(|b| {
-            btc_in_spot_balance_asset(
+        .map(|sb| {
+            spot_balance_asset_in_btc(
                 deps,
                 config.price_oracle_contract.to_string(),
                 config.price_max_blocks_old,
-                b,
+                sb,
             )
         })
         .collect::<ContractResult<Vec<SignedDecimal256>>>()?
@@ -214,7 +208,8 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     )?
     .price_0_to_1;
 
-    let aum_in_btc = (d.data.pm_account_actual_equity / btc_price_in_usd) + spot_total_balance_btc;
+    let aum_in_btc = (last_published_data.data.pm_account_actual_equity / btc_price_in_usd)
+        + spot_total_balance_btc;
 
     // here we convert the AUM in BTC to WBTC (uwBTC specifically)
     // since WBTC has 8 decimals, we need to adjust the decimal places accordingly
