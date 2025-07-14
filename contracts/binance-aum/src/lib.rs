@@ -1,7 +1,7 @@
 pub mod contract;
 
 mod error;
-mod msg;
+pub mod msg;
 mod state;
 #[cfg(test)]
 mod testing;

@@ -3,10 +3,11 @@ use crate::error::{ConsensusError, ConsensusResult};
 use cosmwasm_std::{Addr, Decimal256, Env, SignedDecimal256, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
+use cosmwasm_schema::{cw_serde};
 
 /// Describes the configuration of consensus
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct Config {
     /// a list of oracles that can submit data for consensus
     pub oracles: Vec<Addr>,
@@ -19,7 +20,7 @@ pub struct Config {
 }
 
 /// Describes the round entity
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy)]
+#[cw_serde]
 pub struct Round {
     /// a number of the round
     pub round: u64,
@@ -296,7 +297,7 @@ pub enum PublishResult<T> {
 }
 
 /// Data submitted by an oracle
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct OracleData<T> {
     /// The round number an oracle tries to submit data for
     pub round: u64,
