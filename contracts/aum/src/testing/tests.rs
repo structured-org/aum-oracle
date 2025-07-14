@@ -3,11 +3,11 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetAumResponse, InstantiateMsg, QueryMsg, UpdateConfig};
 use crate::state::{Config, CONFIG};
 use cosmwasm_std::testing::{
-    mock_dependencies, mock_env, message_info, MockApi, MockQuerier, MockStorage,
+    message_info, mock_dependencies, mock_env, MockApi, MockQuerier, MockStorage,
 };
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, ContractResult, Int256, OwnedDeps,
-    StdError, SystemResult, WasmQuery,
+    from_json, to_json_binary, Addr, ContractResult, Int256, OwnedDeps, StdError, SystemResult,
+    WasmQuery,
 };
 
 fn setup_contract() -> OwnedDeps<MockStorage, MockApi, MockQuerier> {

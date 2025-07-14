@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError};
+use cosmwasm_std::StdError;
 use thiserror::Error;
 
 pub type ContractResult<T> = Result<T, ContractError>;
