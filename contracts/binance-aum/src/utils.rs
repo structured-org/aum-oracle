@@ -43,7 +43,7 @@ pub struct CombinedPriceResponse {
 }
 
 // a helper to get spot balance in BTC using oracle contract
-pub fn btc_in_spot_balance_asset(
+pub fn spot_balance_asset_in_btc(
     deps: Deps,
     price_oracle_contract: String,
     max_blocks_old: u64,

@@ -79,10 +79,10 @@ pub struct State<T: ConsensusData> {
     pub last_published_data: Item<OracleData<T>>,
 }
 
-const PENDING_ROUND_KEY: &str = "pending_round";
-const CONFIG_KEY: &str = "consensus_config";
-const PENDING_DATA_KEY: &str = "pending_data";
-const LAST_PUBLISHED_DATA_KEY: &str = "last_published_data";
+const PENDING_ROUND_KEY: &str = "consensus__pending_round";
+const CONFIG_KEY: &str = "consensus__config";
+const PENDING_DATA_KEY: &str = "consensus__pending_data";
+const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
 
 impl<T: ConsensusData> State<T> {
     /// State constructor
