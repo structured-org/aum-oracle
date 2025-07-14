@@ -11,18 +11,26 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Config {
     /// The address that is allowed to perform management actions in the contract.
-    pub admin: Addr,
+    pub owner: Addr,
     /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
-    pub valid_period: u64,
+    pub consensus_data_validity_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
-    pub price_max_blocks_old: u64,
+    pub price_data_validity_period: u64,
 }
 
 impl Config {
     /// Validates the configuration parameters.
     pub fn validate(&self) -> Result<(), ContractError> {
+        if self.consensus_data_validity_period == 0 {
+            return Err(ContractError::InvalidConsensusPeriod {});
+        }
+
+        if self.price_data_validity_period == 0 {
+            return Err(ContractError::InvalidPriceDataPeriod {});
+        }
+
         Ok(())
     }
 }
@@ -35,12 +43,14 @@ pub struct SolanaData {
     pub custody_assets: Vec<CustodyAsset>,
     /// Jupiter's Assets Under Management value in USD.
     pub aum_usd: Uint128,
-    /// JLP token decimal precision
-    pub jlp_token_decimals: u8,
     /// The total supply of JLP (Jupiter Liquidity Provider) tokens.
     pub total_jlp_supply: Uint128,
+    /// JLP token supply decimal precision
+    pub total_jlp_supply_decimals: u8,
     /// The balance of JLP tokens held by the strategy.
     pub strategy_jlp_balance: Uint128,
+    /// JLP token balance decimal precision
+    pub strategy_jlp_balance_decimals: u8,
 }
 
 impl SolanaData {
@@ -74,8 +84,10 @@ impl ConsensusData for SolanaData {
             consensus_on_field_u128(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
         let consensus_strategy_jlp_balance =
             consensus_on_field_u128(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
-        let consensus_jlp_token_decimals =
-            exact_consensus_on_field(data, |d| d.jlp_token_decimals)?;
+        let consensus_total_jlp_supply_decimals =
+            exact_consensus_on_field(data, |d| d.total_jlp_supply_decimals)?;
+        let consensus_strategy_jlp_balance_decimals =
+            exact_consensus_on_field(data, |d| d.strategy_jlp_balance_decimals)?;
 
         // check that all custody assets have the same length
         let custody_assets_lengths = data
@@ -127,9 +139,10 @@ impl ConsensusData for SolanaData {
         Some(SolanaData {
             custody_assets: consensus_custody_assets,
             aum_usd: consensus_aum_usd,
-            jlp_token_decimals: consensus_jlp_token_decimals,
+            total_jlp_supply_decimals: consensus_total_jlp_supply_decimals,
             total_jlp_supply: consensus_total_jlp_supply,
             strategy_jlp_balance: consensus_strategy_jlp_balance,
+            strategy_jlp_balance_decimals: consensus_strategy_jlp_balance_decimals,
         })
     }
 }

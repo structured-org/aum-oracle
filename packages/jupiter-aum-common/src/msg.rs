@@ -1,14 +1,14 @@
 use crate::types::SolanaData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_std::Int256;
+use cosmwasm_std::{Addr, Int256};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// InstantiateMsg defines the message used to initialize the contract.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {
-    /// The address that will be the contract's admin.
-    pub admin: String,
+    /// The address that will be the contract's owner.
+    pub owner: String,
     /// Initial list of oracle addresses.
     pub oracles: Vec<String>,
     /// Initial threshold for consensus.
@@ -18,11 +18,11 @@ pub struct InstantiateMsg {
     /// Consensus round length in seconds
     pub round_length: u64,
     /// Initial valid period for data in seconds.
-    pub valid_period: u64,
+    pub consensus_data_validity_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider BTC/USD price from oracle as valid.
-    pub price_max_blocks_old: u64,
+    pub price_data_validity_period: u64,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -30,7 +30,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
-    /// Only callable by the admin. All fields are optional, allowing partial updates.
+    /// Only callable by the owner. All fields are optional, allowing partial updates.
     UpdateConfig { new_config: UpdateConfig },
     /// PublishData allows a registered oracle to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
@@ -41,14 +41,14 @@ pub enum ExecuteMsg {
 pub struct UpdateConfig {
     /// Contract config updates.
     ///
-    /// New admin address.
-    pub admin: Option<String>,
-    /// New valid period for data in seconds.
-    pub valid_period: Option<u64>,
+    /// New owner address.
+    pub owner: Option<String>,
+    /// New validity period for data in seconds.
+    pub consensus_data_validity_period: Option<u64>,
     /// New required custody asset denoms.
     pub required_custody_assets: Option<Vec<String>>,
     /// New value for how many blocks we consider BTC/USD price from oracle as valid.
-    pub price_max_blocks_old: Option<u64>,
+    pub price_data_validity_period: Option<u64>,
 
     /// Consensus configuration updates
     ///
@@ -83,10 +83,22 @@ pub enum QueryMsg {
 /// ConfigResponse contains the current contract configuration.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ConfigResponse {
-    /// The current admin address.
-    pub admin: String,
+    /// The current owner address.
+    pub owner: String,
     /// The current valid period in seconds.
-    pub valid_period: u64,
+    pub consensus_data_validity_period: u64,
+    /// List of custody asset denoms required for consensus
+    pub required_custody_assets: Vec<String>,
+    /// How many blocks we consider the last price from oracle as valid
+    pub price_data_validity_period: u64,
+    /// a list of oracles that can submit data for consensus
+    pub oracles: Vec<Addr>,
+    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    pub threshold: u32,
+    /// delta in percent per million (ppm), for which two values are considered equal
+    pub data_delta_ppm: u64,
+    /// length of a round in seconds
+    pub round_length: u64,
 }
 
 /// GetDataResponse contains the last successfully published Solana data.
@@ -96,7 +108,7 @@ pub struct GetDataResponse {
     pub last_published_data: Option<OracleData<SolanaData>>,
 }
 
-// GetAumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
+// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles

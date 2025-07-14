@@ -16,14 +16,17 @@ pub enum ContractError {
     #[error("Invalid threshold: {threshold} is greater than the number of oracles {oracles}")]
     InvalidThreshold { threshold: u32, oracles: usize },
 
-    #[error("Period should be greater than 0")]
-    InvalidPeriod {},
+    #[error("Consensus period should be greater than 0")]
+    InvalidConsensusPeriod {},
+
+    #[error("Price data period should be greater than 0")]
+    InvalidPriceDataPeriod {},
 
     #[error("No data published yet")]
     NoDataPublished {},
 
-    #[error("Data is not valid anymore")]
-    DataNotValid {},
+    #[error("Data is too old to be used")]
+    PublishedDataTooOld {},
 
     #[error("Oracle already published data for this slot")]
     AlreadyPublished {},
