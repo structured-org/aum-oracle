@@ -1,6 +1,6 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
 use crate::state::BinanceData;
 use consensus::consensus::{OracleData, Round};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Int256;
 
 #[cw_serde]

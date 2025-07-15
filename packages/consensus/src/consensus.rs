@@ -1,10 +1,10 @@
 use crate::consensus::PublishResult::ConsensusReached;
 use crate::error::{ConsensusError, ConsensusResult};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Decimal256, Env, SignedDecimal256, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
-use serde::{Serialize};
-use cosmwasm_schema::{cw_serde};
+use serde::Serialize;
 
 /// Describes the configuration of consensus
 #[cw_serde]

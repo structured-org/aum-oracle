@@ -1,7 +1,7 @@
-use cosmwasm_schema::{cw_serde, schemars};
-use cosmwasm_schema::schemars::JsonSchema;
 use crate::error::{ContractError, ContractResult};
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
+use cosmwasm_schema::schemars::JsonSchema;
+use cosmwasm_schema::{cw_serde, schemars};
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
@@ -21,16 +21,14 @@ pub struct Config {
     pub required_binance_spot_assets: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[derive(JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Position {
     pub symbol: String,
     pub amount: SignedDecimal256,
     pub pnl: SignedDecimal256,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[derive(JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct SpotBalance {
     pub asset: String,
     pub amount: SignedDecimal256,
