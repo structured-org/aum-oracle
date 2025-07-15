@@ -1,7 +1,7 @@
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, RoundInfoResponse,
-    UpdateConfig,
+    ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, QueryMsg,
+    RoundInfoResponse, UpdateConfig,
 };
 use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
@@ -38,7 +38,7 @@ pub fn instantiate(
         consensus_data_valid_period: msg.consensus_data_valid_period,
         required_binance_spot_assets: msg.required_binance_spot_assets,
         required_binance_positions: msg.required_binance_positions,
-        price_max_blocks_old: msg.price_data_valid_period,
+        price_data_valid_period: msg.price_data_valid_period,
         price_oracle_contract: deps.api.addr_validate(&msg.price_oracle_contract)?,
     };
     CONFIG.save(deps.storage, &contract_config)?;
@@ -164,7 +164,18 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
+        QueryMsg::GetConfig {} => Ok(to_json_binary(&query_configs(deps, env)?)?),
     }
+}
+
+fn query_configs(deps: Deps, _env: Env) -> StdResult<GetConfigResponse> {
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let contract_config = CONFIG.load(deps.storage)?;
+
+    Ok(GetConfigResponse {
+        contract_config,
+        consensus_config,
+    })
 }
 
 fn query_round_info(deps: Deps, _env: Env) -> StdResult<RoundInfoResponse> {
@@ -202,7 +213,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
             spot_balance_asset_in_btc(
                 deps,
                 config.price_oracle_contract.to_string(),
-                config.price_max_blocks_old,
+                config.price_data_valid_period,
                 sb,
             )
         })
@@ -215,7 +226,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         config.price_oracle_contract.to_string(),
         "BTC".to_string(),
         "USD".to_string(),
-        config.price_max_blocks_old,
+        config.price_data_valid_period,
     )?
     .price_0_to_1;
 

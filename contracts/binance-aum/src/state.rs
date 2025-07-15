@@ -1,12 +1,10 @@
 use crate::error::{ContractError, ContractResult};
 use consensus::consensus::{consensus_on_items, ConsensusData, State};
-use cosmwasm_schema::schemars::JsonSchema;
-use cosmwasm_schema::{cw_serde, schemars};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct Config {
     /// owner of the contract
     pub owner: Addr,
@@ -14,21 +12,21 @@ pub struct Config {
     pub price_oracle_contract: Addr,
     /// how many seconds we consider the last published consensus as valid
     pub consensus_data_valid_period: u64,
-    /// how many seconds we consider the last price from oracle as valid
-    pub price_max_blocks_old: u64,
+    /// how many blocks we consider the last price from oracle as valid
+    pub price_data_valid_period: u64,
     /// required binance positions and spot assets that oracles must provide
     pub required_binance_positions: Vec<String>,
     pub required_binance_spot_assets: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Position {
     pub symbol: String,
     pub amount: SignedDecimal256,
     pub pnl: SignedDecimal256,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct SpotBalance {
     pub asset: String,
     pub amount: SignedDecimal256,
@@ -187,7 +185,7 @@ impl Config {
             self.consensus_data_valid_period = consensus_data_valid_period;
         }
         if let Some(price_data_valid_period) = new_config.price_data_valid_period {
-            self.price_max_blocks_old = price_data_valid_period;
+            self.price_data_valid_period = price_data_valid_period;
         }
         if let Some(ref required_binance_positions) = new_config.required_binance_positions {
             self.required_binance_positions = required_binance_positions.clone();

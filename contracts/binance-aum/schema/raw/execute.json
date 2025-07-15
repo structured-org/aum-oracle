@@ -25,7 +25,7 @@
       "additionalProperties": false
     },
     {
-      "description": "UpdateConfig updates the contract's configuration parameters. Only callable by the admin. All fields are optional, allowing partial updates.",
+      "description": "UpdateConfig updates the contract's configuration parameters. Only callable by the owner. All fields are optional, allowing partial updates.",
       "type": "object",
       "required": [
         "update_config"

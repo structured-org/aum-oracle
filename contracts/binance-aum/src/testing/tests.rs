@@ -44,7 +44,7 @@ fn create_test_consensus_config() -> ConsensusConfig {
 fn create_test_contract_config() -> Config {
     Config {
         owner: Addr::unchecked("admin"),
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
         price_oracle_contract: Addr::unchecked("price_oracle_contract"),
@@ -1542,7 +1542,7 @@ fn test_query_get_aum_basic() {
         owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec![
             "BTC".to_string(),
@@ -1624,7 +1624,7 @@ fn test_query_get_aum_with_expired_data() {
         owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string()],
     };
@@ -1701,7 +1701,7 @@ fn test_query_get_aum_with_negative_equity() {
         owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["ETH".to_string()],
     };
@@ -1827,7 +1827,7 @@ fn test_execute_update_config_admin_only() {
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
     assert_eq!(updated_contract_config.owner, new_admin);
     assert_eq!(updated_contract_config.consensus_data_valid_period, 7200);
-    assert_eq!(updated_contract_config.price_max_blocks_old, 200);
+    assert_eq!(updated_contract_config.price_data_valid_period, 200);
     assert_eq!(
         updated_contract_config.required_binance_positions,
         vec!["ETHUSDT".to_string()]
@@ -1886,7 +1886,7 @@ fn test_execute_update_config_partial_updates() {
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
     assert_eq!(updated_contract_config.owner, Addr::unchecked("admin")); // unchanged
     assert_eq!(updated_contract_config.consensus_data_valid_period, 3600); // updated
-    assert_eq!(updated_contract_config.price_max_blocks_old, 150); // updated
+    assert_eq!(updated_contract_config.price_data_valid_period, 150); // updated
     assert_eq!(
         updated_contract_config.required_binance_positions,
         vec!["BTCUSDT".to_string()]
@@ -1947,7 +1947,7 @@ fn test_execute_update_config_partial_updates() {
     // Verify contract config was not changed from previous update
     let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
     assert_eq!(contract_config_after.consensus_data_valid_period, 3600); // still updated value
-    assert_eq!(contract_config_after.price_max_blocks_old, 150); // still updated value
+    assert_eq!(contract_config_after.price_data_valid_period, 150); // still updated value
 }
 
 #[test]
@@ -2134,7 +2134,7 @@ fn test_query_get_aum_with_large_values() {
         owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "ETH".to_string()],
     };
@@ -2260,7 +2260,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
         owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
-        price_max_blocks_old: 100,
+        price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec![
             "BTC".to_string(),

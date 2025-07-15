@@ -1,5 +1,5 @@
-use crate::state::BinanceData;
-use consensus::consensus::{OracleData, Round};
+use crate::state::{BinanceData, Config};
+use consensus::consensus::{Config as ConsensusConfig, OracleData, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Int256;
 
@@ -33,7 +33,7 @@ pub enum ExecuteMsg {
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { new_data: BinanceData },
     /// UpdateConfig updates the contract's configuration parameters.
-    /// Only callable by the admin. All fields are optional, allowing partial updates.
+    /// Only callable by the owner. All fields are optional, allowing partial updates.
     UpdateConfig { new_config: UpdateConfig },
 }
 
@@ -75,6 +75,9 @@ pub enum QueryMsg {
     /// Returns current round info
     #[returns(RoundInfoResponse)]
     GetRoundInfo {},
+    /// Returns the current configuration of the contract and it's consensus mechanism
+    #[returns(GetConfigResponse)]
+    GetConfig {},
 }
 
 #[cw_serde]
@@ -96,4 +99,12 @@ pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
+}
+
+#[cw_serde]
+pub struct GetConfigResponse {
+    /// The current config of the consensus mechanism
+    pub consensus_config: ConsensusConfig,
+    /// The current config of the contract itself
+    pub contract_config: Config,
 }

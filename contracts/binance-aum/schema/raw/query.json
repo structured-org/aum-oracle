@@ -43,6 +43,20 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "Returns the current configuration of the contract and it's consensus mechanism",
+      "type": "object",
+      "required": [
+        "get_config"
+      ],
+      "properties": {
+        "get_config": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }
