@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 BINARY=${BINARY:-neutrond}
 
@@ -11,9 +12,16 @@ IBCUSDCDENOM=${IBCUSDCDENOM:-uibcusdc}
 CONTRACTS_BINARIES_DIR=${CONTRACTS_BINARIES_DIR:-/opt/contracts}
 THIRD_PARTY_CONTRACTS_DIR=${THIRD_PARTY_CONTRACTS_DIR:-/opt/contracts_thirdparty}
 
-# DEMO_MNEMONIC_2="veteran try aware erosion drink dance decade comic dawn museum release episode original list ability owner size tuition surface ceiling depth seminar capable only"
-# echo "$DEMO_MNEMONIC_2" | $BINARY keys add demowallet2 --home "$CHAIN_DIR" --recover --keyring-backend=test
-# $BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show demowallet2 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM,100000000000000$IBCATOMDENOM,100000000000000$IBCUSDCDENOM"  --home "$CHAIN_DIR"
+DEMO_MNEMONIC_1="banner spread envelope side kite person disagree path silver will brother under couch edit food venture squirrel civil budget number acquire point work mass"
+DEMO_MNEMONIC_2="veteran try aware erosion drink dance decade comic dawn museum release episode original list ability owner size tuition surface ceiling depth seminar capable only"
+
+# Create demowallet1
+printf "%s\n" "$DEMO_MNEMONIC_1" | $BINARY keys add demowallet1 --home "$CHAIN_DIR" --recover --keyring-backend test
+$BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show demowallet1 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
+
+# Create demowallet2
+printf "%s\n" "$DEMO_MNEMONIC_2" | $BINARY keys add demowallet2 --home "$CHAIN_DIR" --recover --keyring-backend test
+$BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show demowallet2 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
 
 GENESIS_PATH="$CHAIN_DIR/config/genesis.json"
 
@@ -49,6 +57,10 @@ NEUTRON_STAKING_VAULT_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_vault.was
 NEUTRON_STAKING_TRACKER_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_tracker.wasm
 NEUTRON_STAKING_REWARDS_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_rewards.wasm
 NEUTRON_STAKING_INFO_PROXY_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_info_proxy.wasm
+
+SLINKY_CONTRACT=$CONTRACTS_BINARIES_DIR/slinky_oracle.wasm
+BINANCE_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/binance_aum_oracle_contract.wasm
+JUPITER_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/jupiter_aum_oracle_contract.wasm
 
 # Slinky genesis configs
 USE_CORE_MARKETS=${USE_CORE_MARKETS:-true}
@@ -156,6 +168,10 @@ NEUTRON_STAKING_TRACKER_LABEL="neutron.staking_tracker"
 NEUTRON_STAKING_REWARDS_LABEL="neutron.staking_rewards"
 NEUTRON_STAKING_INFO_PROXY_LABEL="neutron.staking_proxy"
 
+SLINKY_LABEL="slinky_oracle"
+BINANCE_AUM_ORACLE_LABEL="binance_aum_oracle"
+JUPITER_AUM_ORACLE_LABEL="jupiter_aum_oracle"
+
 echo "Initializing dao contract in genesis..."
 
 function store_binary() {
@@ -197,6 +213,11 @@ NEUTRON_STAKING_TRACKER_BINARY_ID=$(store_binary        "$NEUTRON_STAKING_TRACKE
 NEUTRON_STAKING_VAULT_BINARY_ID=$(store_binary          "$NEUTRON_STAKING_VAULT_CONTRACT")
 NEUTRON_STAKING_REWARDS_BINARY_ID=$(store_binary        "$NEUTRON_STAKING_REWARDS_CONTRACT")
 NEUTRON_STAKING_INFO_PROXY_BINARY_ID=$(store_binary     "$NEUTRON_STAKING_INFO_PROXY_CONTRACT")
+
+# AUM ORACLE CONTRACTS
+SLINKY_CONTRACT_BINARY_ID=$(store_binary                 "$SLINKY_CONTRACT")
+BINANCE_AUM_ORACLE_CONTRACT_BINARY_ID=$(store_binary     "$BINANCE_AUM_ORACLE_CONTRACT")
+JUPITER_AUM_ORACLE_CONTRACT_BINARY_ID=$(store_binary     "$JUPITER_AUM_ORACLE_CONTRACT")
 
 # WARNING!
 # The following code is needed to pre-generate the contract addresses
@@ -252,6 +273,11 @@ NEUTRON_STAKING_TRACKER_CONTRACT_ADDRESS=$(genaddr     "$NEUTRON_STAKING_TRACKER
 NEUTRON_STAKING_VAULT_CONTRACT_ADDRESS=$(genaddr       "$NEUTRON_STAKING_VAULT_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
 NEUTRON_STAKING_REWARDS_CONTRACT_ADDRESS=$(genaddr     "$NEUTRON_STAKING_REWARDS_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
 NEUTRON_STAKING_INFO_PROXY_CONTRACT_ADDRESS=$(genaddr  "$NEUTRON_STAKING_INFO_PROXY_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
+
+# AUM ORACLE CONTRACTS
+SLINKY_CONTRACT_ADDRESS=$(genaddr "$SLINKY_CONTRACT_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
+BINANCE_AUM_ORACLE_CONTRACT_ADDRESS=$(genaddr "$BINANCE_AUM_ORACLE_CONTRACT_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
+JUPITER_AUM_ORACLE_CONTRACT_ADDRESS=$(genaddr "$JUPITER_AUM_ORACLE_CONTRACT_BINARY_ID") && (( INSTANCE_ID_COUNTER++ ))
 
 function check_json() {
   MSG=$1
@@ -676,6 +702,30 @@ NEUTRON_STAKING_INFO_PROXY_INIT_MSG='{
   ]
 }'
 
+SLINKY_INIT_MSG='{}'
+BINANCE_AUM_ORACLE_INIT_MSG='{
+  "owner": "'"$ADMIN_ADDRESS"'",
+  "oracles": ["'"$ADMIN_ADDRESS"'"],
+  "threshold": 1,
+  "data_delta_ppm": 10000,
+  "round_length": 5,
+  "consensus_data_valid_period": 60,
+  "price_data_valid_period": 100,
+  "required_binance_positions": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "required_binance_spot_assets": ["USDT", "BTC", "ETH", "SOL"],
+  "price_oracle_contract": "'"$SLINKY_CONTRACT_ADDRESS"'"
+  }'
+JUPITER_AUM_ORACLE_INIT_MSG='{
+  "owner": "'"$ADMIN_ADDRESS"'",
+  "oracles": ["'"$ADMIN_ADDRESS"'"],
+  "threshold": 1,
+  "data_delta_ppm": 10000,
+  "round_length": 5,
+  "consensus_data_validity_period": 60,
+  "required_custody_assets": ["SOL", "USDC", "USDT", "WBTC", "WETH"],
+  "price_data_validity_period": 100
+}'
+
 echo "Instantiate contracts"
 
 function init_contract() {
@@ -704,6 +754,9 @@ init_contract "$NEUTRON_STAKING_TRACKER_BINARY_ID"           "$NEUTRON_STAKING_T
 init_contract "$NEUTRON_STAKING_VAULT_BINARY_ID"             "$NEUTRON_STAKING_VAULT_INIT_MSG"   "$NEUTRON_STAKING_VAULT_LABEL"
 init_contract "$NEUTRON_STAKING_REWARDS_BINARY_ID"           "$NEUTRON_STAKING_REWARDS_INIT_MSG"    "$NEUTRON_STAKING_REWARDS_LABEL"
 init_contract "$NEUTRON_STAKING_INFO_PROXY_BINARY_ID"        "$NEUTRON_STAKING_INFO_PROXY_INIT_MSG" "$NEUTRON_STAKING_INFO_PROXY_LABEL"
+init_contract "$SLINKY_CONTRACT_BINARY_ID"                   "$SLINKY_INIT_MSG"                   "$SLINKY_LABEL"
+init_contract "$BINANCE_AUM_ORACLE_CONTRACT_BINARY_ID"       "$BINANCE_AUM_ORACLE_INIT_MSG"       "$BINANCE_AUM_ORACLE_LABEL"
+init_contract "$JUPITER_AUM_ORACLE_CONTRACT_BINARY_ID"       "$JUPITER_AUM_ORACLE_INIT_MSG"       "$JUPITER_AUM_ORACLE_LABEL"
 
 ADD_SUBDAOS_MSG='{
   "update_sub_daos": {
@@ -817,3 +870,7 @@ echo "STAKING VAULT" $NEUTRON_STAKING_VAULT_CONTRACT_ADDRESS
 echo "STAKING TRACKER" $NEUTRON_STAKING_TRACKER_CONTRACT_ADDRESS
 echo "STAKING_REWARDS" $NEUTRON_STAKING_REWARDS_CONTRACT_ADDRESS
 echo "STAKING INFO PROXY" $NEUTRON_STAKING_INFO_PROXY_CONTRACT_ADDRESS
+
+echo "SLINKY_CONTRACT_ADDRESS" $SLINKY_CONTRACT_ADDRESS
+echo "BINANCE_AUM_ORACLE_CONTRACT_ADDRESS" $BINANCE_AUM_ORACLE_CONTRACT_ADDRESS
+echo "JUPITER_AUM_ORACLE_CONTRACT_ADDRESS" $JUPITER_AUM_ORACLE_CONTRACT_ADDRESS

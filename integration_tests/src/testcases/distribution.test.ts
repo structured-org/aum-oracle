@@ -5,6 +5,7 @@ import { AccountData, DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { GasPrice } from '@cosmjs/stargate';
 import { setupPark } from '../testSuite';
 import Cosmopark from '@neutron-org/cosmopark';
+import { sleep } from '../helpers/sleep';
 
 describe('Distribution', () => {
   const context: {
@@ -21,7 +22,7 @@ describe('Distribution', () => {
     console.log('park has been setup');
 
     context.wallet = await DirectSecp256k1HdWallet.fromMnemonic(
-      context.park.config.wallets.demowallet1.mnemonic,
+      'banner spread envelope side kite person disagree path silver will brother under couch edit food venture squirrel civil budget number acquire point work mass',
       {
         prefix: 'neutron',
       },
@@ -49,5 +50,6 @@ describe('Distribution', () => {
 
   it('instantiate', async () => {
     console.log('in instantiate');
+    await sleep(1000000);
   });
 });

@@ -207,14 +207,6 @@ export const setupPark = async (
     master_mnemonic: wallets.master,
     loglevel: 'info',
     wallets: {
-      demowallet1: {
-        mnemonic: wallets.demowallet1,
-        balance: '1000000000',
-      },
-      demowallet2: {
-        mnemonic: wallets.demowallet2,
-        balance: '1000000000',
-      },
       demo1: { mnemonic: wallets.demo1, balance: '1000000000' },
       demo2: { mnemonic: wallets.demo2, balance: '1000000000' },
       demo3: { mnemonic: wallets.demo3, balance: '1000000000' },
@@ -225,7 +217,7 @@ export const setupPark = async (
         image: `aum-oracle-test:0.0.1`,
         entrypoint: '/app/aum-oracle --config /app/config.yaml',
         ports: [],
-        depends_on: [],
+        depends_on: ['neutron_val1'],
         volumes: ['./aum-oracle-1-config.yaml:/app/config.yaml'],
       },
     ],
