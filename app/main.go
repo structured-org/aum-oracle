@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go"
@@ -156,25 +155,22 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		logger.Info("running binance oracle for neutron")
 		oracle.RunOracle(ctx, binanceOracleForNeutron)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// shift oracles in time to avoid simultaneous prints to stdout at debug submission
-		// TODO: remove when oracles and clients are fully implemented
-		time.Sleep(10 * time.Second)
-		go oracle.RunOracle(ctx, binanceOracleForSolana)
+		logger.Info("running binance oracle for solana")
+		oracle.RunOracle(ctx, binanceOracleForSolana)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// shift oracles in time to avoid simultaneous prints to stdout at debug submission
-		// TODO: remove when oracles and clients are fully implemented
-		time.Sleep(10 * time.Second)
-		go oracle.RunOracle(ctx, jupiterOracleForNeutron)
+		logger.Info("running jupiter oracle for neutron")
+		oracle.RunOracle(ctx, jupiterOracleForNeutron)
 	}()
 
 	go func() {
