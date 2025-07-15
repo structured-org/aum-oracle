@@ -69,7 +69,12 @@ func (m *MockBinanceClient) loadDefaultData() {
 func (m *MockBinanceClient) GetUmPositions(_ context.Context) ([]*binanceportfolio.UMPosition, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.umPositions, nil
+	cp := make([]*binanceportfolio.UMPosition, len(m.umPositions))
+	for i, position := range m.umPositions {
+		positionCp := *position
+		cp[i] = &positionCp
+	}
+	return cp, nil
 }
 
 func (m *MockBinanceClient) SetUmPositions(positions []*binanceportfolio.UMPosition) {
@@ -81,7 +86,12 @@ func (m *MockBinanceClient) SetUmPositions(positions []*binanceportfolio.UMPosit
 func (m *MockBinanceClient) GetCmPositions(_ context.Context) ([]*binanceportfolio.CMPosition, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.cmPositions, nil
+	cp := make([]*binanceportfolio.CMPosition, len(m.cmPositions))
+	for i, position := range m.cmPositions {
+		positionCp := *position
+		cp[i] = &positionCp
+	}
+	return cp, nil
 }
 
 func (m *MockBinanceClient) SetCmPositions(positions []*binanceportfolio.CMPosition) {
@@ -93,7 +103,8 @@ func (m *MockBinanceClient) SetCmPositions(positions []*binanceportfolio.CMPosit
 func (m *MockBinanceClient) GetPMAccountInfo(_ context.Context) (*binanceportfolio.Account, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.pmAccountInfo, nil
+	cp := *m.pmAccountInfo
+	return &cp, nil
 }
 
 func (m *MockBinanceClient) SetPMAccountInfo(account *binanceportfolio.Account) {
@@ -105,7 +116,12 @@ func (m *MockBinanceClient) SetPMAccountInfo(account *binanceportfolio.Account) 
 func (m *MockBinanceClient) GetPMAccountBalance(_ context.Context) ([]*binanceportfolio.Balance, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.pmAccountBalance, nil
+	cp := make([]*binanceportfolio.Balance, len(m.pmAccountBalance))
+	for i, balance := range m.pmAccountBalance {
+		balanceCp := *balance
+		cp[i] = &balanceCp
+	}
+	return cp, nil
 }
 
 func (m *MockBinanceClient) SetPMAccountBalance(balances []*binanceportfolio.Balance) {
@@ -117,7 +133,8 @@ func (m *MockBinanceClient) SetPMAccountBalance(balances []*binanceportfolio.Bal
 func (m *MockBinanceClient) GetSpotAccountInfo(_ context.Context) (*binance.Account, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.spotAccountInfo, nil
+	cp := *m.spotAccountInfo
+	return &cp, nil
 }
 
 func (m *MockBinanceClient) SetSpotAccountInfo(account *binance.Account) {

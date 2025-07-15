@@ -69,7 +69,8 @@ func (m *MockJupiterClient) GetJupiterCustodyInfo(_ context.Context, custody sol
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if info, ok := m.custodyInfo[custody]; ok {
-		return info, nil
+		cp := *info
+		return &cp, nil
 	}
 	return nil, fmt.Errorf("custody info not found for %s", custody.String())
 }
@@ -83,7 +84,8 @@ func (m *MockJupiterClient) SetJupiterCustodyInfo(custody solana.PublicKey, info
 func (m *MockJupiterClient) GetJupiterPoolInfo(_ context.Context, _ solana.PublicKey) (*jupiterclient.JupiterPoolAccount, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.poolInfo, nil
+	cp := *m.poolInfo
+	return &cp, nil
 }
 
 func (m *MockJupiterClient) SetJupiterPoolInfo(info *jupiterclient.JupiterPoolAccount) {

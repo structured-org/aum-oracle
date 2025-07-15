@@ -53,7 +53,8 @@ func (m *MockSolanaClient) loadDefaultData() {
 func (m *MockSolanaClient) GetTokenSupply(_ context.Context, _ solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.tokenSupply, nil
+	cp := *m.tokenSupply
+	return &cp, nil
 }
 
 func (m *MockSolanaClient) SetTokenSupply(supply *solanarpc.UiTokenAmount) {
@@ -66,11 +67,13 @@ func (m *MockSolanaClient) GetTokenAccountBalance(_ context.Context, token solan
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if balance, ok := m.tokenAccountBalance[token]; ok { // Simplified: just check token
-		return balance, nil
+		cp := *balance
+		return &cp, nil
 	}
 	// If the specific token/account combination isn't mocked, return the default loaded one if available.
 	for _, balance := range m.tokenAccountBalance {
-		return balance, nil
+		cp := *balance
+		return &cp, nil
 	}
 	return nil, fmt.Errorf("token account balance not found for token %s and account %s", token.String(), account.String())
 }
