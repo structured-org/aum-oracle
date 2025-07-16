@@ -21,7 +21,7 @@ get_contract_addr() {
 }
 
 echo ">>> storing jupiter aum"
-TX=$(neutrond tx wasm store ./artifacts/jupiter_aum.wasm --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y)
+TX=$(neutrond tx wasm store ./artifacts/jupiter_aum_oracle_contract.wasm --from $FROM --keyring-backend $KEYRING --node $NODE --chain-id $CHAIN_ID --broadcast-mode sync --gas-prices $GAS_PRICES --gas auto --gas-adjustment 1.5 -y)
 sleep 2
 HASH=$(extract_tx_hash "$TX")
 JUPITER_CODE_ID=$(get_code_id "$HASH")
