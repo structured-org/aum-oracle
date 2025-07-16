@@ -1,2 +1,4 @@
 .idea
 target
+app/config.yaml
+app/aum-oracle

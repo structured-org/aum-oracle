@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  aum-oracle:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aum-oracle
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
