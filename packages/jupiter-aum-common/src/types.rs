@@ -258,7 +258,7 @@ pub fn find_indices_of_non_matching_items<T: Eq + Hash>(
     }
 }
 
-// Single field consensus
+// Single field consensus on SignedDecimal256
 pub fn consensus_on_field_dec_256<F>(
     data: &[SolanaData],
     extract: F,
@@ -272,7 +272,7 @@ where
     consensus_on_items_dec256(&items, threshold, delta_ppm)
 }
 
-// Single field consensus
+// Single field consensus on u128
 pub fn consensus_on_field_u128<F>(
     data: &[SolanaData],
     extract: F,
@@ -297,6 +297,7 @@ where
     )
 }
 
+// Represents Jupiter asset under custody in JLP pool
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct CustodyAsset {
     /// Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>

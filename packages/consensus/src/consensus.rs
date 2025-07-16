@@ -319,6 +319,7 @@ pub fn consensus_on_items_dec256(
         items,
         threshold,
         |high, low| {
+            // |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000)
             let diff = high.abs_diff(low);
             let max_dispersion = low
                 .abs_diff(SignedDecimal256::zero())
@@ -401,7 +402,6 @@ where
             let low = sorted[i];
             let high = sorted[j - 1];
 
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
             if inside_ppm_bounds(high, low)? && j - i > max_len {
                 max_len = j - i;
                 best_slice = (i, j);
