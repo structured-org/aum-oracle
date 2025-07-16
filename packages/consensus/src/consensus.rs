@@ -5,6 +5,7 @@ use cosmwasm_std::{Addr, Decimal, Decimal256, Env, SignedDecimal256, StdResult, 
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::ops::{Add, Div, Sub};
 
 /// Describes the configuration of consensus
 #[cw_serde]
@@ -308,78 +309,40 @@ pub struct OracleData<T> {
 }
 
 /// A helper function that calculates consensus for a given array of SignedDecimal256s
-// TODO: make it generic (not critical for now, but it would be nice to have)
-pub fn consensus_on_items(
+pub fn consensus_on_items_dec256(
     items: &[SignedDecimal256],
     threshold: usize,
     delta_ppm: u64,
 ) -> Option<SignedDecimal256> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
     let ppm = Decimal256::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            if high.abs_diff(low)
-                <= low
-                    .abs_diff(SignedDecimal256::zero())
-                    .max(high.abs_diff(SignedDecimal256::zero()))
-                    * ppm
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median(slice))
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = high.abs_diff(low);
+            let max_dispersion = low
+                .abs_diff(SignedDecimal256::zero())
+                .max(high.abs_diff(SignedDecimal256::zero()))
+                * ppm;
+            Some(diff <= max_dispersion)
+        },
+        SignedDecimal256::from_atomics(2, 0).ok()?,
+    )
 }
 
 pub fn consensus_on_items_u64(items: &[u64], threshold: usize, delta_ppm: u64) -> Option<u64> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
-    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            let low_high_abs_diff = low.abs_diff(0).max(high.abs_diff(0));
-            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-            if Uint128::new(high.abs_diff(low) as u128)
-                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median_u64(slice))
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = Uint128::new(high.abs_diff(low) as u128);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        2u64,
+    )
 }
 
 pub fn consensus_on_items_uint128(
@@ -387,43 +350,22 @@ pub fn consensus_on_items_uint128(
     threshold: usize,
     delta_ppm: u64,
 ) -> Option<Uint128> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
-    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            let low_high_abs_diff = low
-                .abs_diff(Uint128::zero())
-                .max(high.abs_diff(Uint128::zero()));
-            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-            if high.abs_diff(low)
-                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median_u128(slice))
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = high.abs_diff(low);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        Uint128::new(2),
+    )
 }
 
 // Utility function that returns item only if all items are the same
-pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
+pub fn all_items_equal<T: Eq + Clone>(items: &[T]) -> Option<T> {
     let item = items.first()?;
 
     for a in items.iter() {
@@ -435,39 +377,58 @@ pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
     Some(item.clone())
 }
 
+pub fn consensus_on_items<T, F>(
+    items: &[T],
+    threshold: usize,
+    inside_ppm_bounds: F,
+    two: T, // 2 in T type
+) -> Option<T>
+where
+    T: Eq + PartialOrd + Copy + Clone + Add<Output = T> + Sub<Output = T> + Div<Output = T>,
+    F: Fn(T, T) -> Option<bool>,
+{
+    if items.len() < threshold {
+        return None;
+    }
+    let mut sorted = items.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // Find largest subslice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
+    let mut max_len = 0;
+    let mut best_slice = (0, 0);
+    // TODO: think about  https://github.com/structured-org/aum-oracle/pull/3#discussion_r2204499971
+    for i in 0..=(sorted.len() - threshold) {
+        for j in (i + threshold)..=sorted.len() {
+            let low = sorted[i];
+            let high = sorted[j - 1];
+
+            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
+            if inside_ppm_bounds(high, low)? && j - i > max_len {
+                max_len = j - i;
+                best_slice = (i, j);
+            }
+        }
+    }
+    if max_len < threshold {
+        return None;
+    }
+    let slice = &sorted[best_slice.0..best_slice.1];
+    median(slice, two)
+}
+
 /// Utility function that calculates the median value of a slice of SignedDecimals
-fn median(slice: &[SignedDecimal256]) -> SignedDecimal256 {
+pub fn median<T>(slice: &[T], two: T) -> Option<T>
+where
+    T: Copy + Clone + Add<Output = T> + Sub<Output = T> + Div<Output = T>,
+{
     let n = slice.len();
     if n == 0 {
-        return SignedDecimal256::zero();
+        return None;
     }
-    if n % 2 == 1 {
+    let res = if n % 2 == 1 {
         slice[n / 2]
     } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / SignedDecimal256::from_ratio(2, 1)
-    }
-}
+        (slice[n / 2 - 1] + slice[n / 2]) / two
+    };
 
-fn median_u64(slice: &[u64]) -> u64 {
-    let n = slice.len();
-    if n == 0 {
-        return 0;
-    }
-    if n % 2 == 1 {
-        slice[n / 2]
-    } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / 2
-    }
-}
-
-fn median_u128(slice: &[Uint128]) -> Uint128 {
-    let n = slice.len();
-    if n == 0 {
-        return Uint128::zero();
-    }
-    if n % 2 == 1 {
-        slice[n / 2]
-    } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / Uint128::new(2)
-    }
+    Some(res)
 }

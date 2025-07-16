@@ -1,10 +1,10 @@
 use crate::error::ContractError;
 use consensus::consensus::{
-    consensus_on_items, consensus_on_items_u64, consensus_on_items_uint128,
-    exact_consensus_on_items, ConsensusData,
+    all_items_equal, consensus_on_items, consensus_on_items_dec256, consensus_on_items_u64,
+    ConsensusData,
 };
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, SignedDecimal256, StdError, StdResult, Uint128};
+use cosmwasm_std::{Addr, Decimal, SignedDecimal256, StdError, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -124,7 +124,7 @@ impl ConsensusData for SolanaData {
             .iter()
             .map(|d| d.custody_assets.len() as u32)
             .collect::<Vec<_>>();
-        exact_consensus_on_items(&custody_assets_lengths)?;
+        all_items_equal(&custody_assets_lengths)?;
 
         let consensus_total_jlp_supply_decimals = data.first()?.total_jlp_supply_decimals;
         let consensus_strategy_jlp_balance_decimals = data.first()?.strategy_jlp_balance_decimals;
@@ -259,7 +259,7 @@ pub fn find_indices_of_non_matching_items<T: Eq + Hash>(
 }
 
 // Single field consensus
-pub fn consensus_on_field<F>(
+pub fn consensus_on_field_dec_256<F>(
     data: &[SolanaData],
     extract: F,
     threshold: usize,
@@ -269,7 +269,7 @@ where
     F: Fn(&SolanaData) -> SignedDecimal256,
 {
     let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items(&items, threshold, delta_ppm)
+    consensus_on_items_dec256(&items, threshold, delta_ppm)
 }
 
 // Single field consensus
@@ -283,7 +283,18 @@ where
     F: Fn(&SolanaData) -> Uint128,
 {
     let items: Vec<Uint128> = data.iter().map(&extract).collect();
-    consensus_on_items_uint128(&items, threshold, delta_ppm)
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        &items,
+        threshold,
+        |high, low| {
+            let diff = high.abs_diff(low);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        Uint128::new(2),
+    )
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

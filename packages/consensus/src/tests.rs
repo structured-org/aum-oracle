@@ -1,5 +1,5 @@
 use crate::consensus::{
-    consensus_on_items, exact_consensus_on_items, Config, ConsensusData, Round, State,
+    all_items_equal, consensus_on_items_dec256, Config, ConsensusData, Round, State,
 };
 use crate::error::ConsensusError;
 use cosmwasm_std::testing::mock_env;
@@ -23,22 +23,22 @@ impl ConsensusData for MockData {
         }
 
         // Try to reach consensus on each field
-        let value1 = consensus_on_items(
+        let value1 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value1).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value2 = consensus_on_items(
+        let value2 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value2).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value3 = consensus_on_items(
+        let value3 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value3).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value4 = consensus_on_items(
+        let value4 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value4).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
@@ -457,7 +457,7 @@ fn test_consensus_on_items() {
     for tc in test_cases {
         println!("Running test case: {}", tc.name);
         assert_eq!(
-            consensus_on_items(&tc.items, tc.threshold, tc.delta),
+            consensus_on_items_dec256(&tc.items, tc.threshold, tc.delta),
             tc.expected,
         )
     }
@@ -807,37 +807,37 @@ fn test_exact_consensus_on_items_various_cases() {
     // empty input
     {
         let items: Vec<u64> = vec![];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // single item
     {
         let items = vec![42];
-        assert_eq!(exact_consensus_on_items(&items), Some(42));
+        assert_eq!(all_items_equal(&items), Some(42));
     }
 
     // all equal
     {
         let items = vec![7, 7, 7, 7];
-        assert_eq!(exact_consensus_on_items(&items), Some(7));
+        assert_eq!(all_items_equal(&items), Some(7));
     }
 
     // one different
     {
         let items = vec![1, 1, 2, 1];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // all equal strings
     {
         let items = vec!["a", "a", "a"];
-        assert_eq!(exact_consensus_on_items(&items), Some("a"));
+        assert_eq!(all_items_equal(&items), Some("a"));
     }
 
     // different strings
     {
         let items = vec!["a", "b", "a"];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // custom struct
@@ -845,6 +845,6 @@ fn test_exact_consensus_on_items_various_cases() {
         #[derive(Clone, Eq, PartialEq, Debug)]
         struct Foo(u8);
         let items = vec![Foo(1), Foo(1), Foo(1)];
-        assert_eq!(exact_consensus_on_items(&items), Some(Foo(1)));
+        assert_eq!(all_items_equal(&items), Some(Foo(1)));
     }
 }

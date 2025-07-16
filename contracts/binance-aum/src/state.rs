@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use consensus::consensus::{consensus_on_items, ConsensusData, State};
+use consensus::consensus::{consensus_on_items_dec256, ConsensusData, State};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
@@ -129,8 +129,8 @@ impl ConsensusData for BinanceData {
 
             consensus_positions.push(Position {
                 symbol: data[0].positions[i].symbol.clone(), // all equal
-                amount: consensus_on_items(&amounts, threshold, delta_ppm)?,
-                pnl: consensus_on_items(&pnls, threshold, delta_ppm)?,
+                amount: consensus_on_items_dec256(&amounts, threshold, delta_ppm)?,
+                pnl: consensus_on_items_dec256(&pnls, threshold, delta_ppm)?,
             });
         }
 
@@ -141,7 +141,7 @@ impl ConsensusData for BinanceData {
                 data.iter().map(|d| d.spot_balances[i].amount).collect();
             consensus_spot.push(SpotBalance {
                 asset: data[0].spot_balances[i].asset.clone(), // all equal
-                amount: consensus_on_items(&amounts, threshold, delta_ppm)?,
+                amount: consensus_on_items_dec256(&amounts, threshold, delta_ppm)?,
             });
         }
 
@@ -168,7 +168,7 @@ where
     F: Fn(&BinanceData) -> SignedDecimal256,
 {
     let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items(&items, threshold, delta_ppm)
+    consensus_on_items_dec256(&items, threshold, delta_ppm)
 }
 
 impl Config {
