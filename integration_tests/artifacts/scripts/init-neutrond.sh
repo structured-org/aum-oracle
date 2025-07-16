@@ -23,6 +23,19 @@ $BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show demowallet1
 printf "%s\n" "$DEMO_MNEMONIC_2" | $BINARY keys add demowallet2 --home "$CHAIN_DIR" --recover --keyring-backend test
 $BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show demowallet2 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
 
+
+# Create wallets for AUM Oracles
+AUM_ORACLE_1_MNEMONIC="garden glass object letter ketchup surprise roof breeze kiss inherit couple mouse cram finish require panther result law nature tool eight box behave disease"
+AUM_ORACLE_2_MNEMONIC="hair swallow tongue burst act bomb test useless board novel hint know monkey solve wet math proud shock become topple buzz festival tail slab"
+AUM_ORACLE_3_MNEMONIC="limb desk rib destroy valid unusual core useful hotel toward brisk hope prefer angry visa faint nature split team tent ask type obscure outdoor"
+
+printf "%s\n" "$AUM_ORACLE_1_MNEMONIC" | $BINARY keys add aum_oracle_1 --home "$CHAIN_DIR" --recover --keyring-backend test
+$BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show aum_oracle_1 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
+printf "%s\n" "$AUM_ORACLE_2_MNEMONIC" | $BINARY keys add aum_oracle_2 --home "$CHAIN_DIR" --recover --keyring-backend test
+$BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show aum_oracle_2 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
+printf "%s\n" "$AUM_ORACLE_3_MNEMONIC" | $BINARY keys add aum_oracle_3 --home "$CHAIN_DIR" --recover --keyring-backend test
+$BINARY add-genesis-account "$($BINARY --home "$CHAIN_DIR" keys show aum_oracle_3 --keyring-backend test -a --home "$CHAIN_DIR")" "100000000000000$STAKEDENOM" --home "$CHAIN_DIR"
+
 GENESIS_PATH="$CHAIN_DIR/config/genesis.json"
 
 ADMIN_ADDRESS=$($BINARY keys show demowallet1 -a --home "$CHAIN_DIR" --keyring-backend test)
@@ -702,10 +715,14 @@ NEUTRON_STAKING_INFO_PROXY_INIT_MSG='{
   ]
 }'
 
+AUM_ORACLE_1_ADDRESS=$($BINARY keys show aum_oracle_1 -a --home "$CHAIN_DIR" --keyring-backend test)
+AUM_ORACLE_2_ADDRESS=$($BINARY keys show aum_oracle_2 -a --home "$CHAIN_DIR" --keyring-backend test)
+AUM_ORACLE_3_ADDRESS=$($BINARY keys show aum_oracle_3 -a --home "$CHAIN_DIR" --keyring-backend test)
+
 SLINKY_INIT_MSG='{}'
 BINANCE_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$ADMIN_ADDRESS"'"],
+  "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 1,
   "data_delta_ppm": 10000,
   "round_length": 5,
@@ -717,7 +734,7 @@ BINANCE_AUM_ORACLE_INIT_MSG='{
   }'
 JUPITER_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$ADMIN_ADDRESS"'"],
+  "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 1,
   "data_delta_ppm": 10000,
   "round_length": 5,
@@ -874,3 +891,7 @@ echo "STAKING INFO PROXY" $NEUTRON_STAKING_INFO_PROXY_CONTRACT_ADDRESS
 echo "SLINKY_CONTRACT_ADDRESS" $SLINKY_CONTRACT_ADDRESS
 echo "BINANCE_AUM_ORACLE_CONTRACT_ADDRESS" $BINANCE_AUM_ORACLE_CONTRACT_ADDRESS
 echo "JUPITER_AUM_ORACLE_CONTRACT_ADDRESS" $JUPITER_AUM_ORACLE_CONTRACT_ADDRESS
+
+echo "AUM_ORACLE_1_ADDRESS" $AUM_ORACLE_1_ADDRESS
+echo "AUM_ORACLE_2_ADDRESS" $AUM_ORACLE_2_ADDRESS
+echo "AUM_ORACLE_3_ADDRESS" $AUM_ORACLE_3_ADDRESS

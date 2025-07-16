@@ -220,6 +220,22 @@ export const setupPark = async (
         depends_on: ['neutron_val1'],
         volumes: ['./aum-oracle-1-config.yaml:/app/config.yaml'],
       },
+      {
+        name: 'aum-oracle-2',
+        image: `aum-oracle-test:0.0.1`,
+        entrypoint: '/app/aum-oracle --config /app/config.yaml',
+        ports: [],
+        depends_on: ['neutron_val1'],
+        volumes: ['./aum-oracle-2-config.yaml:/app/config.yaml'],
+      },
+      {
+        name: 'aum-oracle-3',
+        image: `aum-oracle-test:0.0.1`,
+        entrypoint: '/app/aum-oracle --config /app/config.yaml',
+        ports: [],
+        depends_on: ['neutron_val1'],
+        volumes: ['./aum-oracle-3-config.yaml:/app/config.yaml'],
+      },
     ],
   };
   for (const network of networks) {
