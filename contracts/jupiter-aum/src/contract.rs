@@ -227,7 +227,7 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     let pending_round = CONSENSUS_STATE.get_pending_round(deps.storage)?;
 
     Ok(RoundInfoResponse {
-        pending_round,
+        pending_round: pending_round.clone(),
         next_round: pending_round
             .next_round(CONSENSUS_STATE.config.load(deps.storage)?.round_length),
     })

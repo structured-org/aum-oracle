@@ -1,9 +1,8 @@
 use crate::consensus::PublishResult::ConsensusReached;
 use crate::error::{ConsensusError, ConsensusResult};
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal256, Env, SignedDecimal256, StdResult, Storage};
+use cosmwasm_std::{Addr, Decimal, Decimal256, Env, SignedDecimal256, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

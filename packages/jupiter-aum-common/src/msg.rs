@@ -1,11 +1,10 @@
 use crate::types::SolanaData;
 use consensus::consensus::{OracleData, Round};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Int256};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 /// InstantiateMsg defines the message used to initialize the contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     /// The address that will be the contract's owner.
     pub owner: String,
@@ -26,8 +25,7 @@ pub struct InstantiateMsg {
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
     /// Only callable by the owner. All fields are optional, allowing partial updates.
@@ -37,7 +35,7 @@ pub enum ExecuteMsg {
     PublishData { new_data: SolanaData },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct UpdateConfig {
     /// Contract config updates.
     ///
@@ -63,8 +61,7 @@ pub struct UpdateConfig {
 }
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg {
     /// Config returns the current contract configuration.
     Config {},
@@ -81,7 +78,7 @@ pub enum QueryMsg {
 // --- Query Responses ---
 
 /// ConfigResponse contains the current contract configuration.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct ConfigResponse {
     /// The current owner address.
     pub owner: String,
@@ -102,21 +99,21 @@ pub struct ConfigResponse {
 }
 
 /// GetDataResponse contains the last successfully published Solana data.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct GetDataResponse {
     /// The finalized Solana data, if available.
     pub last_published_data: Option<OracleData<SolanaData>>,
 }
 
-// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
+#[cw_serde]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct RoundInfoResponse {
     /// Current round.
     pub pending_round: Round,
@@ -125,5 +122,5 @@ pub struct RoundInfoResponse {
 }
 
 /// MigrateMsg is used for contract migration.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}

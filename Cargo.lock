@@ -733,6 +733,7 @@ name = "jupiter-aum-common"
 version = "0.1.0"
 dependencies = [
  "consensus",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "hex",
  "schemars",

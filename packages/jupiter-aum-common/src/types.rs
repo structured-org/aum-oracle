@@ -3,9 +3,12 @@ use consensus::consensus::{
     consensus_on_items, consensus_on_items_u64, consensus_on_items_uint128,
     exact_consensus_on_items, ConsensusData,
 };
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, SignedDecimal256, StdError, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 /// Config defines the contract's configuration parameters.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -37,7 +40,8 @@ impl Config {
 
 /// SolanaData represents the off-chain data pulled from the Solana blockchain
 /// specifically for Jupiter AUM (Assets Under Management) calculation.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+
+#[cw_serde]
 pub struct SolanaData {
     /// Slice of CustodyAssets from each Custody
     pub custody_assets: Vec<CustodyAsset>,
@@ -78,16 +82,42 @@ impl ConsensusData for SolanaData {
             return None;
         }
 
+        // iterate over custody assets and pick out the majority on decimals
+        let mut non_matching_indices: HashSet<usize> = HashSet::new();
+        let first = data.first()?;
+        for (i, _) in first.custody_assets.iter().enumerate() {
+            let custody_asset_decimals = |value: &SolanaData| value.custody_assets[i].decimals;
+            non_matching_indices = find_unequal_indices_mapped(
+                non_matching_indices,
+                data,
+                threshold,
+                custody_asset_decimals,
+            )?;
+        }
+
+        non_matching_indices =
+            find_unequal_indices_mapped(non_matching_indices, data, threshold, |value| {
+                value.total_jlp_supply_decimals
+            })?;
+
+        non_matching_indices =
+            find_unequal_indices_mapped(non_matching_indices, data, threshold, |value| {
+                value.strategy_jlp_balance_decimals
+            })?;
+
+        // remove all non-matching indices
+        let mut data = data.to_vec();
+        for i in non_matching_indices {
+            data.remove(i);
+        }
+
         // check top level fields
-        let consensus_aum_usd = consensus_on_field_u128(data, |d| d.aum_usd, threshold, delta_ppm)?;
+        let consensus_aum_usd =
+            consensus_on_field_u128(&data, |d| d.aum_usd, threshold, delta_ppm)?;
         let consensus_total_jlp_supply =
-            consensus_on_field_u128(data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
+            consensus_on_field_u128(&data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
         let consensus_strategy_jlp_balance =
-            consensus_on_field_u128(data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
-        let consensus_total_jlp_supply_decimals =
-            exact_consensus_on_field(data, |d| d.total_jlp_supply_decimals)?;
-        let consensus_strategy_jlp_balance_decimals =
-            exact_consensus_on_field(data, |d| d.strategy_jlp_balance_decimals)?;
+            consensus_on_field_u128(&data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
 
         // check that all custody assets have the same length
         let custody_assets_lengths = data
@@ -96,9 +126,17 @@ impl ConsensusData for SolanaData {
             .collect::<Vec<_>>();
         exact_consensus_on_items(&custody_assets_lengths)?;
 
-        // check custody assets properties
+        let consensus_total_jlp_supply_decimals = data.first()?.total_jlp_supply_decimals;
+        let consensus_strategy_jlp_balance_decimals = data.first()?.strategy_jlp_balance_decimals;
+
+        // check and assign custody assets properties
         let mut consensus_custody_assets = Vec::new();
         for (i, _) in data[0].custody_assets.iter().enumerate() {
+            let decimals_items = data
+                .iter()
+                .map(|d| d.custody_assets[i].decimals)
+                .collect::<Vec<u8>>();
+
             let guaranteed_usd_items = data
                 .iter()
                 .map(|d| d.custody_assets[i].guaranteed_usd)
@@ -111,10 +149,6 @@ impl ConsensusData for SolanaData {
                 .iter()
                 .map(|d| d.custody_assets[i].locked)
                 .collect::<Vec<u64>>();
-            let decimals_items = data
-                .iter()
-                .map(|d| d.custody_assets[i].decimals)
-                .collect::<Vec<u8>>();
             let denom_items = data
                 .iter()
                 .map(|d| d.custody_assets[i].denom.clone())
@@ -124,15 +158,18 @@ impl ConsensusData for SolanaData {
                 consensus_on_items_u64(&guaranteed_usd_items, threshold, delta_ppm)?;
             let consensus_owned = consensus_on_items_u64(&owned_items, threshold, delta_ppm)?;
             let consensus_locked = consensus_on_items_u64(&locked_items, threshold, delta_ppm)?;
-            let consensus_decimals = exact_consensus_on_items(&decimals_items)?;
-            let consensus_denom = exact_consensus_on_items(&denom_items)?;
+            // because of the work we did to filter out non-majority over each custody asset, we can just take the first one
+            let consensus_decimals = decimals_items.first()?;
+            // because we have a cleanup of custody assets to ensure their exact denoms, we are sure the data is already same and filtered
+            // so no need for filtering, only sanity check
+            let consensus_denom = denom_items.first()?;
 
             consensus_custody_assets.push(CustodyAsset {
                 owned: consensus_owned,
                 locked: consensus_locked,
                 guaranteed_usd: consensus_guaranteed_usd,
-                decimals: consensus_decimals,
-                denom: consensus_denom,
+                decimals: *consensus_decimals,
+                denom: consensus_denom.to_string(),
             });
         }
 
@@ -147,13 +184,78 @@ impl ConsensusData for SolanaData {
     }
 }
 
-// Single field exact consensus
-fn exact_consensus_on_field<F, T: Eq + Clone>(data: &[SolanaData], extract: F) -> Option<T>
+pub fn find_equal_indices<T: Eq + Hash>(
+    items: &[(usize, T)],
+    threshold: usize,
+) -> Option<(Vec<usize>, &T)> {
+    let mut groups: HashMap<&T, Vec<usize>> = HashMap::new();
+
+    for (index, value) in items.iter() {
+        groups.entry(value).or_default().push(*index);
+    }
+
+    for (value, indices) in groups {
+        if indices.len() >= threshold {
+            return Some((indices, value));
+        }
+    }
+
+    None
+}
+
+pub fn find_unequal_indices_mapped<T: Eq + Hash, F>(
+    filtered_out_items: HashSet<usize>,
+    data: &[SolanaData],
+    threshold: usize,
+    f: F,
+) -> Option<HashSet<usize>>
 where
     F: Fn(&SolanaData) -> T,
 {
-    let items: Vec<T> = data.iter().map(&extract).collect();
-    exact_consensus_on_items(&items)
+    let items_enumerated: Vec<(usize, T)> = data
+        .iter()
+        .enumerate()
+        .map(|(index, value)| (index, f(value)))
+        .collect();
+    find_indices_of_non_matching_items(filtered_out_items, &items_enumerated, threshold)
+}
+
+pub fn find_indices_of_non_matching_items<T: Eq + Hash>(
+    filtered_out_items: HashSet<usize>,
+    items: &[(usize, T)],
+    threshold: usize,
+) -> Option<HashSet<usize>> {
+    let mut groups: HashMap<&T, Vec<usize>> = HashMap::new();
+
+    // group all items by equality
+    for (index, value) in items.iter() {
+        if !filtered_out_items.contains(index) {
+            groups.entry(value).or_default().push(*index);
+        }
+    }
+
+    let mut result: HashSet<usize> = filtered_out_items;
+    let mut consensus_found = false;
+
+    for (_, indices) in groups {
+        // add all groups of non-matching items to result
+        if indices.len() < threshold {
+            let indices_set = indices.into_iter().collect::<HashSet<usize>>();
+            result = result
+                .union(&indices_set)
+                .copied()
+                .collect::<HashSet<usize>>();
+        } else {
+            // if the threshold is reached, overall consensus is found
+            consensus_found = true
+        }
+    }
+
+    if consensus_found {
+        Some(result)
+    } else {
+        None
+    }
 }
 
 // Single field consensus
