@@ -177,10 +177,10 @@ fn test_strategy_jlp_balance_decimals_exact_consensus_pass() {
 #[test]
 fn test_all_exact_fields_match_min_threshold() {
     let mut data = vec![base_data(); 7];
-    for i in 0..2 {
-        data[i].custody_assets[0].decimals = 3;
-        data[i].total_jlp_supply_decimals = 7;
-        data[i].strategy_jlp_balance_decimals = 8;
+    for item in data.iter_mut().take(2) {
+        item.custody_assets[0].decimals = 3;
+        item.total_jlp_supply_decimals = 7;
+        item.strategy_jlp_balance_decimals = 8;
     }
     let result = SolanaData::try_consensus(&data, 5, 10000);
     assert!(result.is_some());
@@ -194,8 +194,8 @@ fn test_all_exact_fields_match_min_threshold() {
 #[test]
 fn test_custody_decimals_exact_consensus() {
     let mut data = vec![base_data(); 7];
-    for i in 0..3 {
-        data[i].custody_assets[0].decimals = 5;
+    for item in data.iter_mut().take(3) {
+        item.custody_assets[0].decimals = 5;
     }
     assert!(SolanaData::try_consensus(&data, 4, 0).is_some());
 }
@@ -203,8 +203,8 @@ fn test_custody_decimals_exact_consensus() {
 #[test]
 fn test_custody_decimals_exact_fail() {
     let mut data = vec![base_data(); 7];
-    for i in 0..4 {
-        data[i].custody_assets[1].decimals = 3;
+    for item in data.iter_mut().take(4) {
+        item.custody_assets[1].decimals = 3;
     }
     assert!(SolanaData::try_consensus(&data, 5, 0).is_none());
 }
@@ -218,9 +218,8 @@ fn test_each_wrong_one_exact_field_gets_filtered_out() {
     data[5].aum_usd = Uint128::new(888888888);
     data[6].custody_assets[0].decimals = 5;
     data[6].aum_usd = Uint128::new(777777777);
-    for i in 0..4 {
-        data[i] = base_data();
-        data[i].aum_usd = Uint128::new(1000 + i as u128 * 2); // 1000, 1002, 1004, 1006
+    for (i, item) in data.iter_mut().enumerate().take(4) {
+        item.aum_usd = Uint128::new(1000 + i as u128 * 2); // 1000, 1002, 1004, 1006
     }
     let result = SolanaData::try_consensus(&data, 4, 10000);
     assert!(result.is_some());
@@ -249,11 +248,11 @@ fn test_each_wrong_one_exact_field_gets_filtered_out() {
 #[test]
 fn test_exact_field_disagreement_edge_threshold() {
     let mut data = vec![base_data(); 7];
-    for i in 0..3 {
-        data[i].custody_assets[1].decimals = 2;
+    for item in data.iter_mut().take(3) {
+        item.custody_assets[1].decimals = 2;
     }
-    for i in 3..5 {
-        data[i].custody_assets[1].decimals = 3;
+    for item in data.iter_mut().take(5).skip(3) {
+        item.custody_assets[1].decimals = 3;
     }
     assert!(SolanaData::try_consensus(&data, 6, 10000).is_none());
 }

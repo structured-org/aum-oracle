@@ -107,10 +107,10 @@ impl ConsensusData for SolanaData {
 
         // remove all non-matching indices
         let data: Vec<SolanaData> = data
-            .to_vec()
-            .into_iter()
+            .iter()
+            .cloned()
             .enumerate()
-            .filter(|(i, _)| !non_matching_indices.contains(&i))
+            .filter(|(i, _)| !non_matching_indices.contains(i))
             .map(|(_, v)| v)
             .collect();
 
@@ -225,10 +225,7 @@ pub fn find_indices_of_non_matching_items<T: Eq + Hash>(
         // add all groups of non-matching items to result
         if indices.len() < threshold {
             let indices_set: HashSet<usize> = indices.into_iter().collect();
-            result = result
-                .union(&indices_set)
-                .copied()
-                .collect();
+            result = result.union(&indices_set).copied().collect();
         } else {
             // if the threshold is reached, overall consensus is found
             consensus_found = true
