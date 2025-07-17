@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "test": "vitest --run",
-    "test:distribution": "vitest --run distribution.test.ts --bail 1",
+    "test:mock_controller": "vitest --run mock_controller.test.ts",
     "debug": "vitest --inspect-brk --bail 1 --threads false --run core.test.ts",
     "watch": "vitest",
     "build-neutron-image": "./dockerfiles/neutron/build.sh",
