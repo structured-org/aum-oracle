@@ -106,10 +106,13 @@ impl ConsensusData for SolanaData {
             })?;
 
         // remove all non-matching indices
-        let mut data = data.to_vec();
-        for i in non_matching_indices {
-            data.remove(i);
-        }
+        let data: Vec<SolanaData> = data
+            .to_vec()
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| !non_matching_indices.contains(&i))
+            .map(|(_, v)| v)
+            .collect();
 
         // check top level fields
         let consensus_aum_usd =
