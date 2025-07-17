@@ -13,7 +13,6 @@ import (
 type MockBinanceClient struct {
 	mu               sync.RWMutex
 	umPositions      []*binanceportfolio.UMPosition
-	cmPositions      []*binanceportfolio.CMPosition
 	pmAccountInfo    *binanceportfolio.Account
 	pmAccountBalance []*binanceportfolio.Balance
 	spotAccountInfo  *binance.Account
@@ -81,23 +80,6 @@ func (m *MockBinanceClient) SetUmPositions(positions []*binanceportfolio.UMPosit
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.umPositions = positions
-}
-
-func (m *MockBinanceClient) GetCmPositions(_ context.Context) ([]*binanceportfolio.CMPosition, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	cp := make([]*binanceportfolio.CMPosition, len(m.cmPositions))
-	for i, position := range m.cmPositions {
-		positionCp := *position
-		cp[i] = &positionCp
-	}
-	return cp, nil
-}
-
-func (m *MockBinanceClient) SetCmPositions(positions []*binanceportfolio.CMPosition) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.cmPositions = positions
 }
 
 func (m *MockBinanceClient) GetPMAccountInfo(_ context.Context) (*binanceportfolio.Account, error) {

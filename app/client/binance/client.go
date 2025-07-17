@@ -22,15 +22,6 @@ type Client struct {
 	binanceportfolio *binanceportfolio.Client
 }
 
-// GetCmPositions gets user's coin-margined portfolio perpetual futures positions.
-func (c *Client) GetCmPositions(ctx context.Context) ([]*binanceportfolio.CMPosition, error) {
-	resp, err := c.binanceportfolio.NewGetCMPositionRiskService().Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("Binance API query failed: %w", err)
-	}
-	return resp, nil
-}
-
 // GetUmPositions gets user's USD-margined portfolio perpetual futures positions.
 func (c *Client) GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error) {
 	resp, err := c.binanceportfolio.NewGetUMPositionRiskService().Do(ctx)

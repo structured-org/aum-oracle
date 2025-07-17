@@ -49,7 +49,6 @@ func (cm *ClientsMockController) GetMockSolanaClient() *MockSolanaClient {
 
 func (cm *ClientsMockController) Start(port int) error {
 	http.HandleFunc("/mock/binance/umpositions", cm.handleBinanceUmPositions)
-	http.HandleFunc("/mock/binance/cmpositions", cm.handleBinanceCmPositions)
 	http.HandleFunc("/mock/binance/pmaccountinfo", cm.handleBinancePMAccountInfo)
 	http.HandleFunc("/mock/binance/pmaccountbalance", cm.handleBinancePMAccountBalance)
 	http.HandleFunc("/mock/binance/spotaccountinfo", cm.handleBinanceSpotAccountInfo)
