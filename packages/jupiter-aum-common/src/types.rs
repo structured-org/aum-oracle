@@ -187,25 +187,6 @@ impl ConsensusData for SolanaData {
     }
 }
 
-pub fn find_equal_indices<T: Eq + Hash>(
-    items: &[(usize, T)],
-    threshold: usize,
-) -> Option<(Vec<usize>, &T)> {
-    let mut groups: HashMap<&T, Vec<usize>> = HashMap::new();
-
-    for (index, value) in items.iter() {
-        groups.entry(value).or_default().push(*index);
-    }
-
-    for (value, indices) in groups {
-        if indices.len() >= threshold {
-            return Some((indices, value));
-        }
-    }
-
-    None
-}
-
 pub fn find_unequal_indices_mapped<T: Eq + Hash, F>(
     filtered_out_items: HashSet<usize>,
     data: &[SolanaData],
@@ -243,11 +224,11 @@ pub fn find_indices_of_non_matching_items<T: Eq + Hash>(
     for (_, indices) in groups {
         // add all groups of non-matching items to result
         if indices.len() < threshold {
-            let indices_set = indices.into_iter().collect::<HashSet<usize>>();
+            let indices_set: HashSet<usize> = indices.into_iter().collect();
             result = result
                 .union(&indices_set)
                 .copied()
-                .collect::<HashSet<usize>>();
+                .collect();
         } else {
             // if the threshold is reached, overall consensus is found
             consensus_found = true
