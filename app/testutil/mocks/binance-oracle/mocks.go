@@ -38,21 +38,6 @@ func (m *MockBinanceClient) EXPECT() *MockBinanceClientMockRecorder {
 	return m.recorder
 }
 
-// GetCmPositions mocks base method.
-func (m *MockBinanceClient) GetCmPositions(ctx context.Context) ([]*portfolio.CMPosition, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCmPositions", ctx)
-	ret0, _ := ret[0].([]*portfolio.CMPosition)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCmPositions indicates an expected call of GetCmPositions.
-func (mr *MockBinanceClientMockRecorder) GetCmPositions(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCmPositions", reflect.TypeOf((*MockBinanceClient)(nil).GetCmPositions), ctx)
-}
-
 // GetPMAccountBalance mocks base method.
 func (m *MockBinanceClient) GetPMAccountBalance(ctx context.Context) ([]*portfolio.Balance, error) {
 	m.ctrl.T.Helper()

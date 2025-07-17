@@ -10,9 +10,9 @@ import (
 // NextRound contains AUM contract's next consensus round information.
 type NextRound struct {
 	// Round is the next consensus round number.
-	Round int64 `json:"round"`
+	Round uint64 `json:"round"`
 	// Timestamp is the timestamp of the next consensus round beginning.
-	Timestamp int64 `json:"timestamp"`
+	Timestamp uint64 `json:"timestamp"`
 }
 
 // BinanceAumData contains all Binance data that is a matter of consensus for the Binance AUM contract.
@@ -59,13 +59,15 @@ type JupiterAumData struct {
 	CustodyAssets []JupiterCustodyAsset `json:"custody_assets"`
 	// AumUsd is the total Jupiter protocol AUM in USD.
 	AumUsd math.Uint `json:"aum_usd"`
-	// JlpTokenDecimals is the number of decimals of the JLP token.
-	JlpTokenDecimals uint8 `json:"jlp_token_decimals"`
 	// TotalJlpSupply is the total supply of the JLP token.
 	TotalJlpSupply math.Uint `json:"total_jlp_supply"`
+	// TotalJlpSupplyDecimals is the number of decimals of the JLP token supply.
+	TotalJlpSupplyDecimals uint8 `json:"total_jlp_supply_decimals"`
 	// StrategyJlpBalance is the amount of the JLP token that is held by the Jupiter strategy
 	// address.
 	StrategyJlpBalance math.Uint `json:"strategy_jlp_balance"`
+	// StrategyJlpBalanceDecimals is the number of decimals of the strategy jlp balance
+	StrategyJlpBalanceDecimals uint8 `json:"strategy_jlp_balance_decimals"`
 }
 
 // SortCustodyAssets sorts the custody assets by their denomination.
@@ -87,4 +89,22 @@ type JupiterCustodyAsset struct {
 	Decimals uint8 `json:"decimals"`
 	// Denom is the custody asset denomination.
 	Denom string `json:"denom"`
+}
+
+// Smart contract types
+
+// GetRoundResponse is the response of aum smart contracts to the "get_round_info" query
+type GetRoundResponse struct {
+	// PendingRound is a currently pending round.
+	PendingRound Round `json:"pending_round"`
+	// NextRound is the next round.
+	NextRound Round `json:"next_round"`
+}
+
+// Round is the round info from aum smart contracts.
+type Round struct {
+	// Round is a number of the round.
+	Round uint64 `json:"round"`
+	// Start is when the round started (UNIX timestamp in seconds).
+	Start uint64 `json:"start"`
 }

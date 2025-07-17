@@ -22,4 +22,20 @@ jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
 jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
 jupiter_strategy_address: ""
 
+jupiter_aum_contract: ""
+binance_aum_contract: ""
+
+clients:
+  neutron:
+    mnemonic: ""
+    gas_prices: "0.5untrn"
+    gas: 500_000
+    chain_id: "test-1"
+    node: "localhost:9090"
+    node_conn_retries: 5
+    node_conn_retry_delay: "3s"
+
+mock_clients: true
+mock_controller_port: 3000
+
 logger_level: info

@@ -12,7 +12,6 @@ import (
 // BinanceClient is the definition of the expected Binance client.
 type BinanceClient interface {
 	GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error)
-	GetCmPositions(ctx context.Context) ([]*binanceportfolio.CMPosition, error)
 	GetPMAccountInfo(ctx context.Context) (*binanceportfolio.Account, error)
 	GetPMAccountBalance(ctx context.Context) ([]*binanceportfolio.Balance, error)
 	GetSpotAccountInfo(ctx context.Context) (*binance.Account, error)
