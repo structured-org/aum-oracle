@@ -26,7 +26,7 @@ var (
 )
 
 func TestOracleForNeutronRun(t *testing.T) {
-	start := time.Now().UTC().Unix()
+	start := uint64(time.Now().UTC().Unix())
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -87,10 +87,11 @@ func TestOracleForNeutronRun(t *testing.T) {
 			{Denom: "ETH", Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000, Decimals: 6},
 			{Denom: "SOL", Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000, Decimals: 6},
 		},
-		AumUsd:             math.NewUintFromString("5000000"),
-		TotalJlpSupply:     math.NewUintFromString("10000000"),
-		StrategyJlpBalance: math.NewUintFromString("2000000"),
-		JlpTokenDecimals:   6,
+		AumUsd:                     math.NewUintFromString("5000000"),
+		TotalJlpSupply:             math.NewUintFromString("10000000"),
+		StrategyJlpBalance:         math.NewUintFromString("2000000"),
+		TotalJlpSupplyDecimals:     6,
+		StrategyJlpBalanceDecimals: 6,
 	}
 	expectedData.SortCustodyAssets()
 	neutronClient.EXPECT().SubmitJupiterAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{

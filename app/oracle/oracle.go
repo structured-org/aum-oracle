@@ -2,7 +2,6 @@ package oracle
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -27,67 +26,92 @@ type Oracle[T any] interface {
 	// for the current round. This method ensures that the blockchain has the most
 	// up-to-date information about assets under management for decision-making
 	// and tracking purposes. The method returns information about the next round
-	// that should be processed, regardless of whether the current submission was
-	// successful or failed. This allows the oracle to continue its operation
-	// seamlessly and maintain the round progression even in case of errors.
+	// that should be processed.
 	SubmitData(ctx context.Context, data T) (*NextRound, error)
 
 	// Logger returns the logger for the oracle.
 	Logger() *zap.Logger
 }
 
+// failureDelay is the delay taken when an oracle fails to fetch or submit data to pervent
+// the oracle from spamming.
+var failureDelay = 10 * time.Second
+
 // RunOracle is a utility function that runs an oracle in a loop, fetching and submitting data at
 // specified intervals. It handles the necessary context management for the oracle's operation.
-func RunOracle[T any](ctx context.Context, oracle Oracle[T]) error {
-	nextRound, err := oracle.GetNextRound(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get initial round: %w", err)
-	}
-
+func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
+	var nextRound *NextRound
+	var err error
 	for {
-		// TODO: think through fetch/submission error cases
+		if nextRound == nil { // case on initialisation or on failure
+			nextRound, err = oracle.GetNextRound(ctx)
+			if err != nil {
+				oracle.Logger().Error("failed to query next round, having a delay",
+					zap.Error(err),
+					zap.String("delay", failureDelay.String()),
+				)
+				time.Sleep(failureDelay)
+				continue
+			}
+		}
 
-		timeTillNextRound := time.Duration(nextRound.Timestamp-time.Now().Unix()) * time.Second
+		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
 		oracle.Logger().Info("waiting for next round",
-			zap.Int64("round", nextRound.Round),
-			zap.Int64("round_timestamp", nextRound.Timestamp),
+			zap.Uint64("round", nextRound.Round),
+			zap.Uint64("round_timestamp", nextRound.Timestamp),
 			zap.Duration("time_till_next_round", timeTillNextRound),
 		)
 
 		select {
 		case <-time.NewTimer(timeTillNextRound).C:
+			currentRound := &NextRound{Round: nextRound.Round, Timestamp: nextRound.Timestamp}
 			oracle.Logger().Info("new round started",
-				zap.Int64("round", nextRound.Round),
-				zap.Int64("round_timestamp", nextRound.Timestamp),
+				zap.Uint64("round", currentRound.Round),
+				zap.Uint64("round_timestamp", currentRound.Timestamp),
 			)
 
-			data, err := oracle.FetchData(ctx)
-			if err != nil {
-				oracle.Logger().Error("failed to fetch data",
-					zap.Int64("round", nextRound.Round),
-					zap.Error(err),
+			nextRound = processRound(ctx, oracle, currentRound)
+			if nextRound == nil {
+				oracle.Logger().Info("having a delay after round processing failure",
+					zap.String("delay", failureDelay.String()),
 				)
+				time.Sleep(failureDelay)
 				continue
 			}
-
-			nextRound, err = oracle.SubmitData(ctx, data)
-			if err != nil {
-				oracle.Logger().Error("failed to submit AUM data",
-					zap.Int64("round", nextRound.Round),
-					zap.Any("data", data),
-					zap.Error(err),
-				)
-				continue
-			}
-
-			oracle.Logger().Info("AUM data submitted",
-				zap.Int64("round", nextRound.Round),
-				zap.Any("data", data),
-			)
 
 		case <-ctx.Done():
 			oracle.Logger().Info("oracle stopped by context")
-			return nil
+			return
 		}
 	}
+}
+
+// processRound fetches and submits data for a given round. Returns the next round on successful
+// processing as a response from the oracle. If either fetching or submitting data fails, it will
+// return nil, meaning that the next round is unknown.
+func processRound[T any](ctx context.Context, oracle Oracle[T], round *NextRound) *NextRound {
+	data, err := oracle.FetchData(ctx)
+	if err != nil {
+		oracle.Logger().Error("failed to fetch data",
+			zap.Uint64("round", round.Round),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	nextRound, err := oracle.SubmitData(ctx, data)
+	if err != nil {
+		oracle.Logger().Error("failed to submit AUM data",
+			zap.Uint64("round", round.Round),
+			zap.Any("data", data),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	oracle.Logger().Info("AUM data submitted",
+		zap.Uint64("round", round.Round),
+		zap.Any("data", data),
+	)
+	return nextRound
 }
