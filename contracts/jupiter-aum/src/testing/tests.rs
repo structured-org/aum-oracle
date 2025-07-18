@@ -280,7 +280,7 @@ fn test_query_get_data_and_config() {
     let init_msg = default_init_msg(&deps.api);
     instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
 
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
+    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetConfig {}).unwrap();
     assert!(res.len() > 0);
 
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetData {}).unwrap();

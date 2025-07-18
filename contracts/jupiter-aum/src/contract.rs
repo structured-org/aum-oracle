@@ -174,10 +174,10 @@ fn execute_publish_data(
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
     match msg {
-        QueryMsg::Config {} => Ok(to_json_binary(&query_config(deps)?)?),
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
+        QueryMsg::GetConfig {} => Ok(to_json_binary(&query_config(deps)?)?),
     }
 }
 

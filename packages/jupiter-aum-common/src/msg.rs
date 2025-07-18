@@ -65,9 +65,6 @@ pub struct UpdateConfig {
 #[allow(clippy::enum_variant_names)]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// Config returns the current contract configuration.
-    #[returns(ConfigResponse)]
-    Config {},
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
     #[returns(GetDataResponse)]
     GetData {},
@@ -79,6 +76,9 @@ pub enum QueryMsg {
     /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
     #[returns(RoundInfoResponse)]
     GetRoundInfo {},
+    /// Config returns the current contract configuration.
+    #[returns(ConfigResponse)]
+    GetConfig {},
 }
 
 // --- Query Responses ---
