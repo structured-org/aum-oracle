@@ -4,9 +4,9 @@ use cosmwasm_std::{Decimal, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    /// Owner of the contract
+    /// Owner of the contract.
     pub owner: String,
-    /// A list of AUM oracle instances from where the contract need to get individual AUMs and sum them up
+    /// A list of AUM oracle instances from where the contract gets individual AUMs.
     pub oracles: Vec<String>,
     /// The tokenfactory denom of the maxBTC token.
     pub maxbtc_denom: String,

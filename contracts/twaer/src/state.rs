@@ -6,7 +6,7 @@ use cw_storage_plus::{Item, Map};
 pub struct Config {
     /// Owner of the contract.
     pub owner: Addr,
-    /// A list of AUM oracle instances from where the contract need to get individual AUMs.
+    /// A list of AUM oracle instances from where the contract gets individual AUMs.
     pub oracles: Vec<Addr>,
     /// The tokenfactory denom of the maxBTC token.
     pub maxbtc_denom: String,

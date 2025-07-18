@@ -1,9 +1,9 @@
 [package]
 authors = []
-description = "AUM oracle contract"
+description = "Time-weighted average exchange rate contract"
 edition = "2021"
-name = "aum-oracle-contract"
-repository = "https://github.com/structured-org/aum-oracle"
+name = "twaer-contract"
+repository = "https://github.com/structured-org/twaer"
 version = "0.1.0"
 
 [lib]
