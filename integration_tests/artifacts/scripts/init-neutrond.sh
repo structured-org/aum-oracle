@@ -731,7 +731,7 @@ BINANCE_AUM_ORACLE_INIT_MSG='{
   "required_binance_positions": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
   "required_binance_spot_assets": ["USDT", "BTC", "ETH", "SOL"],
   "price_oracle_contract": "'"$SLINKY_CONTRACT_ADDRESS"'"
-  }'
+}'
 JUPITER_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
   "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],

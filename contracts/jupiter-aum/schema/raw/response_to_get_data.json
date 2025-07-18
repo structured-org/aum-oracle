@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetDataResponse",
+  "description": "GetDataResponse contains the last successfully published Solana data.",
+  "type": "object",
+  "properties": {
+    "last_published_data": {
+      "description": "The finalized Solana data, if available.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/OracleData_for_SolanaData"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "CustodyAsset": {
+      "type": "object",
+      "required": [
+        "decimals",
+        "denom",
+        "guaranteed_usd",
+        "locked",
+        "owned"
+      ],
+      "properties": {
+        "decimals": {
+          "description": "How many decimals in each number above.",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "denom": {
+          "description": "Custody denom.",
+          "type": "string"
+        },
+        "guaranteed_usd": {
+          "description": "The value in each custody account represents a total size estimate of all long positions",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "locked": {
+          "description": "Amount of locked tokens (used by traders) in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "owned": {
+          "description": "Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "OracleData_for_SolanaData": {
+      "description": "Data submitted by an oracle",
+      "type": "object",
+      "required": [
+        "data",
+        "round",
+        "timestamp"
+      ],
+      "properties": {
+        "data": {
+          "description": "The data submitted by the oracle",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SolanaData"
+            }
+          ]
+        },
+        "round": {
+          "description": "The round number an oracle tries to submit data for",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "timestamp": {
+          "description": "The UNIX timestamp in seconds when the oracle submitted the data",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SolanaData": {
+      "description": "SolanaData represents the off-chain data pulled from the Solana blockchain specifically for Jupiter AUM (Assets Under Management) calculation.",
+      "type": "object",
+      "required": [
+        "aum_usd",
+        "custody_assets",
+        "strategy_jlp_balance",
+        "strategy_jlp_balance_decimals",
+        "total_jlp_supply",
+        "total_jlp_supply_decimals"
+      ],
+      "properties": {
+        "aum_usd": {
+          "description": "Jupiter's Assets Under Management value in USD.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "custody_assets": {
+          "description": "Slice of CustodyAssets from each Custody",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustodyAsset"
+          }
+        },
+        "strategy_jlp_balance": {
+          "description": "The balance of JLP tokens held by the strategy.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "strategy_jlp_balance_decimals": {
+          "description": "JLP token balance decimal precision",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "total_jlp_supply": {
+          "description": "The total supply of JLP (Jupiter Liquidity Provider) tokens.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "total_jlp_supply_decimals": {
+          "description": "JLP token supply decimal precision",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+      "type": "string"
+    }
+  }
+}

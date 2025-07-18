@@ -1,6 +1,6 @@
 use crate::types::SolanaData;
 use consensus::consensus::{OracleData, Round};
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Int256};
 
 /// InstantiateMsg defines the message used to initialize the contract.
@@ -62,16 +62,22 @@ pub struct UpdateConfig {
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.
 #[cw_serde]
+#[allow(clippy::enum_variant_names)]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Config returns the current contract configuration.
+    #[returns(ConfigResponse)]
     Config {},
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
+    #[returns(GetDataResponse)]
     GetData {},
     /// GetAum calculates and returns the current Jupiter AUM value represented in BTC.
     /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
     /// Returns error if data is not valid.
+    #[returns(GetAumResponse)]
     GetAum {},
     /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
+    #[returns(RoundInfoResponse)]
     GetRoundInfo {},
 }
 
