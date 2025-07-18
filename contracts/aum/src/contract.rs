@@ -1,7 +1,7 @@
+use std::str::FromStr;
+
 use crate::error::{ContractError, ContractResult};
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetHistoricalDataResponse, InstantiateMsg, QueryMsg, UpdateConfig,
-};
+use crate::msg::{ExecuteMsg, GetAumResponse, InstantiateMsg, QueryMsg, UpdateConfig};
 use crate::state::{
     Config, ExchangeRateDataPoint, CONFIG, EXCHANGE_RATE_HISTORY, TWA_EXCHANGE_RATE,
 };
@@ -225,12 +225,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::PredictTwaExchangeRate {} => {
             Ok(to_json_binary(&predict_twa_exchange_rate(deps, env)?)?)
         }
-        QueryMsg::GetHistoricalData { limit } => Ok(to_json_binary(&query_get_historical_data(
-            deps, env, limit,
-        )?)?),
-        QueryMsg::GetDataPointCount {} => {
-            Ok(to_json_binary(&query_get_data_point_count(deps, env)?)?)
-        }
     }
 }
 
@@ -253,11 +247,14 @@ fn predict_twa_exchange_rate(deps: Deps, env: Env) -> ContractResult<Decimal> {
 }
 
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
-    let config = CONFIG.load(deps.storage)?;
-    let supply = deps.querier.query_supply(config.maxbtc_denom)?;
+    // let config = CONFIG.load(deps.storage)?;
+    // let mut supply = deps.querier.query_supply(config.maxbtc_denom)?;
+
+    // TODO: remove this once we have a real supply
+    let maxbtc_supply = Uint128::from_str("3470981878").unwrap();
     let aum = get_aum(deps)?;
 
-    Ok(Decimal::from_ratio(aum, supply.amount))
+    Ok(Decimal::from_ratio(aum, maxbtc_supply))
 }
 
 fn get_aum(deps: Deps) -> ContractResult<Uint128> {
@@ -276,60 +273,4 @@ fn get_aum(deps: Deps) -> ContractResult<Uint128> {
     }
 
     Ok(total_aum)
-}
-
-fn query_get_historical_data(
-    deps: Deps,
-    env: Env,
-    limit: Option<u32>,
-) -> ContractResult<GetHistoricalDataResponse> {
-    let config = CONFIG.load(deps.storage)?;
-    let current_timestamp = env.block.time.seconds();
-    let window_start = current_timestamp.saturating_sub(config.twa_window_seconds);
-    let limit = limit.unwrap_or(100);
-
-    // Get all data points within the TWA window
-    let mut data_points: Vec<ExchangeRateDataPoint> = EXCHANGE_RATE_HISTORY
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter_map(|item| match item {
-            Ok((timestamp, data_point)) if timestamp >= window_start => Some(data_point),
-            _ => None,
-        })
-        .collect();
-
-    let total_count = data_points.len() as u32;
-
-    // Apply limit if specified
-    if data_points.len() > limit as usize {
-        data_points = data_points
-            .into_iter()
-            .rev()
-            .take(limit as usize)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-    }
-
-    Ok(GetHistoricalDataResponse {
-        data_points,
-        total_count,
-    })
-}
-
-fn query_get_data_point_count(deps: Deps, env: Env) -> ContractResult<u32> {
-    let config = CONFIG.load(deps.storage)?;
-    let current_timestamp = env.block.time.seconds();
-    let window_start = current_timestamp.saturating_sub(config.twa_window_seconds);
-
-    // Count data points within the TWA window
-    let count = EXCHANGE_RATE_HISTORY
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter(|item| match item {
-            Ok((timestamp, _)) if *timestamp >= window_start => true,
-            _ => false,
-        })
-        .count() as u32;
-
-    Ok(count)
 }

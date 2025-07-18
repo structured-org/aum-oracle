@@ -1,12 +1,12 @@
 use crate::contract::{execute, instantiate, query};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetAumResponse, InstantiateMsg, QueryMsg, UpdateConfig};
-use crate::state::{Config, CONFIG};
+use crate::state::{Config, ExchangeRateDataPoint, CONFIG, EXCHANGE_RATE_HISTORY};
 use crate::testing::mock_querier::mock_dependencies;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, OwnedDeps, StdError,
-    SystemResult, Timestamp, Uint128, WasmQuery,
+    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
+    StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 
 #[test]
@@ -201,7 +201,7 @@ fn test_store_instant_exchange_rate() {
     let env = test_env_with_time(1000000, 100);
     store_instant_rate(&mut deps, env.clone(), &owner).unwrap();
 
-    let count = query_data_point_count(&deps, env).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
 }
 
@@ -232,7 +232,7 @@ fn test_twa_data_cleanup() {
     store_instant_rate(&mut deps, env2.clone(), &owner).unwrap();
 
     // Should only have 1 data point now (the old one was cleaned up)
-    let count = query_data_point_count(&deps, env2).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
 }
 
@@ -288,7 +288,7 @@ fn test_twa_exchange_rate_long_time_period() {
     let env_final = test_env_with_time(base_time + 3600, 104);
 
     // Verify we have 4 data points
-    let count = query_data_point_count(&deps, env_final.clone()).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 4);
 
     // Calculate expected TWA:
@@ -313,41 +313,25 @@ fn test_twa_exchange_rate_long_time_period() {
     assert_eq!(predicted_twa, stored_twa);
 
     // === Test historical data query ===
-    let bin = query_msg(
-        &deps,
-        env_final.clone(),
-        QueryMsg::GetHistoricalData { limit: None },
-    )
-    .unwrap();
-    let historical_data: crate::msg::GetHistoricalDataResponse = from_json(bin).unwrap();
+    let data_points: Vec<ExchangeRateDataPoint> = EXCHANGE_RATE_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
 
-    assert_eq!(historical_data.total_count, 4);
-    assert_eq!(historical_data.data_points.len(), 4);
+    assert_eq!(data_points.len(), 4);
 
     // Verify the rates are correct
-    assert_eq!(
-        historical_data.data_points[0].rate,
-        Decimal::from_ratio(2u128, 1u128)
-    ); // 2.0
-    assert_eq!(
-        historical_data.data_points[1].rate,
-        Decimal::from_ratio(8u128, 5u128)
-    ); // 1.6
-    assert_eq!(
-        historical_data.data_points[2].rate,
-        Decimal::from_ratio(1u128, 1u128)
-    ); // 1.0
-    assert_eq!(
-        historical_data.data_points[3].rate,
-        Decimal::from_ratio(1u128, 1u128)
-    ); // 1.0
+    assert_eq!(data_points[0].rate, Decimal::from_ratio(2u128, 1u128)); // 2.0
+    assert_eq!(data_points[1].rate, Decimal::from_ratio(8u128, 5u128)); // 1.6
+    assert_eq!(data_points[2].rate, Decimal::from_ratio(1u128, 1u128)); // 1.0
+    assert_eq!(data_points[3].rate, Decimal::from_ratio(1u128, 1u128)); // 1.0
 
     // === Test data cleanup - move beyond window ===
     let env_cleanup = test_env_with_time(base_time + 7200, 105); // 2 hours later
     store_instant_rate(&mut deps, env_cleanup.clone(), &owner).unwrap();
 
     // Should only have 1 data point now (old ones cleaned up)
-    let count = query_data_point_count(&deps, env_cleanup).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
 }
 
@@ -562,16 +546,17 @@ where
     execute_msg(deps, env, owner, ExecuteMsg::StoreInstantExchangeRate {})
 }
 
-/// Query data point count helper
+/// Query data point count helper - reads directly from state
 fn query_data_point_count<T>(
     deps: &OwnedDeps<MockStorage, MockApi, T>,
-    env: Env,
 ) -> Result<u32, ContractError>
 where
     T: cosmwasm_std::Querier,
 {
-    let bin = query_msg(deps, env, QueryMsg::GetDataPointCount {})?;
-    Ok(from_json(bin)?)
+    let count = EXCHANGE_RATE_HISTORY
+        .range(&deps.storage, None, None, Order::Ascending)
+        .count() as u32;
+    Ok(count)
 }
 
 /// Query TWA exchange rate helper

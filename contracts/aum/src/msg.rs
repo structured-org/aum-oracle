@@ -1,4 +1,4 @@
-use crate::state::{Config, ExchangeRateDataPoint};
+use crate::state::Config;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 
@@ -57,17 +57,6 @@ pub enum QueryMsg {
     /// PredictTwaExchangeRate predicts the TWA exchange rate based on the stored instant exchange
     /// rates.
     PredictTwaExchangeRate {},
-
-    #[returns(GetHistoricalDataResponse)]
-    /// Returns historical exchange rate data points within the TWA window.
-    GetHistoricalData {
-        /// Optional limit on the number of data points to return (default: 100).
-        limit: Option<u32>,
-    },
-
-    #[returns(u32)]
-    /// Returns the count of stored exchange rate data points within the TWA window.
-    GetDataPointCount {},
 }
 
 #[cw_serde]
@@ -75,12 +64,4 @@ pub struct GetAumResponse {
     /// The total BTC AUM reported by oracles.
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Uint128,
-}
-
-#[cw_serde]
-pub struct GetHistoricalDataResponse {
-    /// Historical exchange rate data points within the TWA window.
-    pub data_points: Vec<ExchangeRateDataPoint>,
-    /// Total count of data points in the window.
-    pub total_count: u32,
 }
