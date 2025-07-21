@@ -1,5 +1,5 @@
 {
-  "contract_name": "jupiter-aum-oracle-contract",
+  "contract_name": "jupiter-aum-receiver-contract",
   "contract_version": "0.1.0",
   "idl_version": "1.0.0",
   "instantiate": {
@@ -10,7 +10,7 @@
     "required": [
       "consensus_data_validity_period",
       "data_delta_ppm",
-      "oracles",
+      "messengers",
       "owner",
       "price_data_validity_period",
       "required_custody_assets",
@@ -30,8 +30,8 @@
         "format": "uint64",
         "minimum": 0.0
       },
-      "oracles": {
-        "description": "Initial list of oracle addresses.",
+      "messengers": {
+        "description": "Initial list of messenger addresses.",
         "type": "array",
         "items": {
           "type": "string"
@@ -97,7 +97,7 @@
         "additionalProperties": false
       },
       {
-        "description": "PublishData allows a registered oracle to submit new Solana data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
+        "description": "PublishData allows a registered messenger to submit new Solana data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
         "type": "object",
         "required": [
           "publish_data"
@@ -244,8 +244,8 @@
             "format": "uint64",
             "minimum": 0.0
           },
-          "oracles": {
-            "description": "Consensus configuration updates\n\nNew list of oracles.",
+          "messengers": {
+            "description": "Consensus configuration updates\n\nNew list of messengers.",
             "type": [
               "array",
               "null"
@@ -309,20 +309,6 @@
     "description": "QueryMsg defines the messages that can be queried from the contract to get information.",
     "oneOf": [
       {
-        "description": "Config returns the current contract configuration.",
-        "type": "object",
-        "required": [
-          "config"
-        ],
-        "properties": {
-          "config": {
-            "type": "object",
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
         "description": "GetData returns the last Solana data that was successfully published (consensus has been reached).",
         "type": "object",
         "required": [
@@ -363,13 +349,53 @@
           }
         },
         "additionalProperties": false
+      },
+      {
+        "description": "Config returns the current contract configuration.",
+        "type": "object",
+        "required": [
+          "get_config"
+        ],
+        "properties": {
+          "get_config": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
       }
     ]
   },
   "migrate": null,
   "sudo": null,
   "responses": {
-    "config": {
+    "get_aum": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GetAumResponse",
+      "description": "AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)",
+      "type": "object",
+      "required": [
+        "aum_in_btc"
+      ],
+      "properties": {
+        "aum_in_btc": {
+          "description": "The latest AUM in Binance reported by oracles The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Int256"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "definitions": {
+        "Int256": {
+          "description": "An implementation of i256 that is using strings for JSON encoding/decoding, such that the full i256 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances out of primitive uint types or `new` to provide big endian bytes:\n\n``` # use cosmwasm_std::Int256; let a = Int256::from(258u128); let b = Int256::new([ 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8, 2u8, ]); assert_eq!(a, b); ```",
+          "type": "string"
+        }
+      }
+    },
+    "get_config": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ConfigResponse",
       "description": "ConfigResponse contains the current contract configuration.",
@@ -442,32 +468,6 @@
         }
       }
     },
-    "get_aum": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "GetAumResponse",
-      "description": "AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)",
-      "type": "object",
-      "required": [
-        "aum_in_btc"
-      ],
-      "properties": {
-        "aum_in_btc": {
-          "description": "The latest AUM in Binance reported by oracles The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Int256"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false,
-      "definitions": {
-        "Int256": {
-          "description": "An implementation of i256 that is using strings for JSON encoding/decoding, such that the full i256 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances out of primitive uint types or `new` to provide big endian bytes:\n\n``` # use cosmwasm_std::Int256; let a = Int256::from(258u128); let b = Int256::new([ 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8, 2u8, ]); assert_eq!(a, b); ```",
-          "type": "string"
-        }
-      }
-    },
     "get_data": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "GetDataResponse",
@@ -530,7 +530,7 @@
           "additionalProperties": false
         },
         "OracleData_for_SolanaData": {
-          "description": "Data submitted by an oracle",
+          "description": "Data submitted by a messenger",
           "type": "object",
           "required": [
             "data",
@@ -539,7 +539,7 @@
           ],
           "properties": {
             "data": {
-              "description": "The data submitted by the oracle",
+              "description": "The data submitted by the messenger",
               "allOf": [
                 {
                   "$ref": "#/definitions/SolanaData"
@@ -547,13 +547,13 @@
               ]
             },
             "round": {
-              "description": "The round number an oracle tries to submit data for",
+              "description": "The round number a messenger tries to submit data for",
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
             },
             "timestamp": {
-              "description": "The UNIX timestamp in seconds when the oracle submitted the data",
+              "description": "The UNIX timestamp in seconds when the messenger submitted the data",
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0

@@ -6,7 +6,7 @@
   "required": [
     "consensus_data_validity_period",
     "data_delta_ppm",
-    "oracles",
+    "messengers",
     "owner",
     "price_data_validity_period",
     "required_custody_assets",
@@ -26,8 +26,8 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "oracles": {
-      "description": "Initial list of oracle addresses.",
+    "messengers": {
+      "description": "Initial list of messenger addresses.",
       "type": "array",
       "items": {
         "type": "string"

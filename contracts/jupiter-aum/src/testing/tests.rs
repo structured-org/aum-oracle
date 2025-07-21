@@ -14,10 +14,10 @@ use std::str::FromStr;
 fn default_init_msg(api: &MockApi) -> InstantiateMsg {
     InstantiateMsg {
         owner: api.addr_make("owner").to_string(),
-        oracles: vec![
-            api.addr_make("oracle1").to_string(),
-            api.addr_make("oracle2").to_string(),
-            api.addr_make("oracle3").to_string(),
+        messengers: vec![
+            api.addr_make("messenger1").to_string(),
+            api.addr_make("messenger2").to_string(),
+            api.addr_make("messenger3").to_string(),
         ],
         threshold: 2,
         data_delta_ppm: 1000,
@@ -45,7 +45,7 @@ fn test_update_config() {
         consensus_data_validity_period: Some(50_000),
         required_custody_assets: Some(vec!["BTC".to_string()]),
         price_data_validity_period: Some(999),
-        oracles: Some(vec![deps.api.addr_make("oracle1").to_string()]),
+        messengers: Some(vec![deps.api.addr_make("messenger1").to_string()]),
         threshold: Some(1),
         data_delta_ppm: Some(1234),
         round_length: Some(99),
@@ -80,7 +80,7 @@ fn test_update_config() {
     assert_eq!(consensus.threshold, 1);
     assert_eq!(consensus.data_delta_ppm, 1234);
     assert_eq!(consensus.round_length, 99);
-    assert_eq!(consensus.oracles, vec![deps.api.addr_make("oracle1")]);
+    assert_eq!(consensus.messengers, vec![deps.api.addr_make("messenger1")]);
 }
 
 #[test]
@@ -168,8 +168,8 @@ fn test_query_get_aum_behavior() {
 
     let api = deps.api;
     let owner_info = message_info(&api.addr_make("owner"), &[]);
-    let oracle1 = api.addr_make("oracle1");
-    let oracle2 = api.addr_make("oracle2");
+    let messenger1 = api.addr_make("messenger1");
+    let messenger2 = api.addr_make("messenger2");
 
     let mut msg = default_init_msg(&api);
     msg.consensus_data_validity_period = 1_000;
@@ -186,7 +186,7 @@ fn test_query_get_aum_behavior() {
     execute(
         deps.as_mut(),
         env.clone(),
-        message_info(&oracle1, &[]),
+        message_info(&messenger1, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },
@@ -195,7 +195,7 @@ fn test_query_get_aum_behavior() {
     execute(
         deps.as_mut(),
         env.clone(),
-        message_info(&oracle2, &[]),
+        message_info(&messenger2, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },
@@ -263,7 +263,7 @@ fn test_publish_data_invalid_custody() {
     )
     .unwrap();
 
-    let info = message_info(&api.addr_make("oracle1"), &[]);
+    let info = message_info(&api.addr_make("messenger1"), &[]);
     let mut data = dummy_solana_data();
     data.custody_assets.clear();
 
@@ -308,8 +308,8 @@ fn test_query_get_aum_data_stale() {
     env.block.time = Timestamp::from_seconds(start_time);
 
     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
-    let oracle1 = deps.api.addr_make("oracle1");
-    let oracle2 = deps.api.addr_make("oracle2");
+    let messenger1 = deps.api.addr_make("messenger1");
+    let messenger2 = deps.api.addr_make("messenger2");
     let init_msg = default_init_msg(&deps.api);
 
     instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
@@ -318,7 +318,7 @@ fn test_query_get_aum_data_stale() {
     execute(
         deps.as_mut(),
         env.clone(),
-        message_info(&oracle1, &[]),
+        message_info(&messenger1, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },
@@ -327,7 +327,7 @@ fn test_query_get_aum_data_stale() {
     execute(
         deps.as_mut(),
         env.clone(),
-        message_info(&oracle2, &[]),
+        message_info(&messenger2, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },

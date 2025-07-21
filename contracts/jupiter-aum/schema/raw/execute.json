@@ -26,7 +26,7 @@
       "additionalProperties": false
     },
     {
-      "description": "PublishData allows a registered oracle to submit new Solana data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
+      "description": "PublishData allows a registered messenger to submit new Solana data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
       "type": "object",
       "required": [
         "publish_data"
@@ -173,8 +173,8 @@
           "format": "uint64",
           "minimum": 0.0
         },
-        "oracles": {
-          "description": "Consensus configuration updates\n\nNew list of oracles.",
+        "messengers": {
+          "description": "Consensus configuration updates\n\nNew list of messengers.",
           "type": [
             "array",
             "null"

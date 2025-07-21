@@ -8,8 +8,8 @@ use cosmwasm_std::{Addr, Int256};
 pub struct InstantiateMsg {
     /// The address that will be the contract's owner.
     pub owner: String,
-    /// Initial list of oracle addresses.
-    pub oracles: Vec<String>,
+    /// Initial list of messenger addresses.
+    pub messengers: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,
     /// Delta in percent per million (ppm), for which two values are considered equal
@@ -30,7 +30,7 @@ pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
     /// Only callable by the owner. All fields are optional, allowing partial updates.
     UpdateConfig { new_config: UpdateConfig },
-    /// PublishData allows a registered oracle to submit new Solana data.
+    /// PublishData allows a registered messenger to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { new_data: SolanaData },
 }
@@ -50,8 +50,8 @@ pub struct UpdateConfig {
 
     /// Consensus configuration updates
     ///
-    /// New list of oracles.
-    pub oracles: Option<Vec<String>>,
+    /// New list of messengers.
+    pub messengers: Option<Vec<String>>,
     /// New threshold needed for consensus.
     pub threshold: Option<u32>,
     /// New delta in percent per million (ppm), for which two values are considered equal.

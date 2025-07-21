@@ -43,8 +43,8 @@ pub fn instantiate(
     CONFIG.save(deps.storage, &config)?;
 
     let consensus_config = ConsensusConfig {
-        oracles: msg
-            .oracles
+        messengers: msg
+            .messengers
             .into_iter()
             .map(|addr| deps.api.addr_validate(&addr))
             .collect::<Result<Vec<Addr>, _>>()?,
@@ -107,12 +107,12 @@ fn update_config(
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-    if let Some(ref oracles) = new_config.oracles {
+    if let Some(ref oracles) = new_config.messengers {
         let validated_oracles: Vec<Addr> = oracles
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.oracles = validated_oracles;
+        consensus_config.messengers = validated_oracles;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -140,7 +140,7 @@ fn execute_publish_data(
     let contract_config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-    if !consensus_config.oracles.contains(&info.sender) {
+    if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -190,7 +190,7 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
         consensus_data_validity_period: config.consensus_data_validity_period,
         required_custody_assets: config.required_custody_assets,
         price_data_validity_period: config.price_data_validity_period,
-        oracles: consensus_config.oracles,
+        oracles: consensus_config.messengers,
         threshold: consensus_config.threshold,
         data_delta_ppm: consensus_config.data_delta_ppm,
         round_length: consensus_config.round_length,
