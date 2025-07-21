@@ -20,13 +20,13 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
-    let oracles: Vec<Addr> = msg
-        .oracles
+    let messengers: Vec<Addr> = msg
+        .messengers
         .iter()
         .map(|addr| deps.api.addr_validate(addr))
         .collect::<StdResult<_>>()?;
     let consensus_config = ConsensusConfig {
-        oracles,
+        messengers,
         threshold: msg.threshold,
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
@@ -73,7 +73,7 @@ fn execute_publish_data(
 
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     // Only oracle can submit
-    if !consensus_config.oracles.contains(&info.sender) {
+    if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -124,12 +124,12 @@ fn execute_update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     // Update consensus config fields
-    if let Some(ref oracles) = new_config.oracles {
+    if let Some(ref oracles) = new_config.messengers {
         let validated_oracles: Vec<Addr> = oracles
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.oracles = validated_oracles;
+        consensus_config.messengers = validated_oracles;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;

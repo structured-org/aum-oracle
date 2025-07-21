@@ -7,7 +7,7 @@
   ],
   "properties": {
     "aum_in_btc": {
-      "description": "The latest AUM in Binance reported by oracles The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
+      "description": "The latest AUM in Binance reported by messengers The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
       "allOf": [
         {
           "$ref": "#/definitions/Int256"

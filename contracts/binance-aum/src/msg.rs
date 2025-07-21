@@ -7,8 +7,8 @@ use cosmwasm_std::Int256;
 pub struct InstantiateMsg {
     /// Owner of the contract
     pub owner: String,
-    /// A list of oracles allowed to publish data
-    pub oracles: Vec<String>,
+    /// A list of messengers allowed to publish data
+    pub messengers: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,
     /// Delta in percent per million (ppm), for which two values are considered equal
@@ -19,9 +19,9 @@ pub struct InstantiateMsg {
     pub consensus_data_valid_period: u64,
     /// Initial validity period for data in blocks
     pub price_data_valid_period: u64,
-    /// Required binance positions that oracles must provide
+    /// Required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
-    /// Required binance spot assets that oracles must provide
+    /// Required binance spot assets that messengers must provide
     pub required_binance_spot_assets: Vec<String>,
     /// Price oracle contract address
     pub price_oracle_contract: String,
@@ -29,7 +29,7 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// PublishData allows a registered oracle to submit new Binance data.
+    /// PublishData allows a registered messenger to submit new Binance data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { new_data: BinanceData },
     /// UpdateConfig updates the contract's configuration parameters.
@@ -53,7 +53,7 @@ pub struct UpdateConfig {
     pub price_oracle_contract: Option<String>,
 
     /// A new list of oracles that are allowed to publish data
-    pub oracles: Option<Vec<String>>,
+    pub messengers: Option<Vec<String>>,
     /// A new threshold value for the consensus
     pub threshold: Option<u32>,
     /// A new data delta for the consensus
@@ -96,7 +96,7 @@ pub struct GetDataResponse {
 
 #[cw_serde]
 pub struct GetAumResponse {
-    /// The latest AUM in Binance reported by oracles
+    /// The latest AUM in Binance reported by messengers
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
 }
