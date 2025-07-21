@@ -1,8 +1,5 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import {
-  CosmWasmClient,
-  SigningCosmWasmClient,
-} from '@cosmjs/cosmwasm-stargate';
+import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { Client as NeutronClient } from '@neutron-org/client-ts';
 import { AccountData, DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { GasPrice } from '@cosmjs/stargate';
@@ -19,7 +16,15 @@ import {
   SolanaUiTokenAmount,
   MockController,
 } from '../helpers/messenger';
-import { waitFor } from '../helpers/waitFor';
+import { waitFor, waitSeconds } from '../helpers/waitFor';
+import {
+  BINANCE_CONTRACT,
+  BinanceData,
+  JUPITER_CONTRACT,
+  queryLastPublishedData,
+  SolanaData,
+} from '../helpers/queries';
+import { execSync } from 'child_process';
 
 type MockData = {
   umPositions?: BinanceUMPosition[];
@@ -31,11 +36,6 @@ type MockData = {
   tokenSupply?: SolanaUiTokenAmount;
   tokenAccountBalance?: SolanaUiTokenAmount;
 };
-
-const JUPITER_CONTRACT =
-  'neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj';
-const BINANCE_CONTRACT =
-  'neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm';
 
 export async function fetchMockData(
   mockController: MockController,
@@ -107,13 +107,13 @@ describe('Consensus', () => {
   });
 
   afterAll(async () => {
-    await context.park.stop();
+    // TODO: figure out why context.park is undefined (probably because it was already closed by another test?)
+    if (context.park) {
+      await context.park.stop();
+    }
   });
 
   describe('Consensus', () => {
-    // const sampleCustodyPublicKey =
-    //   '5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm';
-    // const sampleTokenPublicKey = '11111111111111111111111111111111';
     const mockController1 = new MockController(3001);
     const mockController2 = new MockController(3002);
     const mockController3 = new MockController(3003);
@@ -130,7 +130,9 @@ describe('Consensus', () => {
           Math.trunc(1_531_381_751_507_034 / 1_000_000).toString(),
         );
         console.log('before aum: ' + result.data.aum_usd);
+      });
 
+      it('changes published data as expected', async () => {
         const data = await fetchMockData(mockController1);
         // let's change one property for consensus example
         data.poolInfo.aumUsd = (1_531_381_751_507_034 * 2).toString(); // let's double it
@@ -156,44 +158,175 @@ describe('Consensus', () => {
           600, // 0.6-second interval
         );
       });
+
+      // TODO: check aum changes?
     });
 
-    describe('Malicious oracles', () => {});
+    describe('Malicious oracle', () => {
+      it('one malicious oracle does not change published data as', async () => {
+        const data = await fetchMockData(mockController1);
+        const originalSupplyAmount = data.pmAccountInfo.actualEquity;
+        data.pmAccountInfo.actualEquity = (
+          +data.pmAccountInfo.actualEquity * 7
+        ).toString(); // Too much
+        await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
 
-    describe('Data sources timeouts and problems', () => {});
+        // wait 2 rounds, in case that one oracle already published data in this round before the set info call (?)
+        const result = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        const currentRound = result.round;
+        await waitFor(
+          async () => {
+            const result = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return result.round > currentRound + 1;
+          },
+          20_000, // 20-second timeout
+          600, // 0.6-second interval
+        );
+
+        const nextRoundResult = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(nextRoundResult.data.pm_account_actual_equity).toEqual(
+          originalSupplyAmount,
+        );
+      });
+
+      afterAll(async () => {
+        // set mockController3 to original data
+        const data = await fetchMockData(mockController1);
+        await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
+      });
+    });
+
+    describe('Oracles do not agree on data', () => {
+      it('different data reported stops publishing data', async () => {
+        const data = await fetchMockData(mockController1);
+        const originalUnimmr = data.pmAccountInfo.uniMMR;
+        await mockController2.setBinancePMAccountInfo({
+          ...data.pmAccountInfo,
+          uniMMR: (+originalUnimmr * 13).toString(),
+        });
+        await mockController3.setBinancePMAccountInfo({
+          ...data.pmAccountInfo,
+          uniMMR: (+originalUnimmr * 26).toString(),
+        });
+
+        const result = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        // wait for the possible next round in case some oracles already submitted data for this round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > result.round;
+          },
+          10_000, // 10-second
+          1600, // 0.6-second interval
+          false, // no exception, just wait
+        );
+
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+
+        // after multiple times new round should happen, publish data still should return old round
+        await waitSeconds(20);
+
+        const resultAfter = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+
+        expect(resultAfter.round).toEqual(resultBefore.round);
+        expect(resultAfter.data.unimmr).toEqual(resultBefore.data.unimmr);
+      });
+      // all three oracles report completely different data
+      // sets checks on grouping: one oracle passes incorrect data on exact field like decimals,
+      //    other values from this oracle does not count in eventual consensus
+    });
+
+    describe('Some oracles not up for some time', () => {
+      it('one oracle does not stop data publishing', async () => {
+        execSync(`docker pause aum-oracle-2`); // pause one oracle
+
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+
+        // next round should happen
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round + 1;
+          },
+          10_000, // 10-second
+          1600, // 1.6-second interval
+          true,
+        );
+      });
+
+      it('two oracles stop data publishing', async () => {
+        execSync(`docker pause aum-oracle-3`); // pause two oracles
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+
+        // next round should not happen
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round + 1;
+          },
+          10_000, // 10-second wait
+          1600, // 1.6-second interval
+          false,
+        );
+
+        const resultAfter = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(resultAfter.round).toEqual(resultBefore.round);
+      });
+
+      // First oracle out, update still works
+      // Second oracle out, data stale after some time
+      // Third oracle out, nothing changes
+      // Two oracles online, data starts publishing
+      // Third oracles online, nothing changes
+
+      afterAll(() => {
+        execSync(`docker unpause aum-oracle-1`);
+        execSync(`docker unpause aum-oracle-2`);
+        execSync(`docker unpause aum-oracle-3`);
+      })
+    });
+
+    describe('Data sources timeouts and problems', () => {
+      // Binance works, Solana doesn't, after restoring back as normal
+      // Solana works, Binance don't, after restoring back as normal
+      // Temporary high delay (higher than round length) doesn't make oracle stop working
+      // TODO: same? Temporary errors from binance or solana doesn't make oracle stop working
+    });
   });
 });
-
-async function queryAum(
-  contract: string,
-  client: CosmWasmClient,
-): Promise<number> {
-  const res = await client.queryContractSmart(contract, { get_aum: {} });
-  return +res.aum_in_btc;
-}
-
-// TODO: this works only for jupiter
-async function queryLastPublishedData<T>(
-  contract: string,
-  client: CosmWasmClient,
-): Promise<LastPublishedData<T>> {
-  const res = await client.queryContractSmart(contract, {
-    get_data: {},
-  });
-  return res.last_published_data;
-}
-
-class LastPublishedData<T> {
-  round: number;
-  timestamp: number;
-  data: T;
-}
-
-class SolanaData {
-  custody_assets: any;
-  aum_usd: string;
-  total_jlp_supply: string;
-  total_jlp_supply_decimals: number;
-  strategy_jlp_balance: string;
-  strategy_jlp_balance_decimals: number;
-}

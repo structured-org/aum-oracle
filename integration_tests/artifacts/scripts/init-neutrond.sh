@@ -723,7 +723,7 @@ SLINKY_INIT_MSG='{}'
 BINANCE_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
   "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
-  "threshold": 1,
+  "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 5,
   "consensus_data_valid_period": 60,
@@ -735,7 +735,7 @@ BINANCE_AUM_ORACLE_INIT_MSG='{
 JUPITER_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
   "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
-  "threshold": 1,
+  "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 5,
   "consensus_data_validity_period": 60,

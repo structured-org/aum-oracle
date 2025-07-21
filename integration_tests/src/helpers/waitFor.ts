@@ -6,6 +6,7 @@ export const waitFor = async (
   fn: () => Promise<boolean>,
   timeout: number = 10000,
   interval: number = 600,
+  withException = true,
 ): Promise<void> => {
   const start = Date.now();
   // eslint-disable-next-line no-constant-condition
@@ -14,12 +15,20 @@ export const waitFor = async (
       break;
     }
     if (Date.now() - start > timeout) {
-      throw new Error('Timeout waiting for condition');
+      if (withException) {
+        throw new Error('Timeout waiting for condition');
+      } else {
+        break
+      }
     }
     await sleep(interval);
   }
 };
 
+export const waitSeconds = async (seconds: number) =>
+  new Promise((r) => {
+    setTimeout(() => r(true), 1000 * seconds);
+  });
 
 export const waitBlocks = async (
   blocks: number,
