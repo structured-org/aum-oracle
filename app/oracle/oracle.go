@@ -33,9 +33,15 @@ type Oracle[T any] interface {
 	Logger() *zap.Logger
 }
 
-// failureDelay is the delay taken when an oracle fails to fetch or submit data to pervent
+// failureDelay is the delay taken when an oracle fails to fetch or submit data to prevent
 // the oracle from spamming.
+// TODO: make this configurable.
 var failureDelay = 10 * time.Second
+
+// preSubmitDelay is an additional delay taken before submitting data to prevent the oracle from
+// submitting data too soon because of possible time desync.
+// TODO: make this configurable.
+var preSubmitDelay = 5 * time.Second
 
 // RunOracle is a utility function that runs an oracle in a loop, fetching and submitting data at
 // specified intervals. It handles the necessary context management for the oracle's operation.
@@ -56,9 +62,11 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 		}
 
 		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
+		timeTillNextRound = timeTillNextRound + preSubmitDelay
 		oracle.Logger().Info("waiting for next round",
 			zap.Uint64("round", nextRound.Round),
 			zap.Uint64("round_timestamp", nextRound.Timestamp),
+			zap.Duration("pre_submit_delay", preSubmitDelay),
 			zap.Duration("time_till_next_round", timeTillNextRound),
 		)
 
