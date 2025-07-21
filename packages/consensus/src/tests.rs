@@ -59,7 +59,7 @@ impl ConsensusData for MockData {
 // Helper function to create a test config
 fn create_test_config() -> Config {
     Config {
-        oracles: vec![
+        messengers: vec![
             Addr::unchecked("oracle1"),
             Addr::unchecked("oracle2"),
             Addr::unchecked("oracle3"),

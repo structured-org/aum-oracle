@@ -9,9 +9,9 @@ use serde::Serialize;
 /// Describes the configuration of consensus
 #[cw_serde]
 pub struct Config {
-    /// a list of oracles that can submit data for consensus
-    pub oracles: Vec<Addr>,
-    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    /// a list of messengers that can submit data for consensus
+    pub messengers: Vec<Addr>,
+    /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm) for which two values are considered equal
     pub data_delta_ppm: u64,
@@ -119,10 +119,10 @@ impl<T: ConsensusData> State<T> {
 
     /// Returns all pending data
     fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<OracleData<T>>> {
-        let oracles = self.config.load(storage)?.oracles;
+        let messenger = self.config.load(storage)?.messengers;
 
         let mut v = Vec::new();
-        for addr in oracles {
+        for addr in messenger {
             if let Some(d) = self.pending_data.may_load(storage, addr)? {
                 v.push(d);
             }
@@ -180,11 +180,11 @@ impl<T: ConsensusData> State<T> {
 
     /// Publishes data for consensus.
     /// * If the pending round is passed, try to form a consensus for the current pending data and move to the next round;
-    /// * If all oracles have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
+    /// * If all messengers have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
     ///
     /// An error is returned in the following cases:
-    /// * an oracle tries to publish data for the same round more than ones;
-    /// * an oracle tries to publish data for the past or future round;
+    /// * a messenger tries to publish data for the same round more than ones;
+    /// * a messenger tries to publish data for the past or future round;
     ///
     /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
     /// and `PublishResult::ConsensusNotReached` in case it did not as the first argument
@@ -193,7 +193,7 @@ impl<T: ConsensusData> State<T> {
         &self,
         storage: &mut dyn Storage,
         env: &Env,
-        oracle: Addr,
+        messenger: Addr,
         new_data: T,
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
@@ -238,10 +238,10 @@ impl<T: ConsensusData> State<T> {
             self.pending_data.clear(storage);
         }
 
-        // Check if oracle has already submitted data for this round
+        // Check if messenger has already submitted data for this round
         if self
             .pending_data
-            .may_load(storage, oracle.clone())?
+            .may_load(storage, messenger.clone())?
             .is_some()
         {
             return Err(ConsensusError::DoubleSubmission {});
@@ -249,7 +249,7 @@ impl<T: ConsensusData> State<T> {
 
         self.pending_data.save(
             storage,
-            oracle.clone(),
+            messenger.clone(),
             &OracleData {
                 round: pending_round.round,
                 timestamp: env.block.time.seconds(),
@@ -257,11 +257,11 @@ impl<T: ConsensusData> State<T> {
             },
         )?;
 
-        // Check if round is complete: either all oracles or round time expired
+        // Check if round is complete: either all messengers or round time expired
         let pending = self.get_all_pending_data(storage)?;
 
-        // Try forming consensus, because we have all oracles published their data for a round
-        if pending.len() == config.oracles.len() {
+        // Try forming consensus, because we have all messengers published their data for a round
+        if pending.len() == config.messengers.len() {
             let data: Vec<T> = pending
                 .iter()
                 .map(|oracle_data| oracle_data.data.clone())
@@ -296,14 +296,14 @@ pub enum PublishResult<T> {
     ConsensusNotReached,
 }
 
-/// Data submitted by an oracle
+/// Data submitted by a messenger
 #[cw_serde]
 pub struct OracleData<T> {
-    /// The round number an oracle tries to submit data for
+    /// The round number a messenger tries to submit data for
     pub round: u64,
-    /// The UNIX timestamp in seconds when the oracle submitted the data
+    /// The UNIX timestamp in seconds when the messenger submitted the data
     pub timestamp: u64,
-    /// The data submitted by the oracle
+    /// The data submitted by the messenger
     pub data: T,
 }
 

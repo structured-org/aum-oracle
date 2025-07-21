@@ -5,7 +5,7 @@
   "required": [
     "consensus_data_valid_period",
     "data_delta_ppm",
-    "oracles",
+    "messengers",
     "owner",
     "price_data_valid_period",
     "price_oracle_contract",
@@ -27,8 +27,8 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "oracles": {
-      "description": "A list of oracles allowed to publish data",
+    "messengers": {
+      "description": "A list of messengers allowed to publish data",
       "type": "array",
       "items": {
         "type": "string"
@@ -49,14 +49,14 @@
       "type": "string"
     },
     "required_binance_positions": {
-      "description": "Required binance positions that oracles must provide",
+      "description": "Required binance positions that messengers must provide",
       "type": "array",
       "items": {
         "type": "string"
       }
     },
     "required_binance_spot_assets": {
-      "description": "Required binance spot assets that oracles must provide",
+      "description": "Required binance spot assets that messengers must provide",
       "type": "array",
       "items": {
         "type": "string"

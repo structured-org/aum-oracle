@@ -1,8 +1,8 @@
 [package]
 authors = []
-description = "Binance AUM oracle contract"
+description = "Binance AUM receiver contract"
 edition = "2021"
-name = "binance-aum-oracle-contract"
+name = "binance-aum-receiver-contract"
 repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.0"
 
