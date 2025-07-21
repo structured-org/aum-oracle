@@ -32,7 +32,10 @@ type MockData = {
   tokenAccountBalance?: SolanaUiTokenAmount;
 };
 
-const JUPITER_CONTRACT = 'TODO';
+const JUPITER_CONTRACT =
+  'neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj';
+const BINANCE_CONTRACT =
+  'neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm';
 
 export async function fetchMockData(
   mockController: MockController,
@@ -107,44 +110,47 @@ describe('Consensus', () => {
     await context.park.stop();
   });
 
-  describe('Consensus', async () => {
-    const sampleCustodyPublicKey =
-      '5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm';
-    const sampleTokenPublicKey = '11111111111111111111111111111111';
+  describe('Consensus', () => {
+    // const sampleCustodyPublicKey =
+    //   '5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm';
+    // const sampleTokenPublicKey = '11111111111111111111111111111111';
     const mockController1 = new MockController(3001);
     const mockController2 = new MockController(3002);
     const mockController3 = new MockController(3003);
+    const mockControllers = [mockController1, mockController2, mockController3];
 
     describe('Happy path', () => {
       it('publishes data as expected', async () => {
-        // TODO: check current data
         // was: 1531381751507034
-        const result = await queryLastPublishedData(
+        const result = await queryLastPublishedData<SolanaData>(
           JUPITER_CONTRACT,
           context.client,
         );
-        expect(result.data.aum_usd).toEqual((1_531_381_751_507_034).toString());
+        expect(result.data.aum_usd).toEqual(
+          Math.trunc(1_531_381_751_507_034 / 1_000_000).toString(),
+        );
+        console.log('before aum: ' + result.data.aum_usd);
 
         const data = await fetchMockData(mockController1);
         // let's change one property for consensus example
         data.poolInfo.aumUsd = (1_531_381_751_507_034 * 2).toString(); // let's double it
-        const mockControllers = [
-          mockController1,
-          mockController2,
-          mockController3,
-        ];
+
         for (const mockController of mockControllers) {
           await mockController.setJupiterPoolInfo(data.poolInfo);
         }
 
         await waitFor(
           async () => {
-            const result = await queryLastPublishedData(
+            const result = await queryLastPublishedData<SolanaData>(
               JUPITER_CONTRACT,
               context.client,
             );
+            console.log('after aum: ' + result.data.aum_usd);
             // wait until we have same changed aum usd gotten from contract
-            return result.data.aum_usd === data.poolInfo.aumUsd;
+            return (
+              result.data.aum_usd ===
+              Math.trunc((1_531_381_751_507_034 * 2) / 1_000_000).toString()
+            );
           },
           20_000, // 20-second timeout
           600, // 0.6-second interval
@@ -158,24 +164,29 @@ describe('Consensus', () => {
   });
 });
 
-// async function queryAum(client: CosmWasmClient): Promise<number> {
-//
-// }
-
-async function queryLastPublishedData(
+async function queryAum(
   contract: string,
   client: CosmWasmClient,
-): Promise<LastPublishedData> {
+): Promise<number> {
+  const res = await client.queryContractSmart(contract, { get_aum: {} });
+  return +res.aum_in_btc;
+}
+
+// TODO: this works only for jupiter
+async function queryLastPublishedData<T>(
+  contract: string,
+  client: CosmWasmClient,
+): Promise<LastPublishedData<T>> {
   const res = await client.queryContractSmart(contract, {
     get_data: {},
   });
   return res.last_published_data;
 }
 
-class LastPublishedData {
+class LastPublishedData<T> {
   round: number;
   timestamp: number;
-  data: SolanaData;
+  data: T;
 }
 
 class SolanaData {
