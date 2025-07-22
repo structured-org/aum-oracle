@@ -4,20 +4,6 @@
   "description": "QueryMsg defines the messages that can be queried from the contract to get information.",
   "oneOf": [
     {
-      "description": "Config returns the current contract configuration.",
-      "type": "object",
-      "required": [
-        "config"
-      ],
-      "properties": {
-        "config": {
-          "type": "object",
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    {
       "description": "GetData returns the last Solana data that was successfully published (consensus has been reached).",
       "type": "object",
       "required": [
@@ -53,6 +39,20 @@
       ],
       "properties": {
         "get_round_info": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Config returns the current contract configuration.",
+      "type": "object",
+      "required": [
+        "get_config"
+      ],
+      "properties": {
+        "get_config": {
           "type": "object",
           "additionalProperties": false
         }

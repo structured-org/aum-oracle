@@ -1,8 +1,8 @@
 [package]
 authors = []
-description = "Neutron Jupiter AUM Oracle contract"
+description = "Neutron Jupiter AUM Oracle Receiver contract"
 edition = "2021"
-name = "jupiter-aum-oracle-contract"
+name = "jupiter-aum-receiver-contract"
 repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.0"
 

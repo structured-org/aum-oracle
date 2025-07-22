@@ -56,7 +56,7 @@
       "additionalProperties": false
     },
     "OracleData_for_BinanceData": {
-      "description": "Data submitted by an oracle",
+      "description": "Data submitted by a messenger",
       "type": "object",
       "required": [
         "data",
@@ -65,7 +65,7 @@
       ],
       "properties": {
         "data": {
-          "description": "The data submitted by the oracle",
+          "description": "The data submitted by the messenger",
           "allOf": [
             {
               "$ref": "#/definitions/BinanceData"
@@ -73,13 +73,13 @@
           ]
         },
         "round": {
-          "description": "The round number an oracle tries to submit data for",
+          "description": "The round number a messenger tries to submit data for",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
         "timestamp": {
-          "description": "The UNIX timestamp in seconds when the oracle submitted the data",
+          "description": "The UNIX timestamp in seconds when the messenger submitted the data",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0

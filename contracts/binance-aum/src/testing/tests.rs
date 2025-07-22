@@ -29,10 +29,10 @@ fn message_info(sender: &str, funds: &[Coin]) -> MessageInfo {
 // Helper function to create a test consensus config
 fn create_test_consensus_config() -> ConsensusConfig {
     ConsensusConfig {
-        oracles: vec![
-            Addr::unchecked("oracle1"),
-            Addr::unchecked("oracle2"),
-            Addr::unchecked("oracle3"),
+        messengers: vec![
+            Addr::unchecked("messenger1"),
+            Addr::unchecked("messenger2"),
+            Addr::unchecked("messenger3"),
         ],
         threshold: 2,
         data_delta_ppm: 10000, // 1%
@@ -120,7 +120,7 @@ fn test_execute_publish_data() {
     // Set up initial state
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    // Modify the config to use threshold instead of all oracles for consensus
+    // Modify the config to use threshold instead of all messengers for consensus
     consensus_config.threshold = 2;
     let round = Round {
         round: 1,
@@ -152,7 +152,7 @@ fn test_execute_publish_data() {
     assert_eq!(result.unwrap_err(), ContractError::Unauthorized {});
 
     // Test 2: Invalid positions
-    let oracle_info = message_info("oracle1", &[]);
+    let oracle_info = message_info("messenger1", &[]);
     let mut invalid_positions_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -185,7 +185,7 @@ fn test_execute_publish_data() {
     }
 
     // Test 2: Invalid spot balances
-    let oracle_info = message_info("oracle1", &[]);
+    let oracle_info = message_info("messenger1", &[]);
     let mut invalid_spot_balances_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -216,15 +216,15 @@ fn test_execute_publish_data() {
     }
 
     // Test 2: Valid submission acceptance
-    let oracle_info = message_info("oracle1", &[]);
+    let oracle_info = message_info("messenger1", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data.clone(),
     };
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_ok());
 
-    // Test 3: Submit data from all oracles to reach consensus
-    let oracle2_info = message_info("oracle2", &[]);
+    // Test 3: Submit data from all messengers to reach consensus
+    let messenger2_info = message_info("messenger2", &[]);
     let mut test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -259,11 +259,11 @@ fn test_execute_publish_data() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Submit data from the third oracle to reach consensus (all oracles)
-    let oracle3_info = message_info("oracle3", &[]);
+    // Submit data from the third oracle to reach consensus (all messengers)
+    let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -273,7 +273,7 @@ fn test_execute_publish_data() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
     // Verify consensus was reached, but round is still the same
@@ -293,7 +293,7 @@ fn test_execute_publish_data() {
     env.block.time = Timestamp::from_seconds(1000 + consensus_config.round_length + 1);
 
     // Submit data for the new round (which should be 2 now)
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let new_round_data = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -303,7 +303,7 @@ fn test_execute_publish_data() {
     let msg = ExecuteMsg::PublishData {
         new_data: new_round_data,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
     // Verify the round has advanced
@@ -324,7 +324,7 @@ fn test_execute_publish_data_time_based_consensus() {
     // Set up initial state with a custom config
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    // Modify the config to use threshold instead of all oracles for consensus
+    // Modify the config to use threshold instead of all messengers for consensus
     consensus_config.threshold = 2;
     let round = Round {
         round: 1,
@@ -347,11 +347,11 @@ fn test_execute_publish_data_time_based_consensus() {
     );
 
     // Test 1: Submit data from one oracle
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Test 2: No consensus yet (only one oracle submitted)
@@ -370,14 +370,14 @@ fn test_execute_publish_data_time_based_consensus() {
         SignedDecimal256::from_ratio(2000, 1), // Identical to test_data1
         SignedDecimal256::from_ratio(500, 1),  // Identical to test_data1
     );
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Test 4: No consensus yet (only two oracles submitted)
+    // Test 4: No consensus yet (only two messengers submitted)
     let response = result.unwrap();
 
     let publish_consensus_attr = response
@@ -393,14 +393,14 @@ fn test_execute_publish_data_time_based_consensus() {
         SignedDecimal256::from_ratio(2000, 1), // Identical to test_data1 and test_data2
         SignedDecimal256::from_ratio(500, 1), // Identical to test_data1 and test_data2
     );
-    let oracle3_info = message_info("oracle3", &[]);
+    let messenger3_info = message_info("messenger3", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
-    // Test 6: Consensus should be reached (all oracles submitted identical data)
+    // Test 6: Consensus should be reached (all messengers submitted identical data)
     let response = result.unwrap();
 
     let publish_consensus_attr = response
@@ -506,7 +506,7 @@ fn test_try_consensus() {
         .is_none());
     }
 
-    // Test 5: Consensus with more than threshold oracles
+    // Test 5: Consensus with more than threshold messengers
     {
         let config = create_test_consensus_config();
         let data_multiple = vec![
@@ -627,7 +627,7 @@ fn test_try_consensus() {
 }
 
 #[test]
-fn test_all_oracles_consensus_round_not_increased() {
+fn test_all_messengers_consensus_round_not_increased() {
     // Set up test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
@@ -649,8 +649,8 @@ fn test_all_oracles_consensus_round_not_increased() {
         round.start,
     );
 
-    // Submit data from all oracles
-    let oracle1_info = message_info("oracle1", &[]);
+    // Submit data from all messengers
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -660,10 +660,10 @@ fn test_all_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -673,10 +673,10 @@ fn test_all_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    let oracle3_info = message_info("oracle3", &[]);
+    let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -686,7 +686,7 @@ fn test_all_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
     // Verify consensus was reached
@@ -697,7 +697,7 @@ fn test_all_oracles_consensus_round_not_increased() {
         .find(|attr| attr.key == "action" && attr.value == "publish_consensus");
     assert!(
         publish_consensus_attr.is_some(),
-        "Consensus should be reached when all oracles submit data"
+        "Consensus should be reached when all messengers submit data"
     );
 
     // Verify round is still the same (not increased)
@@ -723,17 +723,17 @@ fn test_all_oracles_consensus_round_not_increased() {
 }
 
 #[test]
-fn test_partial_oracles_consensus_round_not_increased() {
+fn test_partial_messengers_consensus_round_not_increased() {
     // Set up test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with threshold = 2 (out of 3 oracles)
+    // Set up initial state with threshold = 2 (out of 3 messengers)
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    consensus_config.threshold = 2; // Only need 2 out of 3 oracles for consensus
+    consensus_config.threshold = 2; // Only need 2 out of 3 messengers for consensus
     let round = Round {
         round: 1,
         start: start_time,
@@ -747,7 +747,7 @@ fn test_partial_oracles_consensus_round_not_increased() {
     );
 
     // Submit data from first oracle
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -757,7 +757,7 @@ fn test_partial_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Verify no consensus yet (only one oracle)
@@ -772,7 +772,7 @@ fn test_partial_oracles_consensus_round_not_increased() {
     );
 
     // Submit data from second oracle (should reach threshold)
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -782,19 +782,19 @@ fn test_partial_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Verify no consensus yet (need all oracles or round to pass)
+    // Verify no consensus yet (need all messengers or round to pass)
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
         .iter()
         .find(|attr| attr.key == "action" && attr.value == "publish_consensus");
-    assert!(publish_consensus_attr.is_none(), "No consensus should be reached with only threshold oracles (need all oracles or round to pass)");
+    assert!(publish_consensus_attr.is_none(), "No consensus should be reached with only threshold messengers (need all messengers or round to pass)");
 
-    // Submit data from third oracle (all oracles now)
-    let oracle3_info = message_info("oracle3", &[]);
+    // Submit data from third oracle (all messengers now)
+    let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -804,10 +804,10 @@ fn test_partial_oracles_consensus_round_not_increased() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
-    // Verify consensus was reached with all oracles
+    // Verify consensus was reached with all messengers
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
@@ -815,7 +815,7 @@ fn test_partial_oracles_consensus_round_not_increased() {
         .find(|attr| attr.key == "action" && attr.value == "publish_consensus");
     assert!(
         publish_consensus_attr.is_some(),
-        "Consensus should be reached when all oracles submit data"
+        "Consensus should be reached when all messengers submit data"
     );
 
     // Verify round is still the same (not increased)
@@ -848,10 +848,10 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with threshold = 2 (out of 3 oracles)
+    // Set up initial state with threshold = 2 (out of 3 messengers)
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    consensus_config.threshold = 2; // Need 2 out of 3 messengers for consensus
     let round = Round {
         round: 1,
         start: start_time,
@@ -865,7 +865,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     );
 
     // Submit data from only one oracle (below threshold)
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -875,7 +875,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Verify no consensus yet (only one oracle, below threshold)
@@ -893,7 +893,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
     // Submit data for the new round (round 2)
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -903,7 +903,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
     // Verify round has increased
@@ -939,10 +939,10 @@ fn test_multiple_rounds_passing() {
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with threshold = 2 (out of 3 oracles)
+    // Set up initial state with threshold = 2 (out of 3 messengers)
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    consensus_config.threshold = 2; // Need 2 out of 3 messengers for consensus
     let round = Round {
         round: 1,
         start: start_time,
@@ -956,7 +956,7 @@ fn test_multiple_rounds_passing() {
     );
 
     // Submit data from one oracle for round 1
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -966,14 +966,14 @@ fn test_multiple_rounds_passing() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Advance time by 3 rounds (skipping rounds 2 and 3, landing in round 4)
     env.block.time = Timestamp::from_seconds(start_time + (3 * consensus_config.round_length) + 1);
 
     // Submit data for the current round (round 4)
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data4 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -983,7 +983,7 @@ fn test_multiple_rounds_passing() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
     // Verify round has increased to 4 (skipping 2 and 3)
@@ -1010,14 +1010,14 @@ fn test_multiple_rounds_passing() {
 }
 
 #[test]
-fn test_oracles_submitting_across_multiple_rounds() {
+fn test_messengers_submitting_across_multiple_rounds() {
     // Set up test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with threshold = 2 (out of 3 oracles)
+    // Set up initial state with threshold = 2 (out of 3 messengers)
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
     consensus_config.threshold = 2;
@@ -1041,7 +1041,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // Oracle 1 submits data for round 1
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -1051,7 +1051,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info.clone(), msg);
     assert!(result.is_ok());
 
     // Check data after one oracle submission - should still be None (below threshold)
@@ -1062,7 +1062,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // Oracle 2 submits data for round 1 (reaching threshold)
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data1_2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -1072,18 +1072,18 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_2.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info.clone(), msg);
     assert!(result.is_ok());
 
     // Check data after threshold reached but round not passed - should still be None
     let data_after_threshold = query_last_published_data(deps.as_ref(), env.clone());
     assert!(
         data_after_threshold.last_published_data.is_none(),
-        "No data should be published with only threshold oracles (round not passed)"
+        "No data should be published with only threshold messengers (round not passed)"
     );
 
-    // Oracle 3 submits data for round 1 (all oracles)
-    let oracle3_info = message_info("oracle3", &[]);
+    // Oracle 3 submits data for round 1 (all messengers)
+    let messenger3_info = message_info("messenger3", &[]);
     let test_data1_3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -1093,18 +1093,18 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_3.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info.clone(), msg);
     assert!(result.is_ok());
 
-    // Scenario 1: All oracles submitted data but round is not passed yet
-    // Check data after all oracles submitted - should be updated
-    let data_after_all_oracles = query_last_published_data(deps.as_ref(), env.clone());
+    // Scenario 1: All messengers submitted data but round is not passed yet
+    // Check data after all messengers submitted - should be updated
+    let data_after_all_messengers = query_last_published_data(deps.as_ref(), env.clone());
     assert!(
-        data_after_all_oracles.last_published_data.is_some(),
-        "Data should be published when all oracles submit"
+        data_after_all_messengers.last_published_data.is_some(),
+        "Data should be published when all messengers submit"
     );
     assert_eq!(
-        data_after_all_oracles.last_published_data.unwrap().round,
+        data_after_all_messengers.last_published_data.unwrap().round,
         1,
         "Published data should be for round 1"
     );
@@ -1122,7 +1122,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info.clone(), msg);
     assert!(result.is_ok());
 
     // Verify we're in round 2
@@ -1144,7 +1144,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Verify we're in round 3
@@ -1163,10 +1163,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3_2.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Scenario 2: Part of oracles (more than threshold) submitted data but round not passed yet
+    // Scenario 2: Part of messengers (more than threshold) submitted data but round not passed yet
     // Check data after threshold reached but round not passed - should still show round 1 data
     let data_after_threshold_round3 = query_last_published_data(deps.as_ref(), env.clone());
     assert!(
@@ -1185,7 +1185,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Advance time to round 4 (passing round 3)
     env.block.time = Timestamp::from_seconds(start_time + (3 * consensus_config.round_length) + 1);
 
-    // Scenario 2 (continued): Round is passed with threshold oracles having submitted
+    // Scenario 2 (continued): Round is passed with threshold messengers having submitted
     // Check data after round passed with threshold met - should be updated to round 3 data
     let data_after_round_passed = query_last_published_data(deps.as_ref(), env.clone());
     assert!(
@@ -1208,7 +1208,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info.clone(), msg);
     assert!(result.is_ok());
 
     // Verify we're in round 4
@@ -1224,7 +1224,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     // Advance time to round 5 (skipping round 4)
     env.block.time = Timestamp::from_seconds(start_time + (4 * consensus_config.round_length) + 1);
 
-    // Scenario 3: Less than threshold oracles submitted data and round is passed
+    // Scenario 3: Less than threshold messengers submitted data and round is passed
     // Check data after round passed with below threshold - should still show round 3 data
     let data_after_round_passed_below_threshold =
         query_last_published_data(deps.as_ref(), env.clone());
@@ -1253,7 +1253,7 @@ fn test_oracles_submitting_across_multiple_rounds() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data5.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
     // Verify we're in round 5
@@ -1267,10 +1267,10 @@ fn test_oracles_submitting_across_multiple_rounds() {
     );
 
     // This test demonstrates:
-    // 1. When all oracles submit data but round is not passed yet, query_get_data shows the latest published data
-    // 2. When only part of oracles (but more than threshold) submit data and round is not passed,
+    // 1. When all messengers submit data but round is not passed yet, query_get_data shows the latest published data
+    // 2. When only part of messengers (but more than threshold) submit data and round is not passed,
     //    the last published data is not updated. But when the round is passed, it gets updated properly.
-    // 3. When less than threshold oracles submit data and round is passed, last published data is not changed
+    // 3. When less than threshold messengers submit data and round is passed, last published data is not changed
 }
 
 #[test]
@@ -1297,7 +1297,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     );
 
     // Oracle 1 submits data for round 1
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -1307,7 +1307,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info.clone(), msg);
     assert!(result.is_ok(), "First submission should succeed");
 
     // Oracle 1 tries to submit data for round 1 again (should fail)
@@ -1320,7 +1320,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1_again,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info.clone(), msg);
     assert!(
         result.is_err(),
         "Second submission for the same round should fail"
@@ -1343,7 +1343,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok(), "Submission for a new round should succeed");
 
     // Verify we're in round 2
@@ -1361,10 +1361,10 @@ fn test_delayed_oracle_submissions_within_round() {
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with threshold = 2 (out of 3 oracles)
+    // Set up initial state with threshold = 2 (out of 3 messengers)
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
-    consensus_config.threshold = 2; // Need 2 out of 3 oracles for consensus
+    consensus_config.threshold = 2; // Need 2 out of 3 messengers for consensus
     let round = Round {
         round: 1,
         start: start_time,
@@ -1378,7 +1378,7 @@ fn test_delayed_oracle_submissions_within_round() {
     );
 
     // Oracle 1 submits data at the beginning of round 1
-    let oracle1_info = message_info("oracle1", &[]);
+    let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -1388,7 +1388,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle1_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
     // Verify no consensus yet (only one oracle)
@@ -1406,7 +1406,7 @@ fn test_delayed_oracle_submissions_within_round() {
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length / 2);
 
     // Oracle 2 submits data in the middle of round 1
-    let oracle2_info = message_info("oracle2", &[]);
+    let messenger2_info = message_info("messenger2", &[]);
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -1416,7 +1416,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data2,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle2_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
     // Verify we're still in round 1
@@ -1429,7 +1429,7 @@ fn test_delayed_oracle_submissions_within_round() {
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length - 10);
 
     // Oracle 3 submits data near the end of round 1
-    let oracle3_info = message_info("oracle3", &[]);
+    let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -1439,10 +1439,10 @@ fn test_delayed_oracle_submissions_within_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data3,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info.clone(), msg);
     assert!(result.is_ok());
 
-    // Verify consensus was reached for round 1 (all oracles submitted)
+    // Verify consensus was reached for round 1 (all messengers submitted)
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
@@ -1450,7 +1450,7 @@ fn test_delayed_oracle_submissions_within_round() {
         .find(|attr| attr.key == "action" && attr.value == "publish_consensus");
     assert!(
         publish_consensus_attr.is_some(),
-        "Consensus should be reached when all oracles submit data"
+        "Consensus should be reached when all messengers submit data"
     );
 
     // Verify we're still in round 1
@@ -1471,7 +1471,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let msg = ExecuteMsg::PublishData {
         new_data: test_data4,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle3_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger3_info, msg);
     assert!(result.is_ok());
 
     // Verify we're now in round 2
@@ -1780,7 +1780,7 @@ fn test_execute_update_config_admin_only() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
@@ -1796,8 +1796,8 @@ fn test_execute_update_config_admin_only() {
     }
 
     let new_admin = deps.api.addr_make("new_admin");
-    let oracle1 = deps.api.addr_make("oracle1");
-    let oracle2 = deps.api.addr_make("oracle2");
+    let messenger1 = deps.api.addr_make("messenger1");
+    let messenger2 = deps.api.addr_make("messenger2");
     let price_oracle = deps.api.addr_make("price_oracle");
 
     // Test 2: Admin successfully updates config
@@ -1809,7 +1809,7 @@ fn test_execute_update_config_admin_only() {
         required_binance_positions: Some(vec!["ETHUSDT".to_string()]),
         required_binance_spot_assets: Some(vec!["ETH".to_string(), "USDT".to_string()]),
         price_oracle_contract: Some(price_oracle.to_string()),
-        oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
+        messengers: Some(vec![messenger1.to_string(), messenger2.to_string()]),
         threshold: Some(1),
         data_delta_ppm: Some(5000),
         round_length: Some(1800),
@@ -1840,7 +1840,7 @@ fn test_execute_update_config_admin_only() {
 
     // Verify consensus config was updated
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_consensus_config.oracles, vec![oracle1, oracle2]);
+    assert_eq!(updated_consensus_config.messengers, vec![messenger1, messenger2]);
     assert_eq!(updated_consensus_config.threshold, 1);
     assert_eq!(updated_consensus_config.data_delta_ppm, 5000);
     assert_eq!(updated_consensus_config.round_length, 1800);
@@ -1871,7 +1871,7 @@ fn test_execute_update_config_partial_updates() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
@@ -1898,7 +1898,7 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify consensus config was not updated
     let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after.oracles, consensus_config.oracles);
+    assert_eq!(consensus_config_after.messengers, consensus_config.messengers);
     assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
     assert_eq!(
         consensus_config_after.data_delta_ppm,
@@ -1909,8 +1909,8 @@ fn test_execute_update_config_partial_updates() {
         consensus_config.round_length
     );
 
-    let oracle_a = deps.api.addr_make("oracle_a");
-    let oracle_b = deps.api.addr_make("oracle_b");
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
 
     // Test partial update - only consensus config fields
     let update_config = crate::msg::UpdateConfig {
@@ -1920,7 +1920,7 @@ fn test_execute_update_config_partial_updates() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: Some(vec![oracle_a.to_string(), oracle_b.to_string()]),
+        messengers: Some(vec![messenger_a.to_string(), messenger_b.to_string()]),
         threshold: Some(1),
         data_delta_ppm: None,
         round_length: None,
@@ -1933,7 +1933,7 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify only specified consensus fields were updated
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_consensus_config.oracles, vec![oracle_a, oracle_b]); // updated
+    assert_eq!(updated_consensus_config.messengers, vec![messenger_a, messenger_b]); // updated
     assert_eq!(updated_consensus_config.threshold, 1); // updated
     assert_eq!(
         updated_consensus_config.data_delta_ppm,
@@ -1975,7 +1975,7 @@ fn test_execute_update_config_empty_update() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
@@ -2020,7 +2020,7 @@ fn test_execute_update_config_admin_change() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
@@ -2044,7 +2044,7 @@ fn test_execute_update_config_admin_change() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
@@ -2068,7 +2068,7 @@ fn test_execute_update_config_admin_change() {
         required_binance_positions: None,
         required_binance_spot_assets: None,
         price_oracle_contract: None,
-        oracles: None,
+        messengers: None,
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
