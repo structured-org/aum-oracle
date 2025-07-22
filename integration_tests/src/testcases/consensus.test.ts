@@ -129,7 +129,6 @@ describe('Consensus', () => {
         expect(result.data.aum_usd).toEqual(
           Math.trunc(1_531_381_751_507_034 / 1_000_000).toString(),
         );
-        console.log('before aum: ' + result.data.aum_usd);
       });
 
       it('changes published data as expected', async () => {
@@ -147,7 +146,6 @@ describe('Consensus', () => {
               JUPITER_CONTRACT,
               context.client,
             );
-            console.log('after aum: ' + result.data.aum_usd);
             // wait until we have same changed aum usd gotten from contract
             return (
               result.data.aum_usd ===
@@ -255,18 +253,25 @@ describe('Consensus', () => {
       // all three oracles report completely different data
       // sets checks on grouping: one oracle passes incorrect data on exact field like decimals,
       //    other values from this oracle does not count in eventual consensus
+
+      afterAll(async () => {
+        // set mockController3 to original data
+        const data = await fetchMockData(mockController1);
+        await mockController2.setBinancePMAccountInfo(data.pmAccountInfo);
+        await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
+      });
     });
 
-    describe('Some oracles not up for some time', () => {
+    describe('Oracles paused (down) for some time', () => {
       it('one oracle does not stop data publishing', async () => {
-        execSync(`docker pause aum-oracle-2`); // pause one oracle
+        execSync(`docker pause consensus-aum-oracle-2-1`); // pause one oracle
 
         const resultBefore = await queryLastPublishedData<BinanceData>(
           BINANCE_CONTRACT,
           context.client,
         );
 
-        // next round should happen
+        // the next round should happen
         await waitFor(
           async () => {
             const checkResult = await queryLastPublishedData<BinanceData>(
@@ -282,7 +287,7 @@ describe('Consensus', () => {
       });
 
       it('two oracles stop data publishing', async () => {
-        execSync(`docker pause aum-oracle-3`); // pause two oracles
+        execSync(`docker pause consensus-aum-oracle-3-1`); // pause second oracle
         const resultBefore = await queryLastPublishedData<BinanceData>(
           BINANCE_CONTRACT,
           context.client,
@@ -316,10 +321,10 @@ describe('Consensus', () => {
       // Third oracles online, nothing changes
 
       afterAll(() => {
-        execSync(`docker unpause aum-oracle-1`);
-        execSync(`docker unpause aum-oracle-2`);
-        execSync(`docker unpause aum-oracle-3`);
-      })
+        // execSync(`docker unpause consensus-aum-oracle-1-1`);
+        execSync(`docker unpause consensus-aum-oracle-2-1`);
+        execSync(`docker unpause consensus-aum-oracle-3-1`);
+      });
     });
 
     describe('Data sources timeouts and problems', () => {
