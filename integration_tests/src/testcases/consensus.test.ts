@@ -314,15 +314,58 @@ describe('Consensus', () => {
         expect(resultAfter.round).toEqual(resultBefore.round);
       });
 
-      // First oracle out, update still works
-      // Second oracle out, data stale after some time
-      // Third oracle out, nothing changes
-      // Two oracles online, data starts publishing
-      // Third oracles online, nothing changes
+      it('third oracles stop data publishing', async () => {
+        execSync(`docker pause consensus-aum-oracle-1-1`); // pause second oracle
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
 
-      afterAll(() => {
-        // execSync(`docker unpause consensus-aum-oracle-1-1`);
+        // next round should not happen
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          10_000, // 10-second wait
+          1600, // 1.6-second interval
+          false,
+        );
+
+        const resultAfter = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(resultAfter.round).toEqual(resultBefore.round);
+      });
+
+      it('restore two oracles, data publishing should resume', async () => {
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+
+        execSync(`docker unpause consensus-aum-oracle-1-1`);
         execSync(`docker unpause consensus-aum-oracle-2-1`);
+
+        // wait for the next round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          20_000, // 10-second wait
+          1600, // 1.6-second interval
+          true,
+        );
+      });
+      afterAll(() => {
         execSync(`docker unpause consensus-aum-oracle-3-1`);
       });
     });
