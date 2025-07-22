@@ -29,7 +29,7 @@ clients:
   neutron:
     mnemonic: ""
     gas_prices: "0.5untrn"
-    gas: 500_000
+    gas_adjustment: 1.5
     chain_id: "test-1"
     node: "localhost:9090"
     node_conn_retries: 5

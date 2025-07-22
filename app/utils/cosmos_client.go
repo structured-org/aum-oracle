@@ -7,10 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"cosmossdk.io/api/tendermint/abci"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	retry "github.com/avast/retry-go/v4"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/rpc/client"
+	rpcclient "github.com/cometbft/cometbft/rpc/client"
 	rpcclienthttp "github.com/cometbft/cometbft/rpc/client/http"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	jsonrpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
@@ -20,7 +22,9 @@ import (
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtxtypes "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -45,7 +49,7 @@ var (
 type CosmosClientConfig struct {
 	Mnemonic           string        `yaml:"mnemonic"`
 	GasPrices          string        `yaml:"gas_prices"`
-	Gas                uint64        `yaml:"gas"`
+	GasAdjustment      float64       `yaml:"gas_adjustment"`
 	ChainID            string        `yaml:"chain_id"`
 	Node               string        `yaml:"node"`
 	NodeConnRetries    uint          `yaml:"node_conn_retries"`
@@ -77,7 +81,7 @@ func New(cfg *CosmosClientConfig, logger *zap.Logger) (*CosmosClient, error) {
 		WithTxConfig(txConfig).
 		WithChainID(cfg.ChainID).
 		WithGasPrices(cfg.GasPrices).
-		WithGas(cfg.Gas)
+		WithGasAdjustment(cfg.GasAdjustment)
 
 	k, err := keybase.NewAccount(keyName, cfg.Mnemonic, bip39Passphrase, hdPath, hd.Secp256k1)
 	if err != nil {
@@ -119,13 +123,19 @@ func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*co
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	client, err := c.queryAccount(ctx, c.address.String())
+	acc, err := c.queryAccount(ctx, c.address.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to query client acc info: %w. probably the account has empty balances", err)
 	}
+
 	txFactory := c.baseTxFactory.
-		WithAccountNumber(client.AccountNumber).
-		WithSequence(client.Sequence)
+		WithAccountNumber(acc.AccountNumber).
+		WithSequence(acc.Sequence)
+	gas, err := c.calculateGas(ctx, txFactory, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate gas: %w", err)
+	}
+	txFactory = txFactory.WithGas(uint64(float64(gas) * txFactory.GasAdjustment()))
 
 	txBuilder, err := txFactory.BuildUnsignedTx(msg)
 	if err != nil {
@@ -269,6 +279,63 @@ func (c *CosmosClient) queryAccount(ctx context.Context, address string) (*autht
 		zap.Uint64("sequence_number", account.Sequence),
 	)
 	return &account, nil
+}
+
+func (c *CosmosClient) calculateGas(ctx context.Context, txf tx.Factory, msgs ...types.Msg) (uint64, error) {
+	simTxBytes, err := c.buildSimulationTx(txf, msgs...)
+	if err != nil {
+		return 0, fmt.Errorf("error building simulation tx: %w", err)
+	}
+	simQuery := abci.RequestQuery{
+		Path: "/cosmos.tx.v1beta1.Service/Simulate",
+		Data: simTxBytes,
+	}
+	res, err := c.rpcClient.ABCIQueryWithOptions(ctx, simQuery.Path, simQuery.Data, rpcclient.DefaultABCIQueryOptions)
+	if err != nil {
+		return 0, fmt.Errorf("error making abci query for gas calculation: %w", err)
+	}
+
+	var simRes txtypes.SimulateResponse
+	if err := simRes.Unmarshal(res.Response.Value); err != nil {
+		return 0, fmt.Errorf("error unmarshalling simulate response value: %w", err)
+	}
+	if res.Response.Code != 0 {
+		return 0, fmt.Errorf("simulation failed with code=%d; log=%s", res.Response.Code, res.Response.Log)
+	}
+	if simRes.GasInfo == nil {
+		return 0, fmt.Errorf("no gas info found in simulation response with code=%d; log=%s", res.Response.Code, res.Response.Log)
+	}
+
+	return simRes.GasInfo.GasUsed, nil
+}
+
+// buildSimulationTx creates an unsigned tx with an empty single signature and returns
+// the encoded transaction or an error if the unsigned transaction cannot be built.
+func (c *CosmosClient) buildSimulationTx(txf tx.Factory, msgs ...types.Msg) ([]byte, error) {
+	txb, err := txf.BuildUnsignedTx(msgs...)
+	if err != nil {
+		return nil, fmt.Errorf("error building unsigned tx for simulation: %w", err)
+	}
+
+	// Create an empty signature literal as the ante handler will populate with a
+	// sentinel pubkey.
+	sig := signing.SignatureV2{
+		PubKey: &secp256k1.PubKey{},
+		Data: &signing.SingleSignatureData{
+			SignMode: txf.SignMode(),
+		},
+		Sequence: txf.Sequence(),
+	}
+	if err := txb.SetSignatures(sig); err != nil {
+		return nil, fmt.Errorf("error settings signatures for simulation: %w", err)
+	}
+
+	bz, err := c.txEncoder(txb.GetTx())
+	if err != nil {
+		return nil, fmt.Errorf("error encoding transaction: %w", err)
+	}
+	simReq := txtypes.SimulateRequest{TxBytes: bz}
+	return simReq.Marshal()
 }
 
 // createRpcClient connects to a node by the given addr and returns the client.
