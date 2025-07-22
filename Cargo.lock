@@ -769,7 +769,7 @@ checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 [[package]]
 name = "neutron-std"
 version = "6.0.0"
-source = "git+https://github.com/neutron-org/neutron-std?branch=main#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
+source = "git+https://github.com/neutron-org/neutron-std.git?branch=main#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
 dependencies = [
  "bech32 0.9.1",
  "chrono",
@@ -793,7 +793,7 @@ dependencies = [
 [[package]]
 name = "neutron-std-derive"
 version = "0.20.1"
-source = "git+https://github.com/neutron-org/neutron-std?branch=main#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
+source = "git+https://github.com/neutron-org/neutron-std.git?branch=main#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
 dependencies = [
  "itertools 0.10.5",
  "proc-macro2",
