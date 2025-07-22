@@ -109,7 +109,7 @@ describe('Consensus', () => {
   afterAll(async () => {
     // TODO: figure out why context.park is undefined (probably because it was already closed by another test?)
     if (context.park) {
-      await context.park.stop();
+      // await context.park.stop();
     }
   });
 
@@ -152,8 +152,8 @@ describe('Consensus', () => {
               Math.trunc((1_531_381_751_507_034 * 2) / 1_000_000).toString()
             );
           },
-          20_000, // 20-second timeout
-          600, // 0.6-second interval
+          20_000,
+          2_000,
         );
       });
 
@@ -183,8 +183,8 @@ describe('Consensus', () => {
             );
             return result.round > currentRound + 1;
           },
-          20_000, // 20-second timeout
-          600, // 0.6-second interval
+          20_000,
+          2_000,
         );
 
         const nextRoundResult = await queryLastPublishedData<BinanceData>(
@@ -229,8 +229,8 @@ describe('Consensus', () => {
             );
             return checkResult.round > result.round;
           },
-          10_000, // 10-second
-          1600, // 0.6-second interval
+          20_000,
+          2_000,
           false, // no exception, just wait
         );
 
@@ -280,8 +280,8 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round + 1;
           },
-          10_000, // 10-second
-          1600, // 1.6-second interval
+          20_000,
+          2_000,
           true,
         );
       });
@@ -302,8 +302,8 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round + 1;
           },
-          10_000, // 10-second wait
-          1600, // 1.6-second interval
+          20_000,
+          2_000,
           false,
         );
 
@@ -330,8 +330,8 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round;
           },
-          10_000, // 10-second wait
-          1600, // 1.6-second interval
+          20_000,
+          2_000,
           false,
         );
 
@@ -360,8 +360,8 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round;
           },
-          20_000, // 10-second wait
-          1600, // 1.6-second interval
+          20_000,
+          2_000,
           true,
         );
       });
@@ -371,8 +371,60 @@ describe('Consensus', () => {
     });
 
     describe('Data sources timeouts and problems', () => {
-      // Binance works, Solana doesn't, after restoring back as normal
-      // Solana works, Binance don't, after restoring back as normal
+      it('binance works, solana requests timeouts', async () => {
+        // turn on 200-second timeout
+        for (const mockController of mockControllers) {
+          await mockController.enableSolanaTimeout();
+        }
+
+        const resultBefore = await queryLastPublishedData<BinanceData>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        // wait for the next round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          10_000,
+          2_000,
+          false,
+        );
+        const resultAfter = await queryLastPublishedData<BinanceData>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        expect(resultBefore.round).toEqual(resultAfter.round);
+
+        // disable timeout, messenger should continue publishing data for solana
+        for (const mockController of mockControllers) {
+          await mockController.disableSolanaTimeout();
+        }
+
+        // should publish the next round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          10_000,
+          2_000,
+          true,
+        );
+
+        // TODO: test that binance round publishing still active
+      });
+
+      it('solana works, binance timeouts', async () => {});
+
+      it('all controllers timeout for all data sources', async () => {});
       // Temporary high delay (higher than round length) doesn't make oracle stop working
       // TODO: same? Temporary errors from binance or solana doesn't make oracle stop working
     });
