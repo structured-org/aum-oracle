@@ -109,7 +109,7 @@ describe('Consensus', () => {
   afterAll(async () => {
     // TODO: figure out why context.park is undefined (probably because it was already closed by another test?)
     if (context.park) {
-      // await context.park.stop();
+      await context.park.stop();
     }
   });
 
@@ -377,14 +377,18 @@ describe('Consensus', () => {
           await mockController.enableSolanaTimeout();
         }
 
-        const resultBefore = await queryLastPublishedData<BinanceData>(
+        const resultBefore = await queryLastPublishedData<any>(
           JUPITER_CONTRACT,
+          context.client,
+        );
+        const binanceResultBefore = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
           context.client,
         );
         // wait for the next round
         await waitFor(
           async () => {
-            const checkResult = await queryLastPublishedData<BinanceData>(
+            const checkResult = await queryLastPublishedData<any>(
               JUPITER_CONTRACT,
               context.client,
             );
@@ -394,7 +398,7 @@ describe('Consensus', () => {
           2_000,
           false,
         );
-        const resultAfter = await queryLastPublishedData<BinanceData>(
+        const resultAfter = await queryLastPublishedData<any>(
           JUPITER_CONTRACT,
           context.client,
         );
@@ -405,10 +409,19 @@ describe('Consensus', () => {
           await mockController.disableSolanaTimeout();
         }
 
+        // binance should've worked all this time
+        const binanceResultAfter = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(binanceResultAfter.round).toBeGreaterThan(
+          binanceResultBefore.round,
+        );
+
         // should publish the next round
         await waitFor(
           async () => {
-            const checkResult = await queryLastPublishedData<BinanceData>(
+            const checkResult = await queryLastPublishedData<any>(
               JUPITER_CONTRACT,
               context.client,
             );
@@ -418,8 +431,6 @@ describe('Consensus', () => {
           2_000,
           true,
         );
-
-        // TODO: test that binance round publishing still active
       });
 
       it('solana works, binance timeouts', async () => {});
