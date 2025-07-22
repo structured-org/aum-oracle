@@ -29,7 +29,7 @@ sleep 5
 
 JUPITER_INIT_MSG=$(jq -nc --arg owner "$OWNER" '{
   owner: $owner,
-  oracles: ["neutron1muz6g7pj83clpsalkpa3z5t0726mfja2q6535n", "neutron10u3xlmcd3kq4qr876y76cvwn4aw6ts45upwa6v", "neutron18yaxpvq7aqnrywmzzmfa4qel2p94ts7uh6u6cz", "neutron1sfe577afplmt9ntmp3anf5w9f5es4uctyj5pjh", "neutron1xqn0k73myhvc0y9h3u6qs45vek4clp4s8tr7hs"],
+  messenger: ["neutron1muz6g7pj83clpsalkpa3z5t0726mfja2q6535n", "neutron10u3xlmcd3kq4qr876y76cvwn4aw6ts45upwa6v", "neutron18yaxpvq7aqnrywmzzmfa4qel2p94ts7uh6u6cz", "neutron1sfe577afplmt9ntmp3anf5w9f5es4uctyj5pjh", "neutron1xqn0k73myhvc0y9h3u6qs45vek4clp4s8tr7hs"],
   threshold: 3,
   data_delta_ppm: 100000,
   round_length: 15,
@@ -70,7 +70,7 @@ BINANCE_INIT_MSG=$(jq -nc --arg owner "$OWNER" \
   --arg addr "$SLINKY_CONTRACT_ADDR" \
   '{
     owner: $owner,
-    oracles: ["neutron1muz6g7pj83clpsalkpa3z5t0726mfja2q6535n", "neutron10u3xlmcd3kq4qr876y76cvwn4aw6ts45upwa6v", "neutron18yaxpvq7aqnrywmzzmfa4qel2p94ts7uh6u6cz", "neutron1sfe577afplmt9ntmp3anf5w9f5es4uctyj5pjh", "neutron1xqn0k73myhvc0y9h3u6qs45vek4clp4s8tr7hs"],
+    messengers: ["neutron1muz6g7pj83clpsalkpa3z5t0726mfja2q6535n", "neutron10u3xlmcd3kq4qr876y76cvwn4aw6ts45upwa6v", "neutron18yaxpvq7aqnrywmzzmfa4qel2p94ts7uh6u6cz", "neutron1sfe577afplmt9ntmp3anf5w9f5es4uctyj5pjh", "neutron1xqn0k73myhvc0y9h3u6qs45vek4clp4s8tr7hs"],
     threshold: 3,
     data_delta_ppm: 100000,
     round_length: 15,

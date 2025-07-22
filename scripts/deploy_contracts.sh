@@ -29,7 +29,7 @@ sleep 2
 
 JUPITER_INIT_MSG=$(jq -nc --arg owner "$OWNER" '{
   owner: $owner,
-  oracles: [$owner],
+  messengers: [$owner],
   threshold: 1,
   data_delta_ppm: 10000,
   round_length: 5,
@@ -70,7 +70,7 @@ BINANCE_INIT_MSG=$(jq -nc --arg owner "$OWNER" \
   --arg addr "$SLINKY_CONTRACT_ADDR" \
   '{
     owner: $owner,
-    oracles: [$owner],
+    messengers: [$owner],
     threshold: 1,
     data_delta_ppm: 10000,
     round_length: 5,

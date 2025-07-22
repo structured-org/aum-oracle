@@ -72,8 +72,8 @@ NEUTRON_STAKING_REWARDS_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_rewards
 NEUTRON_STAKING_INFO_PROXY_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_info_proxy.wasm
 
 SLINKY_CONTRACT=$CONTRACTS_BINARIES_DIR/slinky_oracle.wasm
-BINANCE_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/binance_aum_oracle_contract.wasm
-JUPITER_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/jupiter_aum_oracle_contract.wasm
+BINANCE_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/binance_aum_receiver_contract.wasm
+JUPITER_AUM_ORACLE_CONTRACT=$CONTRACTS_BINARIES_DIR/jupiter_aum_receiver_contract.wasm
 
 # Slinky genesis configs
 USE_CORE_MARKETS=${USE_CORE_MARKETS:-true}
@@ -722,7 +722,7 @@ AUM_ORACLE_3_ADDRESS=$($BINARY keys show aum_oracle_3 -a --home "$CHAIN_DIR" --k
 SLINKY_INIT_MSG='{}'
 BINANCE_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
+  "messengers": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 5,
@@ -734,7 +734,7 @@ BINANCE_AUM_ORACLE_INIT_MSG='{
 }'
 JUPITER_AUM_ORACLE_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
+  "messengers": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 5,

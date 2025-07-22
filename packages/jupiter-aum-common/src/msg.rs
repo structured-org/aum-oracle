@@ -95,7 +95,7 @@ pub struct ConfigResponse {
     /// How many blocks we consider the last price from oracle as valid
     pub price_data_validity_period: u64,
     /// a list of oracles that can submit data for consensus
-    pub oracles: Vec<Addr>,
+    pub messengers: Vec<Addr>,
     /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm), for which two values are considered equal

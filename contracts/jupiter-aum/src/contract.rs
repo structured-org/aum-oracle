@@ -108,11 +108,11 @@ fn update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     if let Some(ref oracles) = new_config.messengers {
-        let validated_oracles: Vec<Addr> = oracles
+        let validated_messengers: Vec<Addr> = oracles
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = validated_oracles;
+        consensus_config.messengers = validated_messengers;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -190,7 +190,7 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
         consensus_data_validity_period: config.consensus_data_validity_period,
         required_custody_assets: config.required_custody_assets,
         price_data_validity_period: config.price_data_validity_period,
-        oracles: consensus_config.messengers,
+        messengers: consensus_config.messengers,
         threshold: consensus_config.threshold,
         data_delta_ppm: consensus_config.data_delta_ppm,
         round_length: consensus_config.round_length,

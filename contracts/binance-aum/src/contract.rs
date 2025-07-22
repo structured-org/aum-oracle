@@ -124,12 +124,12 @@ fn execute_update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     // Update consensus config fields
-    if let Some(ref oracles) = new_config.messengers {
-        let validated_oracles: Vec<Addr> = oracles
+    if let Some(ref messengers) = new_config.messengers {
+        let validated_messengers: Vec<Addr> = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = validated_oracles;
+        consensus_config.messengers = validated_messengers;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
