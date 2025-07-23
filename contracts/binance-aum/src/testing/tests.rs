@@ -1840,7 +1840,10 @@ fn test_execute_update_config_admin_only() {
 
     // Verify consensus config was updated
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_consensus_config.messengers, vec![messenger1, messenger2]);
+    assert_eq!(
+        updated_consensus_config.messengers,
+        vec![messenger1, messenger2]
+    );
     assert_eq!(updated_consensus_config.threshold, 1);
     assert_eq!(updated_consensus_config.data_delta_ppm, 5000);
     assert_eq!(updated_consensus_config.round_length, 1800);
@@ -1898,7 +1901,10 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify consensus config was not updated
     let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after.messengers, consensus_config.messengers);
+    assert_eq!(
+        consensus_config_after.messengers,
+        consensus_config.messengers
+    );
     assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
     assert_eq!(
         consensus_config_after.data_delta_ppm,
@@ -1933,7 +1939,10 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify only specified consensus fields were updated
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_consensus_config.messengers, vec![messenger_a, messenger_b]); // updated
+    assert_eq!(
+        updated_consensus_config.messengers,
+        vec![messenger_a, messenger_b]
+    ); // updated
     assert_eq!(updated_consensus_config.threshold, 1); // updated
     assert_eq!(
         updated_consensus_config.data_delta_ppm,
