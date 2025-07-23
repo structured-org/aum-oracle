@@ -11,11 +11,20 @@ pub enum ContractError {
     #[error("Msg sender must be the contract owner")]
     Unauthorized,
 
+    #[error("TWA exchange rate not yet calculated")]
+    TwaerNotCalculated,
+
     #[error("Overflow error")]
     Overflow(cosmwasm_std::OverflowError),
 
     #[error("Division error")]
     CheckedDiv(cosmwasm_std::CheckedFromRatioError),
+
+    #[error("Duplicate data point at timestamp {timestamp}")]
+    DuplicateDataPoint { timestamp: u64 },
+
+    #[error("No next timestamp found for expired rate at timestamp {timestamp}")]
+    NoNextTimestamp { timestamp: u64 },
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {

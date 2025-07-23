@@ -1,14 +1,15 @@
-use std::str::FromStr;
+use std::ops::Sub;
 
 use crate::error::{ContractError, ContractResult};
-use crate::msg::{ExecuteMsg, GetAumResponse, InstantiateMsg, QueryMsg, UpdateConfig};
-use crate::state::{
-    Config, ExchangeRateDataPoint, CONFIG, EXCHANGE_RATE_HISTORY, TWA_EXCHANGE_RATE,
+use crate::msg::{
+    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
+use crate::state::{Config, TwaAggregator, CONFIG, ER_HISTORY, TWAER, TWA_AGGREGATOR};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
 };
+use cw_storage_plus::Bound;
 
 #[entry_point]
 pub fn instantiate(
@@ -18,14 +19,14 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let oracles: Vec<Addr> = msg
-        .oracles
+        .aum_oracles
         .iter()
         .map(|addr| deps.api.addr_validate(addr))
         .collect::<StdResult<_>>()?;
 
     let contract_config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
-        oracles,
+        aum_oracles: oracles,
         maxbtc_denom: msg.maxbtc_denom,
         twa_window_seconds: msg.twa_window_seconds,
     };
@@ -45,12 +46,8 @@ pub fn execute(
         ExecuteMsg::UpdateConfig { new_config } => {
             Ok(execute_update_config(deps, env, info, new_config)?)
         }
-        ExecuteMsg::StoreInstantExchangeRate {} => {
-            Ok(execute_store_instant_exchange_rate(deps, env, info)?)
-        }
-        ExecuteMsg::UpdateTwaExchangeRate {} => {
-            Ok(execute_update_twa_exchange_rate(deps, env, info)?)
-        }
+        ExecuteMsg::RecordEr {} => Ok(execute_record_er(deps, env, info)?),
+        ExecuteMsg::PublishTwaer {} => Ok(execute_publish_twaer(deps, env, info)?),
     }
 }
 
@@ -60,160 +57,200 @@ fn execute_update_config(
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> ContractResult<Response> {
-    // Load current contract config
-    let mut contract_config = CONFIG.load(deps.storage)?;
-
-    // Only admin can update config
-    if info.sender != contract_config.owner {
+    let mut config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
     // Update configuration if fields are provided
-    if let Some(ref oracles) = new_config.oracles {
+    if let Some(ref oracles) = new_config.aum_oracles {
         let validated_oracles: Vec<Addr> = oracles
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        contract_config.oracles = validated_oracles;
+        config.aum_oracles = validated_oracles;
     }
-
     if let Some(new_owner) = new_config.owner {
         let validated_new_owner = deps.api.addr_validate(&new_owner)?;
-        contract_config.owner = validated_new_owner;
+        config.owner = validated_new_owner;
     }
-
+    if let Some(maxbtc_denom) = new_config.maxbtc_denom {
+        config.maxbtc_denom = maxbtc_denom;
+    }
     if let Some(twa_window_seconds) = new_config.twa_window_seconds {
-        contract_config.twa_window_seconds = twa_window_seconds;
+        config.twa_window_seconds = twa_window_seconds;
     }
 
-    CONFIG.save(deps.storage, &contract_config)?;
-
+    CONFIG.save(deps.storage, &config)?;
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-fn execute_store_instant_exchange_rate(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> ContractResult<Response> {
+fn execute_record_er(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    // Only admin can order to store instant exchange rate
     if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
     let exchange_rate = calc_exchange_rate(deps.as_ref())?;
     let timestamp = env.block.time.seconds();
+    ER_HISTORY.save(deps.storage, timestamp, &exchange_rate)?;
 
-    // Store the instant exchange rate data point
-    let data_point = ExchangeRateDataPoint {
-        rate: exchange_rate,
-        timestamp,
-        block_height: env.block.height,
-    };
+    let window_start = timestamp.sub(config.twa_window_seconds);
+    let expired_rates = determine_expired_rates(deps.storage, window_start)?;
+    update_twa_aggregator(deps.storage, exchange_rate, timestamp, &expired_rates)?;
 
-    EXCHANGE_RATE_HISTORY.save(deps.storage, timestamp, &data_point)?;
-
-    // Clean up old data points outside the TWA window
-    cleanup_old_data_points(deps.storage, timestamp, config.twa_window_seconds)?;
-
-    Ok(Response::new().add_attribute("action", "store_instant_exchange_rate"))
+    Ok(Response::new().add_attributes([
+        ("action", "record_er"),
+        ("exchange_rate", &exchange_rate.to_string()),
+    ]))
 }
 
-fn execute_update_twa_exchange_rate(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> ContractResult<Response> {
+fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    // Only admin can order to update TWA exchange rate
     if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
-    let twa_rate = calculate_twa_exchange_rate(deps.as_ref(), &env, &config)?;
-    TWA_EXCHANGE_RATE.save(deps.storage, &twa_rate)?;
+    let twaer = calculate_twaer(deps.as_ref(), env.clone())?;
+    TWAER.save(deps.storage, &(twaer, env.block.time.seconds()))?;
 
-    Ok(Response::new().add_attribute("action", "update_twa_exchange_rate"))
+    Ok(
+        Response::new()
+            .add_attributes([("action", "publish_twaer"), ("twaer", &twaer.to_string())]),
+    )
 }
 
-/// Cleans up exchange rate data points that are older than the TWA window
-fn cleanup_old_data_points(
+/// Determine which exchange rates are expired and return them in ascending timestamp order.
+fn determine_expired_rates(
     storage: &mut dyn cosmwasm_std::Storage,
-    current_timestamp: u64,
-    twa_window_seconds: u64,
+    window_start: u64,
+) -> ContractResult<Vec<(u64, Decimal)>> {
+    let expired_data: Vec<(u64, Decimal)> = ER_HISTORY
+        .range(
+            storage,
+            None,                                 // Start from oldest
+            Some(Bound::exclusive(window_start)), // Stop at window_start (oldest in-window record)
+            Order::Ascending,
+        )
+        .collect::<StdResult<Vec<_>>>()?;
+
+    Ok(expired_data)
+}
+
+/// Updates the TWA aggregator with a new exchange rate data point and manages the time window
+/// by removing expired entries. This function performs incremental TWA calculation by:
+/// 1. Adding the weighted contribution of the most recent rate for the time period since
+///    the last update;
+/// 2. Removing weighted contributions from exchange rates that have expired outside the
+///    configured TWA window;
+/// 3. Recalculating the current TWA based on the updated weighted sum and total duration;
+/// 4. Updating aggregator metadata (window boundaries, current TWA).
+fn update_twa_aggregator(
+    storage: &mut dyn cosmwasm_std::Storage,
+    new_rate: Decimal,
+    new_timestamp: u64,
+    expired_rates: &[(u64, Decimal)],
 ) -> ContractResult<()> {
-    let window_start = current_timestamp.saturating_sub(twa_window_seconds);
+    let mut twa_aggr = match TWA_AGGREGATOR.may_load(storage)? {
+        None => {
+            TWA_AGGREGATOR.save(
+                storage,
+                &TwaAggregator::from_single_point(new_timestamp, new_rate),
+            )?;
+            return Ok(());
+        }
+        Some(buffer) => buffer,
+    };
 
-    // Collect timestamps of old data points to remove
-    let old_timestamps: Vec<u64> = EXCHANGE_RATE_HISTORY
-        .range(storage, None, None, Order::Ascending)
-        .filter_map(|item| match item {
-            Ok((timestamp, _)) if timestamp < window_start => Some(timestamp),
-            _ => None,
-        })
-        .collect();
+    // the rate that was active from window_end until now
+    let latest_rate_duration = new_timestamp - twa_aggr.window_end;
+    if latest_rate_duration <= 0 {
+        return Err(ContractError::DuplicateDataPoint {
+            timestamp: new_timestamp,
+        });
+    }
+    let latest_rate = ER_HISTORY
+        .range(
+            storage,
+            None,
+            Some(Bound::inclusive(twa_aggr.window_end)),
+            Order::Descending,
+        )
+        .next()
+        .transpose()?
+        .map(|(_, rate)| rate)
+        .unwrap_or(twa_aggr.current_twa);
 
-    // Remove old data points
-    for timestamp in old_timestamps {
-        EXCHANGE_RATE_HISTORY.remove(storage, timestamp);
+    let weighted_contribution =
+        latest_rate.checked_mul(Decimal::from_ratio(latest_rate_duration, 1u64))?;
+    twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_add(weighted_contribution)?;
+    twa_aggr.total_duration += latest_rate_duration;
+
+    // Remove contributions from rates that are no longer in the window
+    for (expired_timestamp, expired_rate) in expired_rates {
+        let next_timestamp = find_next_timestamp_after(storage, *expired_timestamp)?.ok_or(
+            ContractError::NoNextTimestamp {
+                timestamp: *expired_timestamp,
+            },
+        )?;
+        // how long the rate was active
+        let expired_duration = next_timestamp - expired_timestamp;
+        // contribution of the rate
+        let expired_contribution =
+            expired_rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
+
+        twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
+        twa_aggr.total_duration -= expired_duration;
+
+        ER_HISTORY.remove(storage, *expired_timestamp);
     }
 
+    twa_aggr.window_end = new_timestamp;
+    if twa_aggr.total_duration > 0 {
+        twa_aggr.current_twa = twa_aggr
+            .weighted_sum
+            .checked_div(Decimal::from_ratio(twa_aggr.total_duration, 1u64))?;
+    } else {
+        twa_aggr.current_twa = new_rate;
+    }
+
+    let oldest_timestamp = ER_HISTORY
+        .range(storage, None, None, Order::Ascending)
+        .next()
+        .transpose()?
+        .map(|(timestamp, _)| timestamp)
+        .unwrap_or(new_timestamp);
+    twa_aggr.window_start = oldest_timestamp;
+
+    TWA_AGGREGATOR.save(storage, &twa_aggr)?;
     Ok(())
 }
 
-/// Calculates the Time-Weighted Average exchange rate based on historical data points
-fn calculate_twa_exchange_rate(deps: Deps, env: &Env, config: &Config) -> ContractResult<Decimal> {
-    let current_timestamp = env.block.time.seconds();
-    let window_start = current_timestamp.saturating_sub(config.twa_window_seconds);
+fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
+    let config = CONFIG.load(deps.storage)?;
+    let maxbtc_supply = deps.querier.query_supply(config.maxbtc_denom)?.amount;
+    let aum = get_aum(deps)?;
 
-    // Get all data points within the TWA window
-    let mut data_points: Vec<ExchangeRateDataPoint> = EXCHANGE_RATE_HISTORY
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter_map(|item| match item {
-            Ok((timestamp, data_point)) if timestamp >= window_start => Some(data_point),
-            _ => None,
-        })
-        .collect();
+    Ok(Decimal::from_ratio(aum, maxbtc_supply))
+}
 
-    // If no historical data, return current exchange rate
-    if data_points.is_empty() {
-        return calc_exchange_rate(deps);
-    }
+/// Find the next timestamp after the given timestamp
+fn find_next_timestamp_after(
+    storage: &dyn cosmwasm_std::Storage,
+    after_timestamp: u64,
+) -> ContractResult<Option<u64>> {
+    let next = ER_HISTORY
+        .range(
+            storage,
+            Some(Bound::exclusive(after_timestamp)),
+            None,
+            Order::Ascending,
+        )
+        .next()
+        .transpose()?
+        .map(|(timestamp, _)| timestamp);
 
-    // Sort by timestamp (should already be sorted from the range query, but ensure it)
-    data_points.sort_by_key(|p| p.timestamp);
-
-    let mut weighted_sum = Decimal::zero();
-    let mut total_weight = 0u64;
-
-    for (i, data_point) in data_points.iter().enumerate() {
-        // Calculate the time weight for this data point
-        let next_timestamp = if i + 1 < data_points.len() {
-            data_points[i + 1].timestamp
-        } else {
-            current_timestamp
-        };
-
-        let weight = next_timestamp - data_point.timestamp;
-
-        // Add to weighted sum
-        weighted_sum = weighted_sum.checked_add(
-            data_point
-                .rate
-                .checked_mul(Decimal::from_ratio(weight, 1u64))?,
-        )?;
-        total_weight += weight;
-    }
-
-    // Calculate the time-weighted average
-    if total_weight == 0 {
-        // If total weight is zero, return the most recent rate
-        return Ok(data_points.last().unwrap().rate);
-    }
-
-    let twa_rate = weighted_sum.checked_div(Decimal::from_ratio(total_weight, 1u64))?;
-    Ok(twa_rate)
+    Ok(next)
 }
 
 #[entry_point]
@@ -221,48 +258,31 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
     match msg {
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps)?)?),
         QueryMsg::GetConfig {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
-        QueryMsg::GetTwaExchangeRate {} => Ok(to_json_binary(&query_get_twa_exchange_rate(deps)?)?),
-        QueryMsg::PredictTwaExchangeRate {} => {
-            Ok(to_json_binary(&predict_twa_exchange_rate(deps, env)?)?)
-        }
+        QueryMsg::GetTwaer {} => Ok(to_json_binary(&query_get_twaer(deps)?)?),
+        QueryMsg::PredictTwaer {} => Ok(to_json_binary(&calculate_twaer(deps, env)?)?),
     }
 }
 
-pub fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
+fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
     let aum = get_aum(deps)?;
     Ok(GetAumResponse { aum_in_btc: aum })
 }
 
-fn query_get_twa_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
-    TWA_EXCHANGE_RATE.load(deps.storage).map_err(|_| {
-        ContractError::Std(cosmwasm_std::StdError::generic_err(
-            "TWA exchange rate not yet calculated. Call UpdateTwaExchangeRate first.",
-        ))
+fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
+    let (twaer, published_at) = TWAER
+        .load(deps.storage)
+        .map_err(|_| ContractError::TwaerNotCalculated {})?;
+
+    Ok(GetTwaerResponse {
+        twaer,
+        published_at,
     })
-}
-
-fn predict_twa_exchange_rate(deps: Deps, env: Env) -> ContractResult<Decimal> {
-    let config = CONFIG.load(deps.storage)?;
-    calculate_twa_exchange_rate(deps, &env, &config)
-}
-
-fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
-    // let config = CONFIG.load(deps.storage)?;
-    // let mut supply = deps.querier.query_supply(config.maxbtc_denom)?;
-
-    // TODO: remove this once we have a real supply
-    let maxbtc_supply = Uint128::from_str("3470981878").unwrap();
-    let aum = get_aum(deps)?;
-
-    Ok(Decimal::from_ratio(aum, maxbtc_supply))
 }
 
 fn get_aum(deps: Deps) -> ContractResult<Uint128> {
     let config = CONFIG.load(deps.storage)?;
-
     let mut total_aum = Uint128::zero();
-
-    for oracle in config.oracles.iter() {
+    for oracle in config.aum_oracles.iter() {
         let aum: GetAumResponse = deps.querier.query_wasm_smart(
             oracle,
             &serde_json::json!({
@@ -273,4 +293,41 @@ fn get_aum(deps: Deps) -> ContractResult<Uint128> {
     }
 
     Ok(total_aum)
+}
+
+fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
+    let twa_buffer = TWA_AGGREGATOR.load(deps.storage)?;
+
+    // If no time has passed since the last update, return the buffer TWA
+    if env.block.time.seconds() <= twa_buffer.window_end {
+        return Ok(twa_buffer.current_twa);
+    }
+
+    // Get the last rate from the most recent timestamp
+    let last_rate = ER_HISTORY
+        .range(deps.storage, None, None, Order::Descending)
+        .next()
+        .transpose()?
+        .map(|(_, rate)| rate)
+        .unwrap_or(twa_buffer.current_twa);
+
+    // Calculate the additional contribution from the last rate
+    let additional_duration = env.block.time.seconds() - twa_buffer.window_end;
+    let additional_contribution =
+        last_rate.checked_mul(Decimal::from_ratio(additional_duration, 1u64))?;
+
+    // Calculate total weighted sum and duration
+    let total_weighted_sum = twa_buffer
+        .weighted_sum
+        .checked_add(additional_contribution)?;
+    let total_duration = twa_buffer.total_duration + additional_duration;
+
+    if total_duration == 0 {
+        return Ok(last_rate);
+    }
+
+    // Calculate final TWA
+    total_weighted_sum
+        .checked_div(Decimal::from_ratio(total_duration, 1u64))
+        .map_err(|e| ContractError::CheckedDiv(e))
 }
