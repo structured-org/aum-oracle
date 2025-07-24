@@ -1,7 +1,7 @@
 use crate::consensus::PublishResult::ConsensusReached;
 use crate::error::{ConsensusError, ConsensusResult};
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal256, Env, SignedDecimal256, StdResult, Storage};
+use cosmwasm_std::{Addr, Decimal256, Env, Order, SignedDecimal256, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -119,14 +119,14 @@ impl<T: ConsensusData> State<T> {
 
     /// Returns all pending data
     fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<OracleData<T>>> {
-        let messenger = self.config.load(storage)?.messengers;
-
-        let mut v = Vec::new();
-        for addr in messenger {
-            if let Some(d) = self.pending_data.may_load(storage, addr)? {
-                v.push(d);
-            }
+        let mut v: Vec<OracleData<T>> = Vec::new();
+        for data in self
+            .pending_data
+            .range(storage, None, None, Order::Ascending)
+        {
+            v.push(data?.1);
         }
+
         Ok(v)
     }
 
