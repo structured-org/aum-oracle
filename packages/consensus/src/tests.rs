@@ -767,6 +767,184 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(5225, 10000),
         "Consensus value1 should be correct"
     );
+
+    // Test scenario: Messengers X and Y in config but no data from them in pending_data
+    {
+        let mut deps_scenario1 = cosmwasm_std::testing::MockStorage::new();
+        let config_with_inactive = Config {
+            messengers: vec![
+                Addr::unchecked("oracle1"),
+                Addr::unchecked("oracle2"),
+                Addr::unchecked("oracle_inactive1"), // In config but no data
+                Addr::unchecked("oracle_inactive2"), // In config but no data
+            ],
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state_scenario1 =
+            setup_test_state(&mut deps_scenario1, &config_with_inactive, 1, start_time);
+
+        // Reset time
+        env.block.time = Timestamp::from_seconds(start_time);
+
+        // Only oracle1 and oracle2 publish data (oracle_inactive1 and oracle_inactive2 don't)
+        let test_data_s1_1 = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+        state_scenario1
+            .publish_data(
+                &mut deps_scenario1,
+                &env,
+                Addr::unchecked("oracle1"),
+                test_data_s1_1,
+            )
+            .unwrap();
+
+        let test_data_s1_2 = create_test_data(
+            SignedDecimal256::from_ratio(505, 1000),
+            SignedDecimal256::from_ratio(1005, 1),
+            SignedDecimal256::from_ratio(2010, 1),
+            SignedDecimal256::from_ratio(505, 1),
+        );
+        state_scenario1
+            .publish_data(
+                &mut deps_scenario1,
+                &env,
+                Addr::unchecked("oracle2"),
+                test_data_s1_2,
+            )
+            .unwrap();
+
+        // Advance time to trigger consensus since not all messengers submitted data
+        env.block.time =
+            Timestamp::from_seconds(start_time + config_with_inactive.round_length + 1);
+
+        // Test that get_last_published_data can form consensus from available data
+        let result = state_scenario1
+            .get_last_published_data(&env, &deps_scenario1)
+            .unwrap();
+        assert!(
+            result.is_some(),
+            "Consensus should be reached even when some config messengers don't provide data"
+        );
+        let consensus = result.unwrap();
+        assert_eq!(consensus.round, 1);
+        assert_eq!(
+            consensus.data.value1,
+            SignedDecimal256::from_ratio(5025, 10000)
+        ); // median of oracle1 and oracle2
+    }
+
+    // Test scenario: No messengers X and Y in config but data exists from them in pending_data
+    {
+        let mut deps_scenario2 = cosmwasm_std::testing::MockStorage::new();
+        let config_limited = Config {
+            messengers: vec![Addr::unchecked("oracle1"), Addr::unchecked("oracle2")],
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state_scenario2 = setup_test_state(&mut deps_scenario2, &config_limited, 1, start_time);
+
+        // Reset time
+        env.block.time = Timestamp::from_seconds(start_time);
+
+        // Add data from oracles that are in config
+        let test_data_s2_1 = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+        state_scenario2
+            .publish_data(
+                &mut deps_scenario2,
+                &env,
+                Addr::unchecked("oracle1"),
+                test_data_s2_1,
+            )
+            .unwrap();
+
+        let test_data_s2_2 = create_test_data(
+            SignedDecimal256::from_ratio(505, 1000),
+            SignedDecimal256::from_ratio(1005, 1),
+            SignedDecimal256::from_ratio(2010, 1),
+            SignedDecimal256::from_ratio(505, 1),
+        );
+        state_scenario2
+            .publish_data(
+                &mut deps_scenario2,
+                &env,
+                Addr::unchecked("oracle2"),
+                test_data_s2_2,
+            )
+            .unwrap();
+
+        // Manually add data from external oracles (not in config)
+        let external_data_1 = create_test_data(
+            SignedDecimal256::from_ratio(8, 10),
+            SignedDecimal256::from_ratio(8000, 1),
+            SignedDecimal256::from_ratio(8000, 1),
+            SignedDecimal256::from_ratio(800, 1),
+        );
+        let external_data_2 = create_test_data(
+            SignedDecimal256::from_ratio(9, 10),
+            SignedDecimal256::from_ratio(9000, 1),
+            SignedDecimal256::from_ratio(9000, 1),
+            SignedDecimal256::from_ratio(900, 1),
+        );
+
+        // Save data from external oracles (not in config)
+        state_scenario2
+            .pending_data
+            .save(
+                &mut deps_scenario2,
+                Addr::unchecked("external_oracle_x"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: external_data_1,
+                },
+            )
+            .unwrap();
+        state_scenario2
+            .pending_data
+            .save(
+                &mut deps_scenario2,
+                Addr::unchecked("external_oracle_y"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: external_data_2,
+                },
+            )
+            .unwrap();
+
+        // Verify consensus is reached based only on config messengers, ignoring external data
+        let published_data = state_scenario2
+            .last_published_data
+            .may_load(&deps_scenario2)
+            .unwrap();
+        assert!(
+            published_data.is_some(),
+            "Consensus should be reached based on config messengers only"
+        );
+        let consensus = published_data.unwrap();
+        assert_eq!(consensus.round, 1);
+        // Consensus should be based only on oracle1 and oracle2 data, not external oracles
+        assert_eq!(
+            consensus.data.value1,
+            SignedDecimal256::from_ratio(5025, 10000)
+        ); // median of oracle1 and oracle2, not external oracles
+
+        // Verify external data doesn't affect the result
+        assert_ne!(consensus.data.value1, SignedDecimal256::from_ratio(8, 10)); // Not external_oracle_x value
+        assert_ne!(consensus.data.value1, SignedDecimal256::from_ratio(9, 10)); // Not external_oracle_y value
+    }
 }
 
 #[test]
@@ -798,4 +976,308 @@ fn test_state_init() {
         env.block.time.seconds(),
         "Round start time should match env time"
     );
+}
+
+#[test]
+fn test_get_all_pending_data_scenarios() {
+    // Set up test environment
+    let mut deps = cosmwasm_std::testing::MockStorage::new();
+    let mut env = mock_env();
+    let start_time = 1000;
+    env.block.time = Timestamp::from_seconds(start_time);
+
+    // Test scenario 1: Messengers in config but no data from them in pending_data
+    {
+        let config = Config {
+            messengers: vec![
+                Addr::unchecked("oracle1"),
+                Addr::unchecked("oracle2"),
+                Addr::unchecked("oracle3"),
+            ],
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state = setup_test_state(&mut deps, &config, 1, start_time);
+
+        // Advance time so the round is passed and get_last_published_data calls get_all_pending_data
+        env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+
+        // Call get_last_published_data which internally calls get_all_pending_data
+        // Should not return any errors even though there's no pending data
+        let result = state.get_last_published_data(&env, &deps);
+        assert!(
+            result.is_ok(),
+            "get_last_published_data should not fail when no pending data exists"
+        );
+        let data = result.unwrap();
+        assert!(
+            data.is_none(),
+            "Should return None when no pending data and no previous published data"
+        );
+    }
+
+    // Test scenario 2: No messengers in config but data exists from them in pending_data
+    {
+        let mut deps2 = cosmwasm_std::testing::MockStorage::new();
+
+        // Config with empty messengers list
+        let config_empty = Config {
+            messengers: vec![], // No messengers in config
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state = setup_test_state(&mut deps2, &config_empty, 1, start_time);
+
+        // Manually insert pending data for oracles not in config
+        let test_data = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+        let oracle_data = crate::consensus::OracleData {
+            round: 1,
+            timestamp: start_time,
+            data: test_data,
+        };
+
+        // Save data for oracles not in config
+        state
+            .pending_data
+            .save(
+                &mut deps2,
+                Addr::unchecked("external_oracle1"),
+                &oracle_data,
+            )
+            .unwrap();
+        state
+            .pending_data
+            .save(
+                &mut deps2,
+                Addr::unchecked("external_oracle2"),
+                &oracle_data,
+            )
+            .unwrap();
+
+        // Advance time so the round is passed
+        env.block.time = Timestamp::from_seconds(start_time + config_empty.round_length + 1);
+
+        // Call get_last_published_data which internally calls get_all_pending_data
+        // Should not return any errors even though pending data exists from oracles not in config
+        let result = state.get_last_published_data(&env, &deps2);
+        assert!(result.is_ok(), "get_last_published_data should not fail when pending data from non-config oracles exists");
+        let data = result.unwrap();
+        assert!(
+            data.is_none(),
+            "Should return None when no data from config messengers"
+        );
+    }
+
+    // Test scenario 3: Mixed scenario - some messengers in config with data, some without, and some external data
+    {
+        let mut deps3 = cosmwasm_std::testing::MockStorage::new();
+
+        let config_mixed = Config {
+            messengers: vec![
+                Addr::unchecked("oracle1"),
+                Addr::unchecked("oracle2"), // This one won't have data
+                Addr::unchecked("oracle3"),
+            ],
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state = setup_test_state(&mut deps3, &config_mixed, 1, start_time);
+
+        let test_data1 = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+        let test_data3 = create_test_data(
+            SignedDecimal256::from_ratio(505, 1000),
+            SignedDecimal256::from_ratio(1005, 1),
+            SignedDecimal256::from_ratio(2010, 1),
+            SignedDecimal256::from_ratio(505, 1),
+        );
+        let external_data = create_test_data(
+            SignedDecimal256::from_ratio(6, 10),
+            SignedDecimal256::from_ratio(1200, 1),
+            SignedDecimal256::from_ratio(2500, 1),
+            SignedDecimal256::from_ratio(600, 1),
+        );
+
+        // Save data for oracle1 and oracle3 (from config)
+        state
+            .pending_data
+            .save(
+                &mut deps3,
+                Addr::unchecked("oracle1"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: test_data1,
+                },
+            )
+            .unwrap();
+        state
+            .pending_data
+            .save(
+                &mut deps3,
+                Addr::unchecked("oracle3"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: test_data3,
+                },
+            )
+            .unwrap();
+
+        // Save data for external oracle (not in config)
+        state
+            .pending_data
+            .save(
+                &mut deps3,
+                Addr::unchecked("external_oracle"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: external_data,
+                },
+            )
+            .unwrap();
+
+        // oracle2 has no data
+
+        // Advance time so the round is passed
+        env.block.time = Timestamp::from_seconds(start_time + config_mixed.round_length + 1);
+
+        // Call get_last_published_data which internally calls get_all_pending_data
+        let result = state.get_last_published_data(&env, &deps3);
+        assert!(
+            result.is_ok(),
+            "get_last_published_data should not fail in mixed scenario"
+        );
+        let data = result.unwrap();
+        assert!(
+            data.is_some(),
+            "Should return consensus data when threshold is met by config messengers"
+        );
+
+        // Verify that only data from config messengers was used (oracle1 and oracle3)
+        let consensus_data = data.unwrap();
+        assert_eq!(consensus_data.round, 1);
+        // The consensus should be the median of oracle1 and oracle3 data (external_oracle data ignored)
+        assert_eq!(
+            consensus_data.data.value1,
+            SignedDecimal256::from_ratio(5025, 10000)
+        ); // median of 0.5 and 0.505
+    }
+}
+
+#[test]
+fn test_get_all_pending_data_through_publish_data() {
+    // Test get_all_pending_data indirectly through publish_data method
+    let mut deps = cosmwasm_std::testing::MockStorage::new();
+    let mut env = mock_env();
+    let start_time = 1000;
+    env.block.time = Timestamp::from_seconds(start_time);
+
+    // Test scenario 1: Config messengers without pending data
+    {
+        let config = Config {
+            messengers: vec![Addr::unchecked("oracle1"), Addr::unchecked("oracle2")],
+            threshold: 2,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state = setup_test_state(&mut deps, &config, 1, start_time);
+
+        // Advance time to trigger round processing
+        env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
+
+        let test_data = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+
+        // publish_data calls get_all_pending_data when round is passed
+        let result = state.publish_data(&mut deps, &env, Addr::unchecked("oracle1"), test_data);
+        assert!(
+            result.is_ok(),
+            "publish_data should not fail when no prior pending data exists"
+        );
+    }
+
+    // Test scenario 2: External oracle data exists but not in config
+    {
+        let mut deps2 = cosmwasm_std::testing::MockStorage::new();
+
+        let config_limited = Config {
+            messengers: vec![Addr::unchecked("oracle1")], // Only one messenger in config
+            threshold: 1,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+        let state = setup_test_state(&mut deps2, &config_limited, 1, start_time);
+
+        // Add data from external oracle not in config
+        let external_data = create_test_data(
+            SignedDecimal256::from_ratio(9, 10),
+            SignedDecimal256::from_ratio(9000, 1),
+            SignedDecimal256::from_ratio(9000, 1),
+            SignedDecimal256::from_ratio(900, 1),
+        );
+        state
+            .pending_data
+            .save(
+                &mut deps2,
+                Addr::unchecked("external_oracle"),
+                &crate::consensus::OracleData {
+                    round: 1,
+                    timestamp: start_time,
+                    data: external_data,
+                },
+            )
+            .unwrap();
+
+        // Advance time to trigger round processing
+        env.block.time = Timestamp::from_seconds(start_time + config_limited.round_length + 1);
+
+        let oracle1_data = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+
+        // publish_data should only consider data from config messengers
+        let result = state.publish_data(
+            &mut deps2,
+            &env,
+            Addr::unchecked("oracle1"),
+            oracle1_data.clone(),
+        );
+        assert!(
+            result.is_ok(),
+            "publish_data should not fail with external oracle data present"
+        );
+
+        let (publish_result, _) = result.unwrap();
+        match publish_result {
+            crate::consensus::PublishResult::ConsensusReached(data) => {
+                // Should only use oracle1 data, ignoring external_oracle data
+                assert_eq!(data.data.value1, oracle1_data.value1);
+                assert_eq!(data.data.value2, oracle1_data.value2);
+                assert_eq!(data.data.value3, oracle1_data.value3);
+                assert_eq!(data.data.value4, oracle1_data.value4);
+            }
+            _ => panic!("Expected consensus to be reached with threshold 1"),
+        }
+    }
 }
