@@ -1351,7 +1351,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "twaer-contract"
+name = "twaer"
 version = "0.1.0"
 dependencies = [
  "consensus",

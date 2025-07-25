@@ -2,8 +2,8 @@
 authors = []
 description = "Time-weighted average exchange rate contract"
 edition = "2021"
-name = "twaer-contract"
-repository = "https://github.com/structured-org/twaer"
+name = "twaer"
+repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.0"
 
 [lib]
