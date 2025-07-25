@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 )
@@ -37,7 +36,7 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
 	// print for debug evaluation. TODO: use actual values when the client is implemented
-	spew.Dump("submitted Binance AUM data:", data)
+	//spew.Dump("submitted Binance AUM data:", data)
 
 	binanceRound++
 	return &NextRound{

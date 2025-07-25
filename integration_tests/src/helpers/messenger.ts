@@ -5,7 +5,7 @@
 // =============================================================================
 
 export class MockController {
-  private baseUrl: string;
+  private readonly baseUrl: string;
 
   constructor(port: number) {
     this.baseUrl = `http://localhost:${port}`;

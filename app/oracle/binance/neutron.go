@@ -70,3 +70,7 @@ func (o *BinanceAumOracleForNeutron) SubmitData(ctx context.Context, data *neutr
 		Timestamp: nextRound.Timestamp,
 	}, nil
 }
+
+func (o *BinanceAumOracleForNeutron) Name() string {
+	return "BinanceAumOracleForNeutron"
+}

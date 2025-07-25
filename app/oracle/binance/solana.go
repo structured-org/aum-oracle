@@ -70,3 +70,7 @@ func (o *BinanceAumOracleForSolana) SubmitData(ctx context.Context, data *solana
 		Timestamp: nextRound.Timestamp,
 	}, nil
 }
+
+func (o *BinanceAumOracleForSolana) Name() string {
+	return "BinanceAumOracleForSolana"
+}

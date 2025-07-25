@@ -38,4 +38,4 @@ clients:
 mock_clients: true
 mock_controller_port: 3000
 
-logger_level: debug
+logger_level: error

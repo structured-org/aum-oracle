@@ -68,13 +68,17 @@ func (m *MockBinanceClient) loadDefaultData() {
 }
 
 func (m *MockBinanceClient) GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error) {
-	m.mu.RLock()
-	cp := make([]*binanceportfolio.UMPosition, len(m.umPositions))
-	for i, position := range m.umPositions {
-		positionCp := *position
-		cp[i] = &positionCp
-	}
-	m.mu.RUnlock()
+	var cp []*binanceportfolio.UMPosition
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+
+		cp = make([]*binanceportfolio.UMPosition, len(m.umPositions))
+		for i, position := range m.umPositions {
+			positionCp := *position
+			cp[i] = &positionCp
+		}
+	}()
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
@@ -114,11 +118,16 @@ func (m *MockBinanceClient) SetPMAccountInfo(account *binanceportfolio.Account) 
 }
 
 func (m *MockBinanceClient) GetPMAccountBalance(ctx context.Context) ([]*binanceportfolio.Balance, error) {
-	cp := make([]*binanceportfolio.Balance, len(m.pmAccountBalance))
-	for i, balance := range m.pmAccountBalance {
-		balanceCp := *balance
-		cp[i] = &balanceCp
-	}
+	var cp []*binanceportfolio.Balance
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		cp = make([]*binanceportfolio.Balance, len(m.pmAccountBalance))
+		for i, balance := range m.pmAccountBalance {
+			balanceCp := *balance
+			cp[i] = &balanceCp
+		}
+	}()
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
@@ -137,10 +146,13 @@ func (m *MockBinanceClient) SetPMAccountBalance(balances []*binanceportfolio.Bal
 }
 
 func (m *MockBinanceClient) GetSpotAccountInfo(ctx context.Context) (*binance.Account, error) {
-	// Acquire and copy under lock immediately
-	m.mu.RLock()
-	cp := *m.spotAccountInfo
-	m.mu.RUnlock()
+	var cp *binance.Account
+	func() {
+		// Acquire and copy under lock immediately
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		cp = m.spotAccountInfo
+	}()
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
@@ -149,7 +161,7 @@ func (m *MockBinanceClient) GetSpotAccountInfo(ctx context.Context) (*binance.Ac
 		}
 	}
 
-	return &cp, nil
+	return cp, nil
 }
 
 func (m *MockBinanceClient) SetSpotAccountInfo(account *binance.Account) {

@@ -725,7 +725,7 @@ BINANCE_AUM_ORACLE_INIT_MSG='{
   "messengers": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 2,
   "data_delta_ppm": 10000,
-  "round_length": 5,
+  "round_length": 15,
   "consensus_data_valid_period": 60,
   "price_data_valid_period": 100,
   "required_binance_positions": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
@@ -737,7 +737,7 @@ JUPITER_AUM_ORACLE_INIT_MSG='{
   "messengers": ["'"$AUM_ORACLE_1_ADDRESS"'", "'"$AUM_ORACLE_2_ADDRESS"'", "'"$AUM_ORACLE_3_ADDRESS"'"],
   "threshold": 2,
   "data_delta_ppm": 10000,
-  "round_length": 5,
+  "round_length": 15,
   "consensus_data_validity_period": 60,
   "required_custody_assets": ["SOL", "USDC", "USDT", "WBTC", "WETH"],
   "price_data_validity_period": 100

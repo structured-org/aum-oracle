@@ -18,7 +18,7 @@ export const waitFor = async (
       if (withException) {
         throw new Error('Timeout waiting for condition');
       } else {
-        break
+        break;
       }
     }
     await sleep(interval);

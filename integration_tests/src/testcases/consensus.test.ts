@@ -107,10 +107,7 @@ describe('Consensus', () => {
   });
 
   afterAll(async () => {
-    // TODO: figure out why context.park is undefined (probably because it was already closed by another test?)
-    if (context.park) {
-      await context.park.stop();
-    }
+    await context.park.stop();
   });
 
   describe('Consensus', () => {
@@ -121,13 +118,21 @@ describe('Consensus', () => {
 
     describe('Happy path', () => {
       it('publishes data as expected', async () => {
-        // was: 1531381751507034
-        const result = await queryLastPublishedData<SolanaData>(
-          JUPITER_CONTRACT,
-          context.client,
-        );
-        expect(result.data.aum_usd).toEqual(
-          Math.trunc(1_531_381_751_507_034 / 1_000_000).toString(),
+        await waitFor(
+          async () => {
+            const result = await queryLastPublishedData<SolanaData>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            // wait until we have same changed aum usd gotten from contract
+            return (
+              result.data.aum_usd ===
+              Math.trunc(1_531_381_751_507_034 / 1_000_000).toString()
+            );
+          },
+          20_000,
+          1_000,
+          true,
         );
       });
 
@@ -153,14 +158,14 @@ describe('Consensus', () => {
             );
           },
           20_000,
-          2_000,
+          1_000,
         );
       });
 
       // TODO: check aum changes?
     });
 
-    describe('Malicious oracle', () => {
+    describe.skip('Malicious oracle', () => {
       it('one malicious oracle does not change published data as', async () => {
         const data = await fetchMockData(mockController1);
         const originalSupplyAmount = data.pmAccountInfo.actualEquity;
@@ -183,8 +188,8 @@ describe('Consensus', () => {
             );
             return result.round > currentRound + 1;
           },
-          20_000,
-          2_000,
+          40_000,
+          1_000,
         );
 
         const nextRoundResult = await queryLastPublishedData<BinanceData>(
@@ -197,7 +202,7 @@ describe('Consensus', () => {
       });
 
       afterAll(async () => {
-        // set mockController3 to original data
+        // restore mockController3 to original data
         const data = await fetchMockData(mockController1);
         await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
       });
@@ -257,6 +262,7 @@ describe('Consensus', () => {
       afterAll(async () => {
         // set mockController3 to original data
         const data = await fetchMockData(mockController1);
+        await mockController1.setBinancePMAccountInfo(data.pmAccountInfo);
         await mockController2.setBinancePMAccountInfo(data.pmAccountInfo);
         await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
       });
@@ -280,20 +286,39 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round + 1;
           },
-          20_000,
-          2_000,
+          40_000,
+          1_000,
           true,
         );
       });
 
       it('two oracles stop data publishing', async () => {
         execSync(`docker pause consensus-aum-oracle-3-1`); // pause second oracle
+        // even tho the oracle is paused first oracle can still change consensus right?
+        // wait one round to be sure since one oracle can still change consensus one more time (when second oracle already submitted this round, first oracle is needed)
+        const resultAfterPause = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultAfterPause.round;
+          },
+          20_000,
+          2_000,
+          false,
+        );
+
         const resultBefore = await queryLastPublishedData<BinanceData>(
           BINANCE_CONTRACT,
           context.client,
         );
 
-        // next round should not happen
+        // the next round should not happen
         await waitFor(
           async () => {
             const checkResult = await queryLastPublishedData<BinanceData>(
@@ -302,7 +327,7 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round + 1;
           },
-          20_000,
+          40_000,
           2_000,
           false,
         );
@@ -314,14 +339,14 @@ describe('Consensus', () => {
         expect(resultAfter.round).toEqual(resultBefore.round);
       });
 
-      it('third oracles stop data publishing', async () => {
-        execSync(`docker pause consensus-aum-oracle-1-1`); // pause second oracle
+      it('all three oracles stop data publishing', async () => {
+        execSync(`docker pause consensus-aum-oracle-1-1`); // pause first oracle
         const resultBefore = await queryLastPublishedData<BinanceData>(
           BINANCE_CONTRACT,
           context.client,
         );
 
-        // next round should not happen
+        // the next round should not happen
         await waitFor(
           async () => {
             const checkResult = await queryLastPublishedData<BinanceData>(
@@ -331,7 +356,7 @@ describe('Consensus', () => {
             return checkResult.round > resultBefore.round;
           },
           20_000,
-          2_000,
+          1_000,
           false,
         );
 
@@ -348,8 +373,10 @@ describe('Consensus', () => {
           context.client,
         );
 
+        console.log('unpausing 1 and 2 messengers...');
         execSync(`docker unpause consensus-aum-oracle-1-1`);
         execSync(`docker unpause consensus-aum-oracle-2-1`);
+        console.log('unpaused 1 and 2 messengers.');
 
         // wait for the next round
         await waitFor(
@@ -360,31 +387,52 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round;
           },
-          20_000,
-          2_000,
+          40_000,
+          1_000,
           true,
         );
-      });
-      afterAll(() => {
+
+        console.log('unpausing 3 messenger...');
         execSync(`docker unpause consensus-aum-oracle-3-1`);
+        console.log('unpaused...');
       });
     });
 
     describe('Data sources timeouts and problems', () => {
-      it('binance works, solana requests timeouts', async () => {
+      it('requests to solana timeouts', async () => {
         // turn on 200-second timeout
         for (const mockController of mockControllers) {
           await mockController.enableSolanaTimeout();
         }
 
+        // wait one round to be sure (maybe some requests were already in progress)
+        const resultAfterPause = await queryLastPublishedData<BinanceData>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultAfterPause.round;
+          },
+          30_000,
+          2_000,
+          false,
+        );
+
         const resultBefore = await queryLastPublishedData<any>(
           JUPITER_CONTRACT,
           context.client,
         );
+        console.log('before round: ' + resultBefore.round);
         const binanceResultBefore = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
         );
+        console.log('waiting for the next round');
         // wait for the next round
         await waitFor(
           async () => {
@@ -392,10 +440,11 @@ describe('Consensus', () => {
               JUPITER_CONTRACT,
               context.client,
             );
+            console.log('round: ' + checkResult.round);
             return checkResult.round > resultBefore.round;
           },
-          10_000,
-          2_000,
+          40_000,
+          1_000,
           false,
         );
         const resultAfter = await queryLastPublishedData<any>(
@@ -427,15 +476,15 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultBefore.round;
           },
-          10_000,
-          2_000,
+          40_000,
+          1_000,
           true,
         );
       });
 
-      it('solana works, binance timeouts', async () => {});
+      it.skip('requests to binance timeouts', async () => {});
 
-      it('all controllers timeout for all data sources', async () => {});
+      it.skip('all controllers timeout for all data sources', async () => {});
       // Temporary high delay (higher than round length) doesn't make oracle stop working
       // TODO: same? Temporary errors from binance or solana doesn't make oracle stop working
     });

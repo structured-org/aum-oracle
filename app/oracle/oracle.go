@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -31,6 +32,8 @@ type Oracle[T any] interface {
 
 	// Logger returns the logger for the oracle.
 	Logger() *zap.Logger
+
+	Name() string
 }
 
 // failureDelay is the delay taken when an oracle fails to fetch or submit data to prevent
@@ -59,6 +62,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 				time.Sleep(failureDelay)
 				continue
 			}
+			fmt.Printf("[%s], Next round from nil: %+v\n", oracle.Name(), nextRound)
 		}
 
 		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
@@ -72,6 +76,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 
 		select {
 		case <-time.NewTimer(timeTillNextRound).C:
+			// TODO: naming currentRound = NextRound seems wrong
 			currentRound := &NextRound{Round: nextRound.Round, Timestamp: nextRound.Timestamp}
 			oracle.Logger().Info("new round started",
 				zap.Uint64("round", currentRound.Round),
@@ -86,6 +91,7 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 				time.Sleep(failureDelay)
 				continue
 			}
+			fmt.Printf("[%s], Next round from process round: %+v\n", oracle.Name(), nextRound)
 
 		case <-ctx.Done():
 			oracle.Logger().Info("oracle stopped by context")
@@ -98,7 +104,10 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 // processing as a response from the oracle. If either fetching or submitting data fails, it will
 // return nil, meaning that the next round is unknown.
 func processRound[T any](ctx context.Context, oracle Oracle[T], round *NextRound) *NextRound {
-	data, err := oracle.FetchData(ctx)
+	ctx2, cancel2 := context.WithTimeout(ctx, time.Second*3)
+	defer cancel2()
+
+	data, err := oracle.FetchData(ctx2)
 	if err != nil {
 		oracle.Logger().Error("failed to fetch data",
 			zap.Uint64("round", round.Round),
@@ -109,7 +118,7 @@ func processRound[T any](ctx context.Context, oracle Oracle[T], round *NextRound
 
 	nextRound, err := oracle.SubmitData(ctx, data)
 	if err != nil {
-		oracle.Logger().Error("failed to submit AUM data",
+		oracle.Logger().Error("failed to submit data",
 			zap.Uint64("round", round.Round),
 			zap.Any("data", data),
 			zap.Error(err),

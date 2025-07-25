@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 )
 
@@ -53,10 +53,14 @@ func (m *MockSolanaClient) loadDefaultData() {
 }
 
 func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, _ solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
-	m.mu.RLock()
-	cp := *m.tokenSupply
-	m.mu.RUnlock()
+	var cp *solanarpc.UiTokenAmount
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		cp = m.tokenSupply
+	}()
 
+	fmt.Printf("#GetTokenSupply m.timeoutEnabled %v\n", m.timeoutEnabled)
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
 		if err := withTimeout(ctx, 200*time.Second); err != nil {
@@ -64,7 +68,7 @@ func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, _ solana.PublicKe
 		}
 	}
 
-	return &cp, nil
+	return cp, nil
 }
 
 func (m *MockSolanaClient) SetTokenSupply(supply *solanarpc.UiTokenAmount) {
@@ -75,20 +79,24 @@ func (m *MockSolanaClient) SetTokenSupply(supply *solanarpc.UiTokenAmount) {
 
 func (m *MockSolanaClient) GetTokenAccountBalance(ctx context.Context, token solana.PublicKey, account solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
 	var res *solanarpc.UiTokenAmount
-	// Acquire and copy under lock immediately
-	m.mu.RLock()
-	if balance, ok := m.tokenAccountBalance[token]; ok { // Simplified: just check token
-		res = balance
-	}
-	// If the specific token/account combination isn't mocked, return the default loaded one if available.
-	if res == nil {
-		for _, balance := range m.tokenAccountBalance {
-			res = balance
-			break
-		}
-	}
-	m.mu.RUnlock()
 
+	func() {
+		// Acquire and copy under lock immediately
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		if balance, ok := m.tokenAccountBalance[token]; ok { // Simplified: just check token
+			res = balance
+		}
+		// If the specific token/account combination isn't mocked, return the default loaded one if available.
+		if res == nil {
+			for _, balance := range m.tokenAccountBalance {
+				res = balance
+				break
+			}
+		}
+	}()
+	
+	fmt.Printf("#GetTokenAccountBalance m.timeoutEnabled %v\n", m.timeoutEnabled)
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
 		if err := withTimeout(ctx, 200*time.Second); err != nil {
@@ -110,9 +118,13 @@ func (m *MockSolanaClient) SetTokenAccountBalance(token solana.PublicKey, balanc
 }
 
 func (m *MockSolanaClient) EnableTimeout() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.timeoutEnabled = true
 }
 
 func (m *MockSolanaClient) DisableTimeout() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.timeoutEnabled = false
 }

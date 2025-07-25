@@ -322,9 +322,11 @@ func (cm *ClientsMockController) handleSolanaDisableTimeout(w http.ResponseWrite
 
 func withTimeout(ctx context.Context, delay time.Duration) error {
 	select {
-	case <-time.After(delay):
+	case <-time.After(delay * 100):
+		fmt.Printf("====WITH_TIMEOUT: AFTER DELAY\n")
 		return ctx.Err() // may be nil if still valid
 	case <-ctx.Done():
+		fmt.Printf("====WITH_TIMEOUT: DONE\n")
 		return ctx.Err()
 	}
 }
