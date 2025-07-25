@@ -373,10 +373,8 @@ describe('Consensus', () => {
           context.client,
         );
 
-        console.log('unpausing 1 and 2 messengers...');
         execSync(`docker unpause consensus-aum-oracle-1-1`);
         execSync(`docker unpause consensus-aum-oracle-2-1`);
-        console.log('unpaused 1 and 2 messengers.');
 
         // wait for the next round
         await waitFor(
@@ -392,9 +390,7 @@ describe('Consensus', () => {
           true,
         );
 
-        console.log('unpausing 3 messenger...');
         execSync(`docker unpause consensus-aum-oracle-3-1`);
-        console.log('unpaused...');
       });
     });
 
@@ -427,12 +423,10 @@ describe('Consensus', () => {
           JUPITER_CONTRACT,
           context.client,
         );
-        console.log('before round: ' + resultBefore.round);
         const binanceResultBefore = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
         );
-        console.log('waiting for the next round');
         // wait for the next round
         await waitFor(
           async () => {
@@ -440,7 +434,6 @@ describe('Consensus', () => {
               JUPITER_CONTRACT,
               context.client,
             );
-            console.log('round: ' + checkResult.round);
             return checkResult.round > resultBefore.round;
           },
           40_000,
@@ -482,11 +475,158 @@ describe('Consensus', () => {
         );
       });
 
-      it.skip('requests to binance timeouts', async () => {});
+      it('requests to binance timeouts', async () => {
+        // turn on 200-second timeout
+        for (const mockController of mockControllers) {
+          await mockController.enableBinanceTimeout();
+        }
 
-      it.skip('all controllers timeout for all data sources', async () => {});
-      // Temporary high delay (higher than round length) doesn't make oracle stop working
-      // TODO: same? Temporary errors from binance or solana doesn't make oracle stop working
+        // wait one round to be sure (maybe some requests were already in progress)
+        const resultAfterPause = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultAfterPause.round;
+          },
+          30_000,
+          2_000,
+          false,
+        );
+
+        const resultBefore = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        const jupiterResultBefore = await queryLastPublishedData<any>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        // wait for the next round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<any>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          40_000,
+          1_000,
+          false,
+        );
+        const resultAfter = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(resultBefore.round).toEqual(resultAfter.round);
+
+        // disable timeout, messenger should continue publishing data for solana
+        for (const mockController of mockControllers) {
+          await mockController.disableBinanceTimeout();
+        }
+
+        // binance should've worked all this time
+        const jupiterResultAfter = await queryLastPublishedData<any>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        expect(jupiterResultAfter.round).toBeGreaterThan(
+          jupiterResultBefore.round,
+        );
+
+        // should publish the next round
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<any>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore.round;
+          },
+          40_000,
+          1_000,
+          true,
+        );
+      });
+
+      it('all controllers timeout for all data sources', async () => {
+        // turn on 200-second timeout
+        for (const mockController of mockControllers) {
+          await mockController.enableBinanceTimeout();
+          await mockController.enableSolanaTimeout();
+        }
+
+        // wait one round to be sure (maybe some requests were already in progress)
+        const resultAfterPause = await queryLastPublishedData<BinanceData>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<BinanceData>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultAfterPause.round;
+          },
+          30_000,
+          2_000,
+          false,
+        );
+        // TODO: also wait for jupiter as well?
+
+        // wait for the next round
+        const resultBefore2 = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<any>(
+              BINANCE_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore2.round;
+          },
+          40_000,
+          1_000,
+          false,
+        );
+        const resultAfter2 = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        expect(resultBefore2.round).toEqual(resultAfter2.round);
+
+        // wait for the next round
+        const resultBefore3 = await queryLastPublishedData<any>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        await waitFor(
+          async () => {
+            const checkResult = await queryLastPublishedData<any>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            return checkResult.round > resultBefore3.round;
+          },
+          40_000,
+          1_000,
+          false,
+        );
+        const resultAfter3 = await queryLastPublishedData<any>(
+          JUPITER_CONTRACT,
+          context.client,
+        );
+        expect(resultBefore3.round).toEqual(resultAfter3.round);
+      });
     });
   });
 });
