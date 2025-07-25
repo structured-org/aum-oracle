@@ -1,0 +1,38 @@
+solana_rpc_endpoint: "https://api.mainnet-beta.solana.com"
+
+binance_api_key: "d9BxHa9BguG9MqFibAzDKTDhe1PcqmidBJm5dCdBC0dQ2HE0kqd6BLsflo2IAffz"
+binance_api_secret: "d5D5rwwLMXz6AkgPw4XTWzgfiSbgNbJKFex41HfpZGYw9gCN8SJG79JHm6z6aju5"
+binance_um_positions_list:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+binance_spot_assets_list:
+  - USDT
+  - BTC
+  - ETH
+  - SOL
+
+jupiter_custodies:
+  SOL: "7xS2gz2bTp3fwCC7knJvUWTEU9Tycczu6VhJYKgi1wdz"
+  WETH: "AQCGyheWPLeo6Qp9WpYS9m3Qj479t7R636N9ey1rEjEn"
+  WBTC: "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm"
+  USDC: "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa"
+  USDT: "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
+jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
+jupiter_strategy_address: "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf"
+
+logger_level: info
+
+jupiter_aum_contract: "neutron1etng88yenu6qjsh90dvcav405d6ksrk83yl97cfjaavt9k4ejczqn9e807"
+binance_aum_contract: "neutron1zxpuhrs04drf4jweswyvqz5kszn50wrznry58hy6wr8mzuxag2wsvw6fq8"
+
+clients:
+  neutron:
+    mnemonic: "garden glass object letter ketchup surprise roof breeze kiss inherit couple mouse cram finish require panther result law nature tool eight box behave disease"
+    gas_prices: "0.0053untrn"
+    gas_adjustment: 1.5
+    chain_id: "pion-1"
+    node: "https://rpc-blazor.pion-1.ntrn.tech:443"
+    node_conn_retries: 5
+    node_conn_retry_delay: "3s"
