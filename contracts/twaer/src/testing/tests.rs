@@ -227,6 +227,19 @@ fn test_record_er() {
 }
 
 #[test]
+fn test_record_er_by_stranger() {
+    let mut deps = setup_contract_with_supply(500000u128, None);
+    let stranger = deps.api.addr_make("stranger");
+    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+
+    let env = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env.clone(), &stranger).unwrap();
+
+    let count = query_data_point_count(&deps).unwrap();
+    assert_eq!(count, 1);
+}
+
+#[test]
 fn test_query_twaer_no_data() {
     let deps = setup_contract();
 

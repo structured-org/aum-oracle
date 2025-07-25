@@ -24,7 +24,6 @@ pub enum ExecuteMsg {
     /// exchange rate history for TWA calculation purposes. This should be called frequently to
     /// to maintain accurate time-weighted average data. The recorded rates are used internally
     /// for TWA calculations but do not directly affect the published rate.
-    /// Only callable by the owner.
     RecordEr {},
 
     /// Calculates and publishes the official Time-Weighted Average Exchange Rate that is exposed

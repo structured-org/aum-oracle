@@ -85,16 +85,12 @@ fn execute_update_config(
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-fn execute_record_er(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
-
+fn execute_record_er(deps: DepsMut, env: Env, _info: MessageInfo) -> ContractResult<Response> {
     let exchange_rate = calc_exchange_rate(deps.as_ref())?;
     let timestamp = env.block.time.seconds();
     ER_HISTORY.save(deps.storage, timestamp, &exchange_rate)?;
 
+    let config = CONFIG.load(deps.storage)?;
     let window_start = timestamp.sub(config.twa_window_seconds);
     let expired_rates = determine_expired_rates(deps.storage, window_start)?;
     update_twa_aggregator(deps.storage, exchange_rate, timestamp, &expired_rates)?;

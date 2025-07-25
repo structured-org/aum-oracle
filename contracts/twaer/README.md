@@ -14,7 +14,7 @@ The TWA calculation uses the formula: `TWA = Σ(rate_i × duration_i) / Σ(durat
 
 Calculates the current exchange rate based on AUM and supply data, stores it in the exchange rate history, and updates the internal TWA aggregator. Should be called frequently to maintain accurate time-weighted data.
 
-**Permissions**: Owner only
+**Permissions**: Permissionless
 
 ### `PublishTwaer {}`
 
