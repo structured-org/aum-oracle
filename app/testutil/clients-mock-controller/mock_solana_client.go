@@ -60,10 +60,9 @@ func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, _ solana.PublicKe
 		cp = m.tokenSupply
 	}()
 
-	fmt.Printf("#GetTokenSupply m.timeoutEnabled %v\n", m.timeoutEnabled)
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}
@@ -95,11 +94,10 @@ func (m *MockSolanaClient) GetTokenAccountBalance(ctx context.Context, token sol
 			}
 		}
 	}()
-	
-	fmt.Printf("#GetTokenAccountBalance m.timeoutEnabled %v\n", m.timeoutEnabled)
+
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}

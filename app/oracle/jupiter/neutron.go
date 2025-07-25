@@ -69,7 +69,3 @@ func (o *JupiterAumOracleForNeutron) SubmitData(ctx context.Context, data *neutr
 		Timestamp: nextRound.Timestamp,
 	}, nil
 }
-
-func (o *JupiterAumOracleForNeutron) Name() string {
-	return "JupiterAumOracleForNeutron"
-}

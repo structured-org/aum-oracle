@@ -82,7 +82,7 @@ func (m *MockBinanceClient) GetUmPositions(ctx context.Context) ([]*binanceportf
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}
@@ -103,7 +103,7 @@ func (m *MockBinanceClient) GetPMAccountInfo(ctx context.Context) (*binanceportf
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}
@@ -131,7 +131,7 @@ func (m *MockBinanceClient) GetPMAccountBalance(ctx context.Context) ([]*binance
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}
@@ -156,7 +156,7 @@ func (m *MockBinanceClient) GetSpotAccountInfo(ctx context.Context) (*binance.Ac
 
 	if m.timeoutEnabled {
 		// Then simulate latency without holding the lock
-		if err := withTimeout(ctx, 200*time.Second); err != nil {
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
 			return nil, err
 		}
 	}

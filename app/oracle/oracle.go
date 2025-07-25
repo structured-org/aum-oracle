@@ -2,7 +2,6 @@ package oracle
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -32,8 +31,6 @@ type Oracle[T any] interface {
 
 	// Logger returns the logger for the oracle.
 	Logger() *zap.Logger
-
-	Name() string
 }
 
 // failureDelay is the delay taken when an oracle fails to fetch or submit data to prevent
@@ -62,7 +59,11 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 				time.Sleep(failureDelay)
 				continue
 			}
-			fmt.Printf("[%s], Next round from nil: %+v\n", oracle.Name(), nextRound)
+			oracle.Logger().Info("fetched next round from contract",
+				zap.Uint64("round", nextRound.Round),
+				zap.Uint64("round_timestamp", nextRound.Timestamp),
+				zap.Duration("pre_submit_delay", preSubmitDelay),
+			)
 		}
 
 		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
@@ -91,7 +92,6 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 				time.Sleep(failureDelay)
 				continue
 			}
-			fmt.Printf("[%s], Next round from process round: %+v\n", oracle.Name(), nextRound)
 
 		case <-ctx.Done():
 			oracle.Logger().Info("oracle stopped by context")

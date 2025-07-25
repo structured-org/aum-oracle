@@ -96,7 +96,6 @@ func fetchJupiterAumData(
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Printf("====solanaClient.GetTokenAccountBalance\n")
 		supply, err := solanaClient.GetTokenAccountBalance(ctx, jupiterConfig.Token, jupiterConfig.Strategy)
 		if err != nil {
 			errsMu.Lock()
@@ -104,7 +103,6 @@ func fetchJupiterAumData(
 			errsMu.Unlock()
 			return
 		}
-		fmt.Printf("====solanaClient.GetTokenAccountBalance = DONE\n")
 
 		data.StrategyJlpBalance = math.NewUintFromString(supply.Amount)
 		data.StrategyJlpBalanceDecimals = supply.Decimals
