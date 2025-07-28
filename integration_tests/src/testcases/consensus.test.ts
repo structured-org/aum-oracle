@@ -161,11 +161,9 @@ describe('Consensus', () => {
           1_000,
         );
       });
-
-      // TODO: check aum changes?
     });
 
-    describe.skip('Malicious oracle', () => {
+    describe('Malicious oracle', () => {
       it('one malicious oracle does not change published data as', async () => {
         const data = await fetchMockData(mockController1);
         const originalSupplyAmount = data.pmAccountInfo.actualEquity;
@@ -175,14 +173,14 @@ describe('Consensus', () => {
         await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
 
         // wait 2 rounds, in case that one oracle already published data in this round before the set info call (?)
-        const result = await queryLastPublishedData<BinanceData>(
+        const result = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
         );
         const currentRound = result.round;
         await waitFor(
           async () => {
-            const result = await queryLastPublishedData<BinanceData>(
+            const result = await queryLastPublishedData<any>(
               BINANCE_CONTRACT,
               context.client,
             );
@@ -561,23 +559,34 @@ describe('Consensus', () => {
         }
 
         // wait one round to be sure (maybe some requests were already in progress)
-        const resultAfterPause = await queryLastPublishedData<BinanceData>(
+        const resultAfterPause = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
+          context.client,
+        );
+        const resultAfterPause2 = await queryLastPublishedData<any>(
+          JUPITER_CONTRACT,
           context.client,
         );
         await waitFor(
           async () => {
-            const checkResult = await queryLastPublishedData<BinanceData>(
+            const checkResult = await queryLastPublishedData<any>(
               BINANCE_CONTRACT,
               context.client,
             );
-            return checkResult.round > resultAfterPause.round;
+
+            const checkResult2 = await queryLastPublishedData<any>(
+              JUPITER_CONTRACT,
+              context.client,
+            );
+            return (
+              checkResult.round > resultAfterPause.round &&
+              checkResult2.round > resultAfterPause2.round
+            );
           },
           30_000,
           2_000,
           false,
         );
-        // TODO: also wait for jupiter as well?
 
         // wait for the next round
         const resultBefore2 = await queryLastPublishedData<any>(
