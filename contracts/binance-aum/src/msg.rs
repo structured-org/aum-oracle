@@ -97,8 +97,11 @@ pub struct GetDataResponse {
 #[cw_serde]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by messengers
-    /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
+    /// Represents the number of decimals that the aum_in_btc is
+    /// represented in. It is used to scale the aum_in_btc to its base BTC value.
+    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
+    pub decimals: u32,
 }
 
 #[cw_serde]
