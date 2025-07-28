@@ -42,6 +42,9 @@ var failureDelay = 10 * time.Second
 // TODO: make this configurable.
 var preSubmitDelay = 5 * time.Second
 
+// fetchDataTimeout is a timeout for fetch data operation
+var fetchDataTimeout = 3 * time.Second
+
 // RunMessenger is a utility function that runs a messenger in a loop, fetching and submitting
 // data at specified intervals. It handles the necessary context management for the messenger's
 // operation.
@@ -97,7 +100,10 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T]) {
 // processing as a response from the receiver. If either fetching or submitting data fails, it will
 // return nil, meaning that the next round is unknown.
 func processRound[T any](ctx context.Context, msgr Messenger[T], round *NextRound) *NextRound {
-	data, err := msgr.FetchData(ctx)
+	fetchCtx, fetchCancel := context.WithTimeout(ctx, fetchDataTimeout)
+	defer fetchCancel()
+
+	data, err := msgr.FetchData(fetchCtx)
 	if err != nil {
 		msgr.Logger().Error("failed to fetch data",
 			zap.Uint64("round", round.Round),

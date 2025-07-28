@@ -233,7 +233,6 @@ describe('Consensus', () => {
           BINANCE_CONTRACT,
           context.client,
         );
-        console.log('unimmr before: ' + resultBeforeBefore.data.unimmr);
         // wait for the possible next round in case some messengers already submitted data for this round
         await waitFor(
           async () => {
@@ -252,7 +251,6 @@ describe('Consensus', () => {
           BINANCE_CONTRACT,
           context.client,
         );
-        console.log('unimmr before: ' + resultBefore.data.unimmr);
 
         // after multiple times new round should happen, publish data still should return old round
         await waitSeconds(40);
@@ -261,8 +259,6 @@ describe('Consensus', () => {
           BINANCE_CONTRACT,
           context.client,
         );
-
-        console.log('unimmr after: ' + resultAfter.data.unimmr);
 
         expect(resultAfter.round).toEqual(resultBefore.round);
         expect(resultAfter.data.unimmr).toEqual(resultBefore.data.unimmr);
