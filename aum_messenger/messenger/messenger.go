@@ -43,6 +43,7 @@ var failureDelay = 10 * time.Second
 var preSubmitDelay = 5 * time.Second
 
 // fetchDataTimeout is a timeout for fetch data operation
+// TODO: make this configurable
 var fetchDataTimeout = 3 * time.Second
 
 // RunMessenger is a utility function that runs a messenger in a loop, fetching and submitting

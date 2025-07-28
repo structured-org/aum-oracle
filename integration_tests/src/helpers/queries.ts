@@ -40,9 +40,9 @@ export class SolanaData {
 
 export class BinanceData {
   unimmr: string;
-  positions: any[]; // TODO
+  positions: any[];
   um_balance_usdt: string;
-  spot_balances: any[]; // TODO
+  spot_balances: any[];
   pm_account_actual_equity: string;
   withdrawable_usdt: string;
 }
