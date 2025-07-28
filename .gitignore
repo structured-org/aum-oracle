@@ -2,11 +2,10 @@
 target
 app/config.yaml
 app/aum-oracle
-
-.idea
+aum_messenger/config.yaml
+aum_messenger/aum-messenger
 
 artifacts
-target
 
 .DS_Store
 target/

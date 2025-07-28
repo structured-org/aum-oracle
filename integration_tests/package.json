@@ -9,7 +9,7 @@
     "debug": "vitest --inspect-brk --bail 1 --threads false --run core.test.ts",
     "watch": "vitest",
     "build-neutron-image": "./dockerfiles/neutron/build.sh",
-    "build-aum-oracle-image": "./dockerfiles/aum_oracle/build.sh",
+    "build-aum-messenger-image": "./dockerfiles/aum_messenger/build.sh",
     "build-images": "./dockerfiles/build-all.sh && docker images",
     "lint": "eslint ./src -f compact",
     "lint:fix": "eslint ./src -f compact --fix"

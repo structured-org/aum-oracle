@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  aum-messenger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aum-messenger
+    volumes:
+      - ./config.yaml:/aum_messenger/config.yaml:ro
+    command: ["--config", "/aum_messenger/config.yaml"]
