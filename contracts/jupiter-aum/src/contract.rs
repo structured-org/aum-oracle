@@ -219,7 +219,10 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> 
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
     let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
 
-    Ok(GetAumResponse { aum_in_btc })
+    Ok(GetAumResponse {
+        aum_in_btc,
+        decimals: WBTC_DECIMALS,
+    })
 }
 
 /// Returns pending and next round info.
