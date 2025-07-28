@@ -18,7 +18,7 @@
       "additionalProperties": false
     },
     {
-      "description": "GetAum calculates and returns the current Jupiter AUM value represented in BTC. Returned value is a decimal integer with precision of `DECIMAL_PRECISION` Returns error if data is not valid.",
+      "description": "GetAum calculates and returns the current Jupiter AUM value represented in BTC. Returned value is a decimal integer with precision of `WBTC_DECIMALS` Returns error if data is not valid.",
       "type": "object",
       "required": [
         "get_aum"

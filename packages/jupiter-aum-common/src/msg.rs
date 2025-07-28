@@ -69,7 +69,7 @@ pub enum QueryMsg {
     #[returns(GetDataResponse)]
     GetData {},
     /// GetAum calculates and returns the current Jupiter AUM value represented in BTC.
-    /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
+    /// Returned value is a decimal integer with precision of `WBTC_DECIMALS`
     /// Returns error if data is not valid.
     #[returns(GetAumResponse)]
     GetAum {},
@@ -114,9 +114,13 @@ pub struct GetDataResponse {
 /// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[cw_serde]
 pub struct GetAumResponse {
-    /// The latest AUM in Binance reported by oracles
+    /// The latest AUM in Jupiter reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
+    /// Represents the number of decimals that the aum_in_btc is
+    /// represented in. It is used to scale the aum_in_btc to its base BTC value.
+    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
+    pub decimals: u32,
 }
 
 #[cw_serde]
