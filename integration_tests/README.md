@@ -1,7 +1,5 @@
 # integration-tests
 
-TODO: write a readme
-
 This repository contains tests for MaxBTC AUM Oracle and respective contracts.
 
 ## How to run
