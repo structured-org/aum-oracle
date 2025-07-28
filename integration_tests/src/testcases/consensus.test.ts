@@ -26,6 +26,11 @@ import {
 } from '../helpers/queries';
 import { execSync } from 'child_process';
 
+// docker container names for messengers
+const DOCKER_MESSENGER_1 = 'consensus-aum-messenger-1-1';
+const DOCKER_MESSENGER_2 = 'consensus-aum-messenger-2-1';
+const DOCKER_MESSENGER_3 = 'consensus-aum-messenger-3-1';
+
 type MockData = {
   umPositions?: BinanceUMPosition[];
   pmAccountInfo?: BinancePmAccountInfo;
@@ -163,8 +168,8 @@ describe('Consensus', () => {
       });
     });
 
-    describe('Malicious oracle', () => {
-      it('one malicious oracle does not change published data as', async () => {
+    describe('Malicious messenger', () => {
+      it('one malicious messenger does not change published data as', async () => {
         const data = await fetchMockData(mockController1);
         const originalSupplyAmount = data.pmAccountInfo.actualEquity;
         data.pmAccountInfo.actualEquity = (
@@ -172,7 +177,7 @@ describe('Consensus', () => {
         ).toString(); // Too much
         await mockController3.setBinancePMAccountInfo(data.pmAccountInfo);
 
-        // wait 2 rounds, in case that one oracle already published data in this round before the set info call (?)
+        // wait 2 rounds, in case that one messenger already published data in this round before the set info call (?)
         const result = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
@@ -206,7 +211,7 @@ describe('Consensus', () => {
       });
     });
 
-    describe('Oracles do not agree on data', () => {
+    describe('Messengers do not agree on data', () => {
       it('different data reported stops publishing data', async () => {
         const data = await fetchMockData(mockController1);
         const originalUnimmr = data.pmAccountInfo.uniMMR;
@@ -223,16 +228,22 @@ describe('Consensus', () => {
           BINANCE_CONTRACT,
           context.client,
         );
-        // wait for the possible next round in case some oracles already submitted data for this round
+
+        const resultBeforeBefore = await queryLastPublishedData<any>(
+          BINANCE_CONTRACT,
+          context.client,
+        );
+        console.log('unimmr before: ' + resultBeforeBefore.data.unimmr);
+        // wait for the possible next round in case some messengers already submitted data for this round
         await waitFor(
           async () => {
             const checkResult = await queryLastPublishedData<any>(
               BINANCE_CONTRACT,
               context.client,
             );
-            return checkResult.round > result.round;
+            return checkResult.round > result.round + 1;
           },
-          20_000,
+          40_000,
           2_000,
           false, // no exception, just wait
         );
@@ -241,21 +252,24 @@ describe('Consensus', () => {
           BINANCE_CONTRACT,
           context.client,
         );
+        console.log('unimmr before: ' + resultBefore.data.unimmr);
 
         // after multiple times new round should happen, publish data still should return old round
-        await waitSeconds(20);
+        await waitSeconds(40);
 
         const resultAfter = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
         );
 
+        console.log('unimmr after: ' + resultAfter.data.unimmr);
+
         expect(resultAfter.round).toEqual(resultBefore.round);
         expect(resultAfter.data.unimmr).toEqual(resultBefore.data.unimmr);
       });
-      // all three oracles report completely different data
-      // sets checks on grouping: one oracle passes incorrect data on exact field like decimals,
-      //    other values from this oracle does not count in eventual consensus
+      // all three messengers report completely different data
+      // sets checks on grouping: one messenger passes incorrect data on exact field like decimals,
+      //    other values from this messenger does not count in eventual consensus
 
       afterAll(async () => {
         // set mockController3 to original data
@@ -266,9 +280,9 @@ describe('Consensus', () => {
       });
     });
 
-    describe('Oracles paused (down) for some time', () => {
-      it('one oracle does not stop data publishing', async () => {
-        execSync(`docker pause consensus-aum-oracle-2-1`); // pause one oracle
+    describe('Messengers paused (down) for some time', () => {
+      it('one messenger does not stop data publishing', async () => {
+        execSync(`docker pause ${DOCKER_MESSENGER_2}`); // pause one messenger
 
         const resultBefore = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
@@ -290,10 +304,10 @@ describe('Consensus', () => {
         );
       });
 
-      it('two oracles stop data publishing', async () => {
-        execSync(`docker pause consensus-aum-oracle-3-1`); // pause second oracle
-        // even tho the oracle is paused first oracle can still change consensus right?
-        // wait one round to be sure since one oracle can still change consensus one more time (when second oracle already submitted this round, first oracle is needed)
+      it('two messengers stop data publishing', async () => {
+        execSync(`docker pause ${DOCKER_MESSENGER_3}`); // pause second messenger
+        // wait one round to be sure since messenger can still change consensus one more time
+        // (when second messenger already submitted this round, first messenger is needed)
         const resultAfterPause = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
@@ -337,8 +351,9 @@ describe('Consensus', () => {
         expect(resultAfter.round).toEqual(resultBefore.round);
       });
 
-      it('all three oracles stop data publishing', async () => {
-        execSync(`docker pause consensus-aum-oracle-1-1`); // pause first oracle
+      it('all three messengers stop data publishing', async () => {
+        // pause first messenger
+        execSync(`docker pause ${DOCKER_MESSENGER_1}`);
         const resultBefore = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
@@ -365,14 +380,14 @@ describe('Consensus', () => {
         expect(resultAfter.round).toEqual(resultBefore.round);
       });
 
-      it('restore two oracles, data publishing should resume', async () => {
+      it('restore two messengers, data publishing should resume', async () => {
         const resultBefore = await queryLastPublishedData<any>(
           BINANCE_CONTRACT,
           context.client,
         );
 
-        execSync(`docker unpause consensus-aum-oracle-1-1`);
-        execSync(`docker unpause consensus-aum-oracle-2-1`);
+        execSync(`docker unpause ${DOCKER_MESSENGER_1}`);
+        execSync(`docker unpause ${DOCKER_MESSENGER_2}`);
 
         // wait for the next round
         await waitFor(
@@ -388,7 +403,7 @@ describe('Consensus', () => {
           true,
         );
 
-        execSync(`docker unpause consensus-aum-oracle-3-1`);
+        execSync(`docker unpause ${DOCKER_MESSENGER_3}`);
       });
     });
 

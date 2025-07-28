@@ -722,7 +722,7 @@ SLINKY_INIT_MSG='{}'
 BINANCE_AUM_RECEIVER_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
   "messengers": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
-  "threshold": 1,
+  "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 15,
   "consensus_data_valid_period": 60,
@@ -734,7 +734,7 @@ BINANCE_AUM_RECEIVER_INIT_MSG='{
 JUPITER_AUM_RECEIVER_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
   "messengers": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
-  "threshold": 1,
+  "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 15,
   "consensus_data_validity_period": 60,
