@@ -35,9 +35,6 @@ func (c *Client) GetBinanceAumContractNextRound(ctx context.Context) (*NextRound
 
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
-	// print for debug evaluation. TODO: use actual values when the client is implemented
-	//spew.Dump("submitted Binance AUM data:", data)
-
 	binanceRound++
 	return &NextRound{
 		Round:     uint64(binanceRound),

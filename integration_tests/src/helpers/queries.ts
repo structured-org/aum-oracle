@@ -13,7 +13,6 @@ export async function queryAum(
   return +res.aum_in_btc;
 }
 
-// TODO: this works only for jupiter
 export async function queryLastPublishedData<T>(
   contract: string,
   client: CosmWasmClient,

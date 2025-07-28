@@ -43,6 +43,9 @@ var failureDelay = 10 * time.Second
 // TODO: make this configurable.
 var preSubmitDelay = 5 * time.Second
 
+// fetchTimeout is the timeout for the fetch data operation
+var fetchTimeout = 3 * time.Second
+
 // RunOracle is a utility function that runs an oracle in a loop, fetching and submitting data at
 // specified intervals. It handles the necessary context management for the oracle's operation.
 func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
@@ -77,14 +80,12 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 
 		select {
 		case <-time.NewTimer(timeTillNextRound).C:
-			// TODO: naming currentRound = NextRound seems wrong
-			currentRound := &NextRound{Round: nextRound.Round, Timestamp: nextRound.Timestamp}
 			oracle.Logger().Info("new round started",
-				zap.Uint64("round", currentRound.Round),
-				zap.Uint64("round_timestamp", currentRound.Timestamp),
+				zap.Uint64("round", nextRound.Round),
+				zap.Uint64("round_timestamp", nextRound.Timestamp),
 			)
 
-			nextRound = processRound(ctx, oracle, currentRound)
+			nextRound = processRound(ctx, oracle, nextRound)
 			if nextRound == nil {
 				oracle.Logger().Info("having a delay after round processing failure",
 					zap.String("delay", failureDelay.String()),
@@ -104,10 +105,10 @@ func RunOracle[T any](ctx context.Context, oracle Oracle[T]) {
 // processing as a response from the oracle. If either fetching or submitting data fails, it will
 // return nil, meaning that the next round is unknown.
 func processRound[T any](ctx context.Context, oracle Oracle[T], round *NextRound) *NextRound {
-	ctx2, cancel2 := context.WithTimeout(ctx, time.Second*3)
-	defer cancel2()
+	fetchCtx, fetchCancel := context.WithTimeout(ctx, fetchTimeout)
+	defer fetchCancel()
 
-	data, err := oracle.FetchData(ctx2)
+	data, err := oracle.FetchData(fetchCtx)
 	if err != nil {
 		oracle.Logger().Error("failed to fetch data",
 			zap.Uint64("round", round.Round),
