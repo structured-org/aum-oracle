@@ -1,5 +1,6 @@
-use crate::error::{ContractError, ContractResult};
+use crate::error::ContractResult;
 use consensus::consensus::{consensus_on_items_dec256, ConsensusData, State};
+use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
@@ -42,41 +43,34 @@ pub struct BinanceData {
     pub withdrawable_usdt: SignedDecimal256,
 }
 
-impl BinanceData {
-    /// Cleans the data to only contain the required binance positions and spot assets
-    /// Validates the data to contain required positions and spot assets. Returns an error if it does not.
-    pub fn clean_and_validate(
-        &mut self,
-        required_binance_positions: Vec<String>,
-        required_binance_spot_assets: Vec<String>,
-    ) -> ContractResult<()> {
+impl ConsensusData<Config> for BinanceData {
+    fn prepublish_cleanup(&mut self, options: Config) -> Result<(), ConsensusError> {
+        // clean and validate published data
         // positions must contain only required binance positions
         self.positions
-            .retain(|p| required_binance_positions.contains(&p.symbol));
+            .retain(|p| options.required_binance_positions.contains(&p.symbol));
         self.positions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
-        if self.positions.len() != required_binance_positions.len() {
-            return Err(ContractError::InvalidBinanceData {
-                msg: "Binance positions do not match required positions".to_string(),
+        if self.positions.len() != options.required_binance_positions.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Binance positions do not match required positions".into(),
             });
         }
 
         // spot_balances must contain only required binance spot assets
         self.spot_balances
-            .retain(|p| required_binance_spot_assets.contains(&p.asset));
+            .retain(|p| options.required_binance_spot_assets.contains(&p.asset));
         self.spot_balances.sort_by(|a, b| a.asset.cmp(&b.asset));
 
-        if self.spot_balances.len() != required_binance_spot_assets.len() {
-            return Err(ContractError::InvalidBinanceData {
-                msg: "Binance spot assets do not match required spot assets".to_string(),
+        if self.spot_balances.len() != options.required_binance_spot_assets.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Binance spot assets do not match required spot assets".into(),
             });
         }
 
         Ok(())
     }
-}
 
-impl ConsensusData for BinanceData {
     fn try_consensus(
         data: &[BinanceData],
         threshold: usize,
@@ -202,4 +196,4 @@ impl Config {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
-pub const CONSENSUS_STATE: State<BinanceData> = State::default();
+pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();

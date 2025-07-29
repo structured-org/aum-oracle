@@ -90,7 +90,7 @@ fn setup_test_state(
     round: u64,
     start_time: u64,
 ) {
-    let state: State<BinanceData> = State::default();
+    let state: State<BinanceData, Config> = State::default();
     state.config.save(deps.storage, consensus_config).unwrap();
     state
         .pending_round
@@ -178,7 +178,7 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        ContractError::InvalidBinanceData { msg } => {
+        ContractError::ConsensusError(ConsensusError::PrepublishError { msg }) => {
             assert_eq!(msg, "Binance positions do not match required positions")
         }
         _ => panic!("Unexpected error"),
@@ -209,7 +209,7 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        ContractError::InvalidBinanceData { msg } => {
+        ContractError::ConsensusError(ConsensusError::PrepublishError { msg }) => {
             assert_eq!(msg, "Binance spot assets do not match required spot assets")
         }
         _ => panic!("Unexpected error"),

@@ -15,7 +15,12 @@ struct MockData {
     pub value4: SignedDecimal256,
 }
 
-impl ConsensusData for MockData {
+struct MockConfig {}
+
+impl ConsensusData<MockConfig> for MockData {
+    fn prepublish_cleanup(&mut self, _: MockConfig) -> Result<(), ConsensusError> {
+        Ok(())
+    }
     // Consensus function for MockData
     fn try_consensus(data: &[MockData], threshold: usize, delta_ppm: u64) -> Option<MockData> {
         if data.len() < threshold {
@@ -85,6 +90,10 @@ fn create_test_data(
         value3,
         value4,
     }
+}
+
+fn create_mock_config() -> MockConfig {
+    MockConfig {}
 }
 
 #[test]
@@ -469,7 +478,7 @@ fn setup_test_state(
     config: &Config,
     round: u64,
     start_time: u64,
-) -> State<MockData> {
+) -> State<MockData, MockConfig> {
     let state = State::default();
     state.config.save(deps, config).unwrap();
     state
@@ -511,11 +520,23 @@ fn test_state_publish_data() {
 
     // Test 1: Oracle publishes data
     let oracle1 = Addr::unchecked("oracle1");
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
     assert!(result.is_ok(), "Oracle should be able to publish data");
 
     // Test 2: Oracle tries to publish data again for the same round (should fail)
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
     assert!(
         result.is_err(),
         "Oracle should not be able to publish data twice for the same round"
@@ -530,7 +551,13 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(2010, 1),
         SignedDecimal256::from_ratio(505, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle2.clone(), test_data2);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle2.clone(),
+        test_data2,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Second oracle should be able to publish data"
@@ -544,7 +571,13 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(2005, 1),
         SignedDecimal256::from_ratio(503, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle3.clone(), test_data3);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle3.clone(),
+        test_data3,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Third oracle should be able to publish data"
@@ -607,7 +640,13 @@ fn test_state_round_advancement() {
         SignedDecimal256::from_ratio(2000, 1),
         SignedDecimal256::from_ratio(500, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Oracle should be able to publish data for the new round"
@@ -632,7 +671,13 @@ fn test_state_round_advancement() {
         SignedDecimal256::from_ratio(2020, 1),
         SignedDecimal256::from_ratio(510, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data_multi);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data_multi,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Oracle should be able to publish data after multiple round advances"
@@ -680,7 +725,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data1)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle1.clone(),
+            test_data1,
+            create_mock_config(),
+        )
         .unwrap();
 
     let oracle2 = Addr::unchecked("oracle2");
@@ -691,7 +742,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(505, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data2)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle2.clone(),
+            test_data2,
+            create_mock_config(),
+        )
         .unwrap();
 
     let oracle3 = Addr::unchecked("oracle3");
@@ -702,7 +759,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(503, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle3.clone(), test_data3)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle3.clone(),
+            test_data3,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify data is published
@@ -730,7 +793,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(520, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data4)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle1.clone(),
+            test_data4,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify we still get the last published data from round 1
@@ -747,7 +816,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(525, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data5)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle2.clone(),
+            test_data5,
+            create_mock_config(),
+        )
         .unwrap();
 
     // But verify we still get the last published data from round 1 because round is not passed yet
@@ -778,7 +853,7 @@ fn test_state_init() {
     let env = mock_env();
 
     // Create a new state
-    let state = State::<MockData>::default();
+    let state = State::<MockData, MockConfig>::default();
 
     // Initialize the state
     let config = create_test_config();

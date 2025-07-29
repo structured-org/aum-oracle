@@ -3,8 +3,9 @@ use consensus::consensus::{
     all_items_equal, consensus_on_items, consensus_on_items_dec256, consensus_on_items_u64,
     ConsensusData,
 };
+use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, SignedDecimal256, StdError, StdResult, Uint128};
+use cosmwasm_std::{Addr, Decimal, SignedDecimal256, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -57,26 +58,26 @@ pub struct SolanaData {
     pub strategy_jlp_balance_decimals: u8,
 }
 
-impl SolanaData {
-    // Leaves only required data, sorts it and checks that all required assets passed
-    pub fn clean_and_validate(&mut self, required_custody_assets: Vec<String>) -> StdResult<()> {
-        self.custody_assets
-            .retain(|c| required_custody_assets.contains(&c.denom.to_string()));
+impl ConsensusData<Config> for SolanaData {
+    fn prepublish_cleanup(&mut self, config: Config) -> Result<(), ConsensusError> {
+        self.custody_assets.retain(|c| {
+            config
+                .required_custody_assets
+                .contains(&c.denom.to_string())
+        });
         self.custody_assets
             .sort_by(|c1, c2| c1.denom.cmp(&c2.denom));
         self.custody_assets.dedup_by(|a, b| a.denom.eq(&b.denom));
 
-        if self.custody_assets.len() != required_custody_assets.len() {
-            return Err(StdError::generic_err(
-                "Solana custody assets have some required custody assets missing",
-            ));
+        if self.custody_assets.len() != config.required_custody_assets.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Solana custody assets have some required custody assets missing".into(),
+            });
         }
 
         Ok(())
     }
-}
 
-impl ConsensusData for SolanaData {
     fn try_consensus(data: &[SolanaData], threshold: usize, delta_ppm: u64) -> Option<SolanaData> {
         if data.len() < threshold {
             return None;

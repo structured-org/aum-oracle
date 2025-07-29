@@ -8,6 +8,9 @@ pub enum ConsensusError {
     #[error(transparent)]
     Std(#[from] StdError),
 
+    #[error("Prepublish error: {msg}")]
+    PrepublishError { msg: String },
+
     #[error("You already submitted data for this round")]
     DoubleSubmission {},
 

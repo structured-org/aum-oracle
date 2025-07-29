@@ -7,6 +7,7 @@ use cosmwasm_std::{
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 use std::ops::{Add, Div, Sub};
 
 /// Describes the configuration of consensus
@@ -66,13 +67,15 @@ impl Round {
 
 /// Describes a data you want to get a consensus for.
 /// The structure must be Clonable, Serialized and Deserialized to store it in the CosmWasm storage.
-pub trait ConsensusData: Serialize + DeserializeOwned + Clone {
+pub trait ConsensusData<O>: Serialize + DeserializeOwned + Clone {
+    /// The method sorts and cleans incoming data, and checks for all required fields present.
+    fn prepublish_cleanup(&mut self, options: O) -> Result<(), ConsensusError>;
     /// The method tries to form a single value from a slice of [ConsensusData] values based on `threshold` and `delta_ppm` from the Config.
     fn try_consensus(data: &[Self], threshold: usize, delta_ppm: u64) -> Option<Self>;
 }
 
 /// State of the consensus
-pub struct State<T: ConsensusData> {
+pub struct State<T: ConsensusData<O>, O> {
     /// the current pending round we are waiting data for
     pub pending_round: Item<Round>,
     /// the configuration of the consensus
@@ -81,6 +84,8 @@ pub struct State<T: ConsensusData> {
     pub pending_data: Map<Addr, OracleData<T>>,
     /// the last published data oracles agreed on
     pub last_published_data: Item<OracleData<T>>,
+    /// necessary to allow trait constraint
+    pub phantom_data: Option<PhantomData<O>>,
 }
 
 const PENDING_ROUND_KEY: &str = "consensus__pending_round";
@@ -88,7 +93,7 @@ const CONFIG_KEY: &str = "consensus__config";
 const PENDING_DATA_KEY: &str = "consensus__pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
 
-impl<T: ConsensusData> State<T> {
+impl<T: ConsensusData<O>, O> State<T, O> {
     /// State constructor
     pub const fn default() -> Self {
         State {
@@ -96,6 +101,7 @@ impl<T: ConsensusData> State<T> {
             pending_data: Map::new(PENDING_DATA_KEY),
             last_published_data: Item::new(LAST_PUBLISHED_DATA_KEY),
             config: Item::new(CONFIG_KEY),
+            phantom_data: None,
         }
     }
 
@@ -197,11 +203,14 @@ impl<T: ConsensusData> State<T> {
         storage: &mut dyn Storage,
         env: &Env,
         messenger: Addr,
-        new_data: T,
+        mut new_data: T,
+        options: O,
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
         let config = self.config.load(storage)?;
+
+        ConsensusData::prepublish_cleanup(&mut new_data, options)?;
 
         let mut consensus_data = PublishResult::ConsensusNotReached;
 

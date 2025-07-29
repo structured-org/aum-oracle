@@ -67,7 +67,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mut new_data: BinanceData,
+    new_data: BinanceData,
 ) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
@@ -77,14 +77,8 @@ fn execute_publish_data(
         return Err(ContractError::Unauthorized {});
     }
 
-    // clean and validate published data
-    new_data.clean_and_validate(
-        contract_config.required_binance_positions,
-        contract_config.required_binance_spot_assets,
-    )?;
-
     let (result, pending_round) =
-        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
+        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
     let mut res = Response::new();
 
