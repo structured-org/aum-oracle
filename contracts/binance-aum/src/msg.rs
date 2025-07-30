@@ -29,10 +29,10 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// PublishData allows a registered messenger to submit new Binance data.
+    /// Allows a registered messenger to submit new Binance data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { new_data: BinanceData },
-    /// UpdateConfig updates the contract's configuration parameters.
+    /// Updates the contract's configuration parameters.
     /// Only callable by the owner. All fields are optional, allowing partial updates.
     UpdateConfig { new_config: UpdateConfig },
 }
