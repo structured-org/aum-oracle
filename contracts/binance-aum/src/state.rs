@@ -14,8 +14,9 @@ pub struct Config {
     pub consensus_data_valid_period: u64,
     /// how many blocks we consider the last price from the oracle price contract as valid
     pub price_data_valid_period: u64,
-    /// required binance positions and spot assets that messengers must provide
+    /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
+    /// required binance spot assets that messengers must provide
     pub required_binance_spot_assets: Vec<String>,
 }
 
