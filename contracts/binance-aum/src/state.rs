@@ -178,8 +178,8 @@ impl Config {
         deps: Deps,
         new_config: &crate::msg::UpdateConfig,
     ) -> ContractResult<()> {
-        if let Some(ref admin) = new_config.owner {
-            self.owner = deps.api.addr_validate(admin)?;
+        if let Some(ref owner) = new_config.owner {
+            self.owner = deps.api.addr_validate(owner)?;
         }
         if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
             self.consensus_data_valid_period = consensus_data_valid_period;
