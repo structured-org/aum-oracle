@@ -986,17 +986,13 @@ fn test_multiple_rounds_passing() {
     let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Verify round has increased to 4 (skipping 2 and 3)
+    // Verify round has increased to 2
     let response = result.unwrap();
     let round_attr = response.attributes.iter().find(|attr| attr.key == "round");
     assert!(round_attr.is_some());
-    assert_eq!(
-        round_attr.unwrap().value,
-        "4",
-        "Round should be 4 after 3 rounds have passed"
-    );
+    assert_eq!(round_attr.unwrap().value, "2", "Round should be 2");
 
-    // Verify next round is correctly set to 5
+    // Verify next round is correctly set to 3
     let next_round_attr = response
         .attributes
         .iter()
@@ -1004,8 +1000,8 @@ fn test_multiple_rounds_passing() {
     assert!(next_round_attr.is_some());
     assert_eq!(
         next_round_attr.unwrap().value,
-        "5",
-        "Next round should be set to 5"
+        "3",
+        "Next round should be set to 3"
     );
 }
 

@@ -34,23 +34,6 @@ impl Round {
         self.start + round_length <= env.block.time.seconds()
     }
 
-    /// how many rounds passed since the round started?
-    pub fn rounds_passed(&self, env: &Env, round_length: u64) -> u64 {
-        (env.block.time.seconds() - self.start) / round_length
-    }
-
-    /// Returns a new round after the current one based on two inputs:
-    /// `round_length` - length of one round in seconds
-    /// `rounds` - how many rounds to add to the current one
-    /// The new round has the `start_time` equals to `self.start + rounds * round_length`
-    /// and the `round` equals to `self.round + rounds`
-    pub fn add_rounds(&self, round_length: u64, rounds: u64) -> Round {
-        Round {
-            round: self.round + rounds,
-            start: self.start + rounds * round_length,
-        }
-    }
-
     /// Returns a new round after the current one based on one input:
     /// `round_length` - length of one round in seconds
     pub fn next_round(&self, round_length: u64) -> Round {
@@ -228,10 +211,10 @@ impl<T: ConsensusData> State<T> {
                 consensus_data = ConsensusReached(oracle_data);
             }
 
-            pending_round = pending_round.add_rounds(
-                config.round_length,
-                pending_round.rounds_passed(env, config.round_length),
-            );
+            pending_round = Round {
+                round: pending_round.round + 1,
+                start: env.block.time.seconds(),
+            };
             self.pending_round.save(storage, &pending_round)?;
 
             // Reset pending data
