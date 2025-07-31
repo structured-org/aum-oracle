@@ -303,7 +303,7 @@ pub struct OracleData<T> {
 }
 
 // Single field consensus
-pub fn consensus_on_field<F, T>(
+pub fn consensus_on_field<F, T, O>(
     data: &[T],
     extract: F,
     threshold: usize,
@@ -311,10 +311,10 @@ pub fn consensus_on_field<F, T>(
 ) -> Option<SignedDecimal256>
 where
     F: Fn(&T) -> SignedDecimal256,
-    T: ConsensusData,
+    T: ConsensusData<O>,
 {
     let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items(&items, threshold, delta_ppm)
+    consensus_on_items_dec256(&items, threshold, delta_ppm)
 }
 
 /// A helper function that calculates consensus for a given array of SignedDecimal256s

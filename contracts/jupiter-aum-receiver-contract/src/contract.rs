@@ -17,7 +17,7 @@ use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
 
-const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
+const CONTRACT_NAME: &str = "crates.io:jupiter-aum-receiver-contract";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const BTC_DENOM: &str = "BTC";

@@ -1,5 +1,5 @@
 use crate::error::ContractResult;
-use consensus::consensus::{consensus_on_items_dec256, ConsensusData, State};
+use consensus::consensus::{consensus_on_field, consensus_on_items_dec256, ConsensusData, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
