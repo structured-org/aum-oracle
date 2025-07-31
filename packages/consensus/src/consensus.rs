@@ -38,23 +38,6 @@ impl Round {
         self.start + round_length <= env.block.time.seconds()
     }
 
-    /// how many rounds passed since the round started?
-    pub fn rounds_passed(&self, env: &Env, round_length: u64) -> u64 {
-        (env.block.time.seconds() - self.start) / round_length
-    }
-
-    /// Returns a new round after the current one based on two inputs:
-    /// `round_length` - length of one round in seconds
-    /// `rounds` - how many rounds to add to the current one
-    /// The new round has the `start_time` equals to `self.start + rounds * round_length`
-    /// and the `round` equals to `self.round + rounds`
-    pub fn add_rounds(&self, round_length: u64, rounds: u64) -> Round {
-        Round {
-            round: self.round + rounds,
-            start: self.start + rounds * round_length,
-        }
-    }
-
     /// Returns a new round after the current one based on one input:
     /// `round_length` - length of one round in seconds
     pub fn next_round(&self, round_length: u64) -> Round {
@@ -240,10 +223,10 @@ impl<T: ConsensusData<O>, O> State<T, O> {
                 consensus_data = ConsensusReached(oracle_data);
             }
 
-            pending_round = pending_round.add_rounds(
-                config.round_length,
-                pending_round.rounds_passed(env, config.round_length),
-            );
+            pending_round = Round {
+                round: pending_round.round + 1,
+                start: env.block.time.seconds(),
+            };
             self.pending_round.save(storage, &pending_round)?;
 
             // Reset pending data
@@ -317,6 +300,21 @@ pub struct OracleData<T> {
     pub timestamp: u64,
     /// The data submitted by the messenger
     pub data: T,
+}
+
+// Single field consensus
+pub fn consensus_on_field<F, T>(
+    data: &[T],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<SignedDecimal256>
+where
+    F: Fn(&T) -> SignedDecimal256,
+    T: ConsensusData,
+{
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
+    consensus_on_items(&items, threshold, delta_ppm)
 }
 
 /// A helper function that calculates consensus for a given array of SignedDecimal256s
@@ -407,15 +405,17 @@ where
     // Find largest subslice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
     let mut max_len = 0;
     let mut best_slice = (0, 0);
-    // TODO: think about  https://github.com/structured-org/aum-oracle/pull/3#discussion_r2204499971
-    for i in 0..=(sorted.len() - threshold) {
-        for j in (i + threshold)..=sorted.len() {
+    'outer: for i in 0..sorted.len() {
+        // iterate in reverse, so we could find the largest faster
+        for j in ((i + threshold)..=sorted.len()).rev() {
             let low = sorted[i];
             let high = sorted[j - 1];
 
             if inside_ppm_bounds(high, low)? && j - i > max_len {
                 max_len = j - i;
                 best_slice = (i, j);
+                // we found the largest slice, we can exit
+                break 'outer;
             }
         }
     }

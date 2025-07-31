@@ -11,12 +11,17 @@ pub struct Config {
     pub owner: Addr,
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
-    /// how many seconds we consider the last published consensus as valid
+    /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
+    /// Binance AUM contract cannot rely on it in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub consensus_data_valid_period: u64,
-    /// how many blocks we consider the last price from the oracle price contract as valid
+    /// Validity period for prices from the oracle contract in blocks. If the prices are too old,
+    /// Binance AUM contract cannot rely on them in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub price_data_valid_period: u64,
-    /// required binance positions and spot assets that messengers must provide
+    /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
+    /// required binance spot assets that messengers must provide
     pub required_binance_spot_assets: Vec<String>,
 }
 
@@ -151,20 +156,6 @@ impl ConsensusData<Config> for BinanceData {
     }
 }
 
-// Single field consensus
-pub fn consensus_on_field<F>(
-    data: &[BinanceData],
-    extract: F,
-    threshold: usize,
-    delta_ppm: u64,
-) -> Option<SignedDecimal256>
-where
-    F: Fn(&BinanceData) -> SignedDecimal256,
-{
-    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items_dec256(&items, threshold, delta_ppm)
-}
-
 impl Config {
     /// Updates the contract configuration with new values, keeping existing values for None options
     pub fn update_config(
@@ -172,8 +163,8 @@ impl Config {
         deps: Deps,
         new_config: &crate::msg::UpdateConfig,
     ) -> ContractResult<()> {
-        if let Some(ref admin) = new_config.owner {
-            self.owner = deps.api.addr_validate(admin)?;
+        if let Some(ref owner) = new_config.owner {
+            self.owner = deps.api.addr_validate(owner)?;
         }
         if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
             self.consensus_data_valid_period = consensus_data_valid_period;

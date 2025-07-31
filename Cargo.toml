@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "contracts/binance-aum",
-    "contracts/jupiter-aum",
+    "contracts/binance-aum-receiver-contract",
+    "contracts/jupiter-aum-receiver-contract"
     "packages/*"
 ]
 

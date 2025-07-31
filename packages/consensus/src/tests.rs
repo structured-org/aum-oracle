@@ -294,44 +294,6 @@ fn test_round_operations() {
         "Round should be passed after end time"
     );
 
-    // Test Round::rounds_passed
-    env.block.time = Timestamp::from_seconds(start_time);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed at start time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length - 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed just before end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        1,
-        "One round should have passed at end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + 3 * round_length + 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        3,
-        "Three rounds should have passed"
-    );
-
-    // Test Round::add_rounds
-    let new_round = round.add_rounds(round_length, 2);
-    assert_eq!(new_round.round, 3, "Round number should be increased by 2");
-    assert_eq!(
-        new_round.start,
-        start_time + 2 * round_length,
-        "Start time should be increased by 2 round lengths"
-    );
-
     // Test Round::next_round
     let next_round = round.next_round(round_length);
     assert_eq!(next_round.round, 2, "Round number should be increased by 1");
@@ -657,7 +619,7 @@ fn test_state_round_advancement() {
     assert_eq!(pending_round.round, 2, "Round should have advanced");
     assert_eq!(
         pending_round.start,
-        start_time + config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 
@@ -683,15 +645,15 @@ fn test_state_round_advancement() {
         "Oracle should be able to publish data after multiple round advances"
     );
 
-    // Verify round has advanced by multiple steps
+    // Verify round has advanced by one step, but the start time of the round has advanced by multiple steps
     let pending_round = state.pending_round.load(&deps).unwrap();
     assert_eq!(
-        pending_round.round, 4,
+        pending_round.round, 3,
         "Round should have advanced by multiple steps"
     );
     assert_eq!(
         pending_round.start,
-        start_time + 3 * config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 }
