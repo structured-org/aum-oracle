@@ -166,7 +166,7 @@ impl<T: ConsensusData> State<T> {
     /// * If all messengers have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
     ///
     /// An error is returned in the following cases:
-    /// * a messenger tries to publish data for the same round more than ones;
+    /// * a messenger tries to publish data for the same round more than once;
     /// * a messenger tries to publish data for the past or future round;
     ///
     /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
