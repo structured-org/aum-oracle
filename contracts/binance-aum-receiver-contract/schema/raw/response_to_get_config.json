@@ -80,7 +80,7 @@
       ],
       "properties": {
         "consensus_data_valid_period": {
-          "description": "how many seconds we consider the last published consensus as valid",
+          "description": "Validity period for data (that reached consensus) in the contract in seconds. If the data is too old, Binance AUM contract cannot rely on it in AUM calculations, and something terrible depending on your business logic.",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
@@ -94,7 +94,7 @@
           ]
         },
         "price_data_valid_period": {
-          "description": "how many blocks we consider the last price from the oracle price contract as valid",
+          "description": "Validity period for prices from the oracle contract in blocks. If the prices are too old, Binance AUM contract cannot rely on them in AUM calculations, and something terrible depending on your business logic.",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
@@ -108,13 +108,14 @@
           ]
         },
         "required_binance_positions": {
-          "description": "required binance positions and spot assets that messengers must provide",
+          "description": "required binance positions that messengers must provide",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "required_binance_spot_assets": {
+          "description": "required binance spot assets that messengers must provide",
           "type": "array",
           "items": {
             "type": "string"

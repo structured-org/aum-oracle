@@ -1,5 +1,5 @@
 use crate::error::{ContractError, ContractResult};
-use consensus::consensus::{consensus_on_items, ConsensusData, State};
+use consensus::consensus::{consensus_on_field, consensus_on_items, ConsensusData, State};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
@@ -10,9 +10,13 @@ pub struct Config {
     pub owner: Addr,
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
-    /// how many seconds we consider the last published consensus as valid
+    /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
+    /// Binance AUM contract cannot rely on it in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub consensus_data_valid_period: u64,
-    /// how many blocks we consider the last price from the oracle price contract as valid
+    /// Validity period for prices from the oracle contract in blocks. If the prices are too old,
+    /// Binance AUM contract cannot rely on them in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub price_data_valid_period: u64,
     /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
@@ -156,20 +160,6 @@ impl ConsensusData for BinanceData {
             withdrawable_usdt: consensus_withdrawable_usdt,
         })
     }
-}
-
-// Single field consensus
-pub fn consensus_on_field<F>(
-    data: &[BinanceData],
-    extract: F,
-    threshold: usize,
-    delta_ppm: u64,
-) -> Option<SignedDecimal256>
-where
-    F: Fn(&BinanceData) -> SignedDecimal256,
-{
-    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items(&items, threshold, delta_ppm)
 }
 
 impl Config {

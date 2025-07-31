@@ -307,6 +307,21 @@ pub struct OracleData<T> {
     pub data: T,
 }
 
+// Single field consensus
+pub fn consensus_on_field<F, T>(
+    data: &[T],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<SignedDecimal256>
+where
+    F: Fn(&T) -> SignedDecimal256,
+    T: ConsensusData
+{
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
+    consensus_on_items(&items, threshold, delta_ppm)
+}
+
 /// A helper function that calculates consensus for a given array of SignedDecimal256s
 // TODO: make it generic (not critical for now, but it would be nice to have)
 pub fn consensus_on_items(
@@ -319,12 +334,13 @@ pub fn consensus_on_items(
     }
     let mut sorted = items.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
+    // Find largest sublice [i..j] such that sorted[j] - sorted[i] <= sorted[j] * data_delta_ppm / 1_000_000
     let ppm = Decimal256::from_ratio(delta_ppm, 1_000_000u64);
     let mut max_len = 0;
     let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
+    'outer: for i in 0..sorted.len() {
+        // iterate in reverse, so we could find the largest faster
+        for j in ((i + threshold)..=sorted.len()).rev() {
             let low = sorted[i];
             let high = sorted[j - 1];
 
@@ -338,6 +354,8 @@ pub fn consensus_on_items(
             {
                 max_len = j - i;
                 best_slice = (i, j);
+                // we found the largest slice, we can exit
+                break 'outer;
             }
         }
     }
