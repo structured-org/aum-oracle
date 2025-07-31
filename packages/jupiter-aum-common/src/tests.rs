@@ -146,13 +146,13 @@ fn base_data() -> SolanaData {
 }
 
 #[test]
-fn test_all_equal_consensus_7_oracles() {
+fn test_all_equal_consensus_7_messengers() {
     let data = vec![base_data(); 7];
     assert!(SolanaData::try_consensus(&data, 5, 0).is_some());
 }
 
 #[test]
-fn test_one_malicious_aum_still_consensus_7_oracles() {
+fn test_one_malicious_aum_still_consensus_7_messengers() {
     let mut data = vec![base_data(); 7];
     data[6].aum_usd = Uint128::new(50000);
     assert!(SolanaData::try_consensus(&data, 5, 0).is_some());

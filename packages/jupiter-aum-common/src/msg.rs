@@ -73,7 +73,7 @@ pub enum QueryMsg {
     /// Returns error if data is not valid.
     #[returns(GetAumResponse)]
     GetAum {},
-    /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
+    /// GetRoundInfo returns round info that is needed for messengers to know when to publish data
     #[returns(RoundInfoResponse)]
     GetRoundInfo {},
     /// Config returns the current contract configuration.
@@ -94,9 +94,9 @@ pub struct ConfigResponse {
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
     pub price_data_validity_period: u64,
-    /// a list of oracles that can submit data for consensus
+    /// a list of messengers that can submit data for consensus
     pub messengers: Vec<Addr>,
-    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
@@ -114,7 +114,7 @@ pub struct GetDataResponse {
 /// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[cw_serde]
 pub struct GetAumResponse {
-    /// The latest AUM in Jupiter reported by oracles
+    /// The latest AUM in Jupiter reported by messengers
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
     /// Represents the number of decimals that the aum_in_btc is

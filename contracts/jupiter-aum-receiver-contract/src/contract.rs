@@ -107,8 +107,8 @@ fn update_config(
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
-    if let Some(ref oracles) = new_config.messengers {
-        let validated_messengers: Vec<Addr> = oracles
+    if let Some(ref messengers) = new_config.messengers {
+        let validated_messengers: Vec<Addr> = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
@@ -129,7 +129,7 @@ fn update_config(
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-/// Allows a registered oracle to publish Solana data for the current round.
+/// Allows a registered messenger to publish Solana data for the current round.
 /// If consensus is reached, finalizes the data and returns next round info in events.
 fn execute_publish_data(
     deps: DepsMut,
@@ -234,7 +234,7 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     })
 }
 
-/// Fetches the BTC/USD price from the oracle and ensures freshness.
+/// Fetches the BTC/USD price from the slinky oracle and ensures freshness.
 fn query_btc_price_in_usd(
     deps: Deps,
     env: Env,

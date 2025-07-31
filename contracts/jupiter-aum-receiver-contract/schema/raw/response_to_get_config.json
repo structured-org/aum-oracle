@@ -27,7 +27,7 @@
       "minimum": 0.0
     },
     "messengers": {
-      "description": "a list of oracles that can submit data for consensus",
+      "description": "a list of messengers that can submit data for consensus",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Addr"
@@ -57,7 +57,7 @@
       "minimum": 0.0
     },
     "threshold": {
-      "description": "threshold of the consensus (how many oracles must submit data for consensus to be reached)",
+      "description": "threshold of the consensus (how many messengers must submit data for consensus to be reached)",
       "type": "integer",
       "format": "uint32",
       "minimum": 0.0
