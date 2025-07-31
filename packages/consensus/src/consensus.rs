@@ -240,7 +240,6 @@ impl<T: ConsensusData> State<T> {
             },
         )?;
 
-        // Check if round is complete: either all messengers or round time expired
         let pending = self.get_all_pending_data(storage)?;
 
         // Try forming consensus if we have all messengers published their data for the round
@@ -273,7 +272,7 @@ impl<T: ConsensusData> State<T> {
 
 /// Result of the `publish_data` method
 pub enum PublishResult<T> {
-    /// The consensus was reached, the first element is the data
+    /// The consensus was reached for the OracleData
     ConsensusReached(OracleData<T>),
     /// The consensus was not reached
     ConsensusNotReached,
