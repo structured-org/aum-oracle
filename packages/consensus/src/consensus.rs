@@ -316,7 +316,7 @@ pub fn consensus_on_field<F, T>(
 ) -> Option<SignedDecimal256>
 where
     F: Fn(&T) -> SignedDecimal256,
-    T: ConsensusData
+    T: ConsensusData,
 {
     let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
     consensus_on_items(&items, threshold, delta_ppm)
