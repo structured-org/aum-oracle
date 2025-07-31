@@ -11,7 +11,7 @@ use cosmwasm_std::{
     Response, SignedDecimal256, StdError, StdResult,
 };
 
-const WBTC_DECIMALS: u32 = 8; // WBTC via Eurika has 8 decimals
+const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
 #[entry_point]
 pub fn instantiate(
