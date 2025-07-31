@@ -123,7 +123,7 @@ impl<T: ConsensusData> State<T> {
         self.config.save(storage, &new_config)
     }
 
-    /// Returns the last current data oracles agreed on
+    /// Returns the last consensus data oracles agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(
