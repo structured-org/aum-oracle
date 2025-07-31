@@ -16,10 +16,12 @@ pub struct InstantiateMsg {
     /// Consensus round length in seconds
     pub round_length: u64,
     /// Initial validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
-    /// Binance AUM contract cannot rely on it in AUM calculations.
+    /// Binance AUM contract cannot rely on it in AUM calculations,
+    /// and in that case the contract just doesn't calculate AUM and returns an error in the corresponding query.
     pub consensus_data_valid_period: u64,
     /// Initial validity period for prices from the oracle contract in blocks. If the prices are too old,
-    /// Binance AUM contract cannot rely on them in AUM calculations.
+    /// Binance AUM contract cannot rely on them in AUM calculations,
+    /// and in that case the contract just doesn't calculate AUM and returns an error in the corresponding query.
     pub price_data_valid_period: u64,
     /// Required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
@@ -71,7 +73,9 @@ pub enum QueryMsg {
     /// Returns the latest published data
     #[returns(GetDataResponse)]
     GetData {},
-    /// Returns the latest total AUM in Binance reported by oracles
+    /// Returns the latest total AUM in Binance reported by oracles.
+    /// Returns an error if published data by messengers are too old,
+    /// or token prices reported by Slinky are too old
     #[returns(GetAumResponse)]
     GetAum {},
     /// Returns current round info
