@@ -7,6 +7,7 @@ use cosmwasm_std::{
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 use std::ops::{Add, Div, Sub};
 
 /// Describes the configuration of consensus
@@ -37,23 +38,6 @@ impl Round {
         self.start + round_length <= env.block.time.seconds()
     }
 
-    /// how many rounds passed since the round started?
-    pub fn rounds_passed(&self, env: &Env, round_length: u64) -> u64 {
-        (env.block.time.seconds() - self.start) / round_length
-    }
-
-    /// Returns a new round after the current one based on two inputs:
-    /// `round_length` - length of one round in seconds
-    /// `rounds` - how many rounds to add to the current one
-    /// The new round has the `start_time` equals to `self.start + rounds * round_length`
-    /// and the `round` equals to `self.round + rounds`
-    pub fn add_rounds(&self, round_length: u64, rounds: u64) -> Round {
-        Round {
-            round: self.round + rounds,
-            start: self.start + rounds * round_length,
-        }
-    }
-
     /// Returns a new round after the current one based on one input:
     /// `round_length` - length of one round in seconds
     pub fn next_round(&self, round_length: u64) -> Round {
@@ -66,13 +50,15 @@ impl Round {
 
 /// Describes a data you want to get a consensus for.
 /// The structure must be Clonable, Serialized and Deserialized to store it in the CosmWasm storage.
-pub trait ConsensusData: Serialize + DeserializeOwned + Clone {
+pub trait ConsensusData<O>: Serialize + DeserializeOwned + Clone {
+    /// The method sorts and cleans incoming data, and checks for all required fields present.
+    fn prepublish_cleanup(&mut self, options: O) -> Result<(), ConsensusError>;
     /// The method tries to form a single value from a slice of [ConsensusData] values based on `threshold` and `delta_ppm` from the Config.
     fn try_consensus(data: &[Self], threshold: usize, delta_ppm: u64) -> Option<Self>;
 }
 
 /// State of the consensus
-pub struct State<T: ConsensusData> {
+pub struct State<T: ConsensusData<O>, O> {
     /// the current pending round we are waiting data for
     pub pending_round: Item<Round>,
     /// the configuration of the consensus
@@ -81,6 +67,8 @@ pub struct State<T: ConsensusData> {
     pub pending_data: Map<Addr, OracleData<T>>,
     /// the last published data oracles agreed on
     pub last_published_data: Item<OracleData<T>>,
+    /// necessary to allow trait constraint
+    pub phantom_data: Option<PhantomData<O>>,
 }
 
 const PENDING_ROUND_KEY: &str = "consensus__pending_round";
@@ -88,7 +76,7 @@ const CONFIG_KEY: &str = "consensus__config";
 const PENDING_DATA_KEY: &str = "consensus__pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
 
-impl<T: ConsensusData> State<T> {
+impl<T: ConsensusData<O>, O> State<T, O> {
     /// State constructor
     pub const fn default() -> Self {
         State {
@@ -96,6 +84,7 @@ impl<T: ConsensusData> State<T> {
             pending_data: Map::new(PENDING_DATA_KEY),
             last_published_data: Item::new(LAST_PUBLISHED_DATA_KEY),
             config: Item::new(CONFIG_KEY),
+            phantom_data: None,
         }
     }
 
@@ -197,11 +186,14 @@ impl<T: ConsensusData> State<T> {
         storage: &mut dyn Storage,
         env: &Env,
         messenger: Addr,
-        new_data: T,
+        mut new_data: T,
+        options: O,
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
         let config = self.config.load(storage)?;
+
+        ConsensusData::prepublish_cleanup(&mut new_data, options)?;
 
         let mut consensus_data = PublishResult::ConsensusNotReached;
 
@@ -231,10 +223,10 @@ impl<T: ConsensusData> State<T> {
                 consensus_data = ConsensusReached(oracle_data);
             }
 
-            pending_round = pending_round.add_rounds(
-                config.round_length,
-                pending_round.rounds_passed(env, config.round_length),
-            );
+            pending_round = Round {
+                round: pending_round.round + 1,
+                start: env.block.time.seconds(),
+            };
             self.pending_round.save(storage, &pending_round)?;
 
             // Reset pending data
@@ -308,6 +300,21 @@ pub struct OracleData<T> {
     pub timestamp: u64,
     /// The data submitted by the messenger
     pub data: T,
+}
+
+// Single field consensus
+pub fn consensus_on_field<F, T, O>(
+    data: &[T],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<SignedDecimal256>
+where
+    F: Fn(&T) -> SignedDecimal256,
+    T: ConsensusData<O>,
+{
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
+    consensus_on_items_dec256(&items, threshold, delta_ppm)
 }
 
 /// A helper function that calculates consensus for a given array of SignedDecimal256s
@@ -398,15 +405,17 @@ where
     // Find largest subslice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
     let mut max_len = 0;
     let mut best_slice = (0, 0);
-    // TODO: think about  https://github.com/structured-org/aum-oracle/pull/3#discussion_r2204499971
-    for i in 0..=(sorted.len() - threshold) {
-        for j in (i + threshold)..=sorted.len() {
+    'outer: for i in 0..sorted.len() {
+        // iterate in reverse, so we could find the largest faster
+        for j in ((i + threshold)..=sorted.len()).rev() {
             let low = sorted[i];
             let high = sorted[j - 1];
 
             if inside_ppm_bounds(high, low)? && j - i > max_len {
                 max_len = j - i;
                 best_slice = (i, j);
+                // we found the largest slice, we can exit
+                break 'outer;
             }
         }
     }

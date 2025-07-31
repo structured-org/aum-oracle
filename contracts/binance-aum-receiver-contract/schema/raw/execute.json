@@ -3,7 +3,7 @@
   "title": "ExecuteMsg",
   "oneOf": [
     {
-      "description": "PublishData allows a registered messenger to submit new Binance data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
+      "description": "Allows a registered messenger to submit new Binance data. This message triggers the consensus check and updates `last_published_data` if consensus is reached.",
       "type": "object",
       "required": [
         "publish_data"
@@ -25,7 +25,7 @@
       "additionalProperties": false
     },
     {
-      "description": "UpdateConfig updates the contract's configuration parameters. Only callable by the owner. All fields are optional, allowing partial updates.",
+      "description": "Updates the contract's configuration parameters. Only callable by the owner. All fields are optional, allowing partial updates.",
       "type": "object",
       "required": [
         "update_config"

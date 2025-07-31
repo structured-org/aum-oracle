@@ -1,6 +1,7 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::mock_dependencies;
+use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi};
 use cosmwasm_std::{from_json, Int256, SignedDecimal256, Timestamp, Uint128};
 use jupiter_aum_common::error::ContractError;
@@ -269,7 +270,12 @@ fn test_publish_data_invalid_custody() {
 
     let msg = ExecuteMsg::PublishData { new_data: data };
     let res = execute(deps.as_mut(), env, info, msg);
-    assert!(matches!(res, Err(ContractError::Std(_))));
+    assert!(matches!(
+        res,
+        Err(ContractError::ConsensusError(
+            ConsensusError::PrepublishError { .. }
+        ))
+    ));
 }
 
 #[test]

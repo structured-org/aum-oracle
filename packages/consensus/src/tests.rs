@@ -15,7 +15,12 @@ struct MockData {
     pub value4: SignedDecimal256,
 }
 
-impl ConsensusData for MockData {
+struct MockConfig {}
+
+impl ConsensusData<MockConfig> for MockData {
+    fn prepublish_cleanup(&mut self, _: MockConfig) -> Result<(), ConsensusError> {
+        Ok(())
+    }
     // Consensus function for MockData
     fn try_consensus(data: &[MockData], threshold: usize, delta_ppm: u64) -> Option<MockData> {
         if data.len() < threshold {
@@ -85,6 +90,10 @@ fn create_test_data(
         value3,
         value4,
     }
+}
+
+fn create_mock_config() -> MockConfig {
+    MockConfig {}
 }
 
 #[test]
@@ -285,44 +294,6 @@ fn test_round_operations() {
         "Round should be passed after end time"
     );
 
-    // Test Round::rounds_passed
-    env.block.time = Timestamp::from_seconds(start_time);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed at start time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length - 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed just before end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        1,
-        "One round should have passed at end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + 3 * round_length + 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        3,
-        "Three rounds should have passed"
-    );
-
-    // Test Round::add_rounds
-    let new_round = round.add_rounds(round_length, 2);
-    assert_eq!(new_round.round, 3, "Round number should be increased by 2");
-    assert_eq!(
-        new_round.start,
-        start_time + 2 * round_length,
-        "Start time should be increased by 2 round lengths"
-    );
-
     // Test Round::next_round
     let next_round = round.next_round(round_length);
     assert_eq!(next_round.round, 2, "Round number should be increased by 1");
@@ -469,7 +440,7 @@ fn setup_test_state(
     config: &Config,
     round: u64,
     start_time: u64,
-) -> State<MockData> {
+) -> State<MockData, MockConfig> {
     let state = State::default();
     state.config.save(deps, config).unwrap();
     state
@@ -511,11 +482,23 @@ fn test_state_publish_data() {
 
     // Test 1: Oracle publishes data
     let oracle1 = Addr::unchecked("oracle1");
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
     assert!(result.is_ok(), "Oracle should be able to publish data");
 
     // Test 2: Oracle tries to publish data again for the same round (should fail)
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
     assert!(
         result.is_err(),
         "Oracle should not be able to publish data twice for the same round"
@@ -530,7 +513,13 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(2010, 1),
         SignedDecimal256::from_ratio(505, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle2.clone(), test_data2);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle2.clone(),
+        test_data2,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Second oracle should be able to publish data"
@@ -544,7 +533,13 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(2005, 1),
         SignedDecimal256::from_ratio(503, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle3.clone(), test_data3);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle3.clone(),
+        test_data3,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Third oracle should be able to publish data"
@@ -607,7 +602,13 @@ fn test_state_round_advancement() {
         SignedDecimal256::from_ratio(2000, 1),
         SignedDecimal256::from_ratio(500, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Oracle should be able to publish data for the new round"
@@ -618,7 +619,7 @@ fn test_state_round_advancement() {
     assert_eq!(pending_round.round, 2, "Round should have advanced");
     assert_eq!(
         pending_round.start,
-        start_time + config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 
@@ -632,21 +633,27 @@ fn test_state_round_advancement() {
         SignedDecimal256::from_ratio(2020, 1),
         SignedDecimal256::from_ratio(510, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data_multi);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        oracle1.clone(),
+        test_data_multi,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
         "Oracle should be able to publish data after multiple round advances"
     );
 
-    // Verify round has advanced by multiple steps
+    // Verify round has advanced by one step, but the start time of the round has advanced by multiple steps
     let pending_round = state.pending_round.load(&deps).unwrap();
     assert_eq!(
-        pending_round.round, 4,
+        pending_round.round, 3,
         "Round should have advanced by multiple steps"
     );
     assert_eq!(
         pending_round.start,
-        start_time + 3 * config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 }
@@ -680,7 +687,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data1)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle1.clone(),
+            test_data1,
+            create_mock_config(),
+        )
         .unwrap();
 
     let oracle2 = Addr::unchecked("oracle2");
@@ -691,7 +704,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(505, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data2)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle2.clone(),
+            test_data2,
+            create_mock_config(),
+        )
         .unwrap();
 
     let oracle3 = Addr::unchecked("oracle3");
@@ -702,7 +721,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(503, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle3.clone(), test_data3)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle3.clone(),
+            test_data3,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify data is published
@@ -730,7 +755,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(520, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data4)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle1.clone(),
+            test_data4,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify we still get the last published data from round 1
@@ -747,7 +778,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(525, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data5)
+        .publish_data(
+            &mut deps,
+            &env,
+            oracle2.clone(),
+            test_data5,
+            create_mock_config(),
+        )
         .unwrap();
 
     // But verify we still get the last published data from round 1 because round is not passed yet
@@ -778,7 +815,7 @@ fn test_state_init() {
     let env = mock_env();
 
     // Create a new state
-    let state = State::<MockData>::default();
+    let state = State::<MockData, MockConfig>::default();
 
     // Initialize the state
     let config = create_test_config();

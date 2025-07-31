@@ -1,5 +1,6 @@
-use crate::error::{ContractError, ContractResult};
-use consensus::consensus::{consensus_on_items_dec256, ConsensusData, State};
+use crate::error::ContractResult;
+use consensus::consensus::{consensus_on_field, consensus_on_items_dec256, ConsensusData, State};
+use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, SignedDecimal256};
 use cw_storage_plus::Item;
@@ -10,12 +11,17 @@ pub struct Config {
     pub owner: Addr,
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
-    /// how many seconds we consider the last published consensus as valid
+    /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
+    /// Binance AUM contract cannot rely on it in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub consensus_data_valid_period: u64,
-    /// how many blocks we consider the last price from the oracle price contract as valid
+    /// Validity period for prices from the oracle contract in blocks. If the prices are too old,
+    /// Binance AUM contract cannot rely on them in AUM calculations, and something terrible
+    /// depending on your business logic.
     pub price_data_valid_period: u64,
-    /// required binance positions and spot assets that messengers must provide
+    /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
+    /// required binance spot assets that messengers must provide
     pub required_binance_spot_assets: Vec<String>,
 }
 
@@ -42,41 +48,34 @@ pub struct BinanceData {
     pub withdrawable_usdt: SignedDecimal256,
 }
 
-impl BinanceData {
-    /// Cleans the data to only contain the required binance positions and spot assets
-    /// Validates the data to contain required positions and spot assets. Returns an error if it does not.
-    pub fn clean_and_validate(
-        &mut self,
-        required_binance_positions: Vec<String>,
-        required_binance_spot_assets: Vec<String>,
-    ) -> ContractResult<()> {
+impl ConsensusData<Config> for BinanceData {
+    fn prepublish_cleanup(&mut self, options: Config) -> Result<(), ConsensusError> {
+        // clean and validate published data
         // positions must contain only required binance positions
         self.positions
-            .retain(|p| required_binance_positions.contains(&p.symbol));
+            .retain(|p| options.required_binance_positions.contains(&p.symbol));
         self.positions.sort_by(|a, b| a.symbol.cmp(&b.symbol));
 
-        if self.positions.len() != required_binance_positions.len() {
-            return Err(ContractError::InvalidBinanceData {
-                msg: "Binance positions do not match required positions".to_string(),
+        if self.positions.len() != options.required_binance_positions.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Binance positions do not match required positions".into(),
             });
         }
 
         // spot_balances must contain only required binance spot assets
         self.spot_balances
-            .retain(|p| required_binance_spot_assets.contains(&p.asset));
+            .retain(|p| options.required_binance_spot_assets.contains(&p.asset));
         self.spot_balances.sort_by(|a, b| a.asset.cmp(&b.asset));
 
-        if self.spot_balances.len() != required_binance_spot_assets.len() {
-            return Err(ContractError::InvalidBinanceData {
-                msg: "Binance spot assets do not match required spot assets".to_string(),
+        if self.spot_balances.len() != options.required_binance_spot_assets.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Binance spot assets do not match required spot assets".into(),
             });
         }
 
         Ok(())
     }
-}
 
-impl ConsensusData for BinanceData {
     fn try_consensus(
         data: &[BinanceData],
         threshold: usize,
@@ -157,20 +156,6 @@ impl ConsensusData for BinanceData {
     }
 }
 
-// Single field consensus
-pub fn consensus_on_field<F>(
-    data: &[BinanceData],
-    extract: F,
-    threshold: usize,
-    delta_ppm: u64,
-) -> Option<SignedDecimal256>
-where
-    F: Fn(&BinanceData) -> SignedDecimal256,
-{
-    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
-    consensus_on_items_dec256(&items, threshold, delta_ppm)
-}
-
 impl Config {
     /// Updates the contract configuration with new values, keeping existing values for None options
     pub fn update_config(
@@ -178,8 +163,8 @@ impl Config {
         deps: Deps,
         new_config: &crate::msg::UpdateConfig,
     ) -> ContractResult<()> {
-        if let Some(ref admin) = new_config.owner {
-            self.owner = deps.api.addr_validate(admin)?;
+        if let Some(ref owner) = new_config.owner {
+            self.owner = deps.api.addr_validate(owner)?;
         }
         if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
             self.consensus_data_valid_period = consensus_data_valid_period;
@@ -202,4 +187,4 @@ impl Config {
 
 pub const CONFIG: Item<Config> = Item::new("config");
 
-pub const CONSENSUS_STATE: State<BinanceData> = State::default();
+pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();

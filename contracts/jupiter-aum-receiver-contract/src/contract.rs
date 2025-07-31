@@ -17,7 +17,7 @@ use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
 
-const CONTRACT_NAME: &str = "crates.io:jupiter-aum";
+const CONTRACT_NAME: &str = "crates.io:jupiter-aum-receiver-contract";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const BTC_DENOM: &str = "BTC";
@@ -135,7 +135,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mut new_data: SolanaData,
+    new_data: SolanaData,
 ) -> Result<Response, ContractError> {
     let contract_config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
@@ -144,10 +144,8 @@ fn execute_publish_data(
         return Err(ContractError::Unauthorized {});
     }
 
-    new_data.clean_and_validate(contract_config.required_custody_assets)?;
-
     let (result, pending_round) =
-        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
+        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
