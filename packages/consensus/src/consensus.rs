@@ -243,7 +243,7 @@ impl<T: ConsensusData> State<T> {
         // Check if round is complete: either all messengers or round time expired
         let pending = self.get_all_pending_data(storage)?;
 
-        // Try forming consensus, because we have all messengers published their data for a round
+        // Try forming consensus if we have all messengers published their data for the round
         if pending.len() == config.messengers.len() {
             let data: Vec<T> = pending
                 .iter()
