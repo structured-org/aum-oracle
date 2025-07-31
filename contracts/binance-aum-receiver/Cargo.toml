@@ -2,7 +2,7 @@
 authors = []
 description = "Binance AUM receiver contract"
 edition = "2021"
-name = "binance-aum-receiver-contract"
+name = "binance-aum-receiver"
 repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.0"
 

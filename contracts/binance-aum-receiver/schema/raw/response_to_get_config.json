@@ -80,7 +80,7 @@
       ],
       "properties": {
         "consensus_data_valid_period": {
-          "description": "Validity period for data (that reached consensus) in the contract in seconds. If the data is too old, Binance AUM contract cannot rely on it in AUM calculations, and something terrible depending on your business logic.",
+          "description": "Validity period for data (that reached consensus) in the contract in seconds. If the data is too old, Binance AUM contract cannot rely on it in AUM calculations.",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
@@ -94,7 +94,7 @@
           ]
         },
         "price_data_valid_period": {
-          "description": "Validity period for prices from the oracle contract in blocks. If the prices are too old, Binance AUM contract cannot rely on them in AUM calculations, and something terrible depending on your business logic.",
+          "description": "Validity period for prices from the oracle contract in blocks. If the prices are too old, Binance AUM contract cannot rely on them in AUM calculations.",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0

@@ -16,12 +16,10 @@ pub struct InstantiateMsg {
     /// Consensus round length in seconds
     pub round_length: u64,
     /// Initial validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
-    /// Binance AUM contract cannot rely on it in AUM calculations, and something terrible
-    /// depending on your business logic.
+    /// Binance AUM contract cannot rely on it in AUM calculations.
     pub consensus_data_valid_period: u64,
     /// Initial validity period for prices from the oracle contract in blocks. If the prices are too old,
-    /// Binance AUM contract cannot rely on them in AUM calculations, and something terrible
-    /// depending on your business logic.
+    /// Binance AUM contract cannot rely on them in AUM calculations.
     pub price_data_valid_period: u64,
     /// Required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,

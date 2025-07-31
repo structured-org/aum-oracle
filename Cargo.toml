@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "contracts/binance-aum-receiver-contract",
+    "contracts/binance-aum-receiver",
     "packages/*"
 ]
 

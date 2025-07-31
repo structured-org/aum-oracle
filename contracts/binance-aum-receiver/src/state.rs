@@ -11,12 +11,10 @@ pub struct Config {
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
     /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
-    /// Binance AUM contract cannot rely on it in AUM calculations, and something terrible
-    /// depending on your business logic.
+    /// Binance AUM contract cannot rely on it in AUM calculations.
     pub consensus_data_valid_period: u64,
     /// Validity period for prices from the oracle contract in blocks. If the prices are too old,
-    /// Binance AUM contract cannot rely on them in AUM calculations, and something terrible
-    /// depending on your business logic.
+    /// Binance AUM contract cannot rely on them in AUM calculations.
     pub price_data_valid_period: u64,
     /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
