@@ -11,7 +11,7 @@ use cosmwasm_std::{
     Response, SignedDecimal256, StdError, StdResult,
 };
 
-const WBTC_DECIMALS: u32 = 8; // WBTC via Eureka has 8 decimals
+const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
 #[entry_point]
 pub fn instantiate(
@@ -84,11 +84,14 @@ fn execute_publish_data(
 
     // If we have new published data for the current round, consensus was reached
     if let PublishResult::ConsensusReached(_) = result {
-        res = res.add_attribute("action", "publish_consensus");
+        res = res.add_attribute("consensus_reached", "true");
+    } else {
+        res = res.add_attribute("consensus_reached", "false");
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([
+        attr("action", "publish_data"),
         attr("next_round", next_round.round.to_string()),
         attr("next_round_timestamp", next_round.start.to_string()),
         attr("round", pending_round.round.to_string()),

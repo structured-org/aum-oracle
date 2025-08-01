@@ -1,5 +1,5 @@
 {
-  "contract_name": "jupiter-aum-receiver-contract",
+  "contract_name": "jupiter-aum-receiver",
   "contract_version": "0.1.0",
   "idl_version": "1.0.0",
   "instantiate": {

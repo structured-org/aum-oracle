@@ -132,7 +132,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
         self.config.save(storage, &new_config)
     }
 
-    /// Returns the last current data oracles agreed on
+    /// Returns the last consensus data oracles agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(
@@ -175,7 +175,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
     /// * If all messengers have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
     ///
     /// An error is returned in the following cases:
-    /// * a messenger tries to publish data for the same round more than ones;
+    /// * a messenger tries to publish data for the same round more than once;
     /// * a messenger tries to publish data for the past or future round;
     ///
     /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
@@ -252,10 +252,9 @@ impl<T: ConsensusData<O>, O> State<T, O> {
             },
         )?;
 
-        // Check if round is complete: either all messengers or round time expired
         let pending = self.get_all_pending_data(storage)?;
 
-        // Try forming consensus, because we have all messengers published their data for a round
+        // Try forming consensus if we have all messengers published their data for the round
         if pending.len() == config.messengers.len() {
             let data: Vec<T> = pending
                 .iter()
@@ -285,7 +284,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
 
 /// Result of the `publish_data` method
 pub enum PublishResult<T> {
-    /// The consensus was reached, the first element is the data
+    /// The consensus was reached for the OracleData
     ConsensusReached(OracleData<T>),
     /// The consensus was not reached
     ConsensusNotReached,
