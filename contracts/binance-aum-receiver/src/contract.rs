@@ -72,7 +72,7 @@ fn execute_publish_data(
     let contract_config = CONFIG.load(deps.storage)?;
 
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
-    // Only oracle can submit
+    // Only messengers can submit
     if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
