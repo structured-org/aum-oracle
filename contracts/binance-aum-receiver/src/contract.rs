@@ -72,7 +72,7 @@ fn execute_publish_data(
     let contract_config = CONFIG.load(deps.storage)?;
 
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
-    // Only oracle can submit
+    // Only messengers can submit
     if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
@@ -82,11 +82,9 @@ fn execute_publish_data(
 
     let mut res = Response::new();
 
-    // If we have new published data for the current round, consensus was reached
-    if let PublishResult::ConsensusReached(_) = result {
-        res = res.add_attribute("consensus_reached", "true");
-    } else {
-        res = res.add_attribute("consensus_reached", "false");
+    // If we have newly published data for the current round, consensus was reached
+    if let PublishResult::ConsensusReached(data) = result {
+        res = res.add_attribute("consensus_reached", data.round.to_string());
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
@@ -109,7 +107,7 @@ fn execute_update_config(
     // Load current contract config
     let mut contract_config = CONFIG.load(deps.storage)?;
 
-    // Only admin can update config
+    // Only owner can update config
     if info.sender != contract_config.owner {
         return Err(ContractError::Unauthorized {});
     }
@@ -121,12 +119,12 @@ fn execute_update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     // Update consensus config fields
-    if let Some(ref oracles) = new_config.messengers {
-        let validated_oracles: Vec<Addr> = oracles
+    if let Some(ref messengers) = new_config.messengers {
+        let validated_messengers: Vec<Addr> = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = validated_oracles;
+        consensus_config.messengers = validated_messengers;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -139,7 +137,7 @@ fn execute_update_config(
     }
 
     // Save updated consensus config
-    CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
+    CONSENSUS_STATE.save_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -183,8 +181,7 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
 pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
     let last_published_data = CONSENSUS_STATE
-        .last_published_data
-        .may_load(deps.storage)?
+        .get_last_published_data(&env, deps.storage)?
         .ok_or_else(|| StdError::generic_err("No published data"))?;
     if last_published_data.timestamp + config.consensus_data_valid_period < env.block.time.seconds()
     {

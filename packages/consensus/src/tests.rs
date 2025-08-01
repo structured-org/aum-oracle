@@ -6,7 +6,7 @@ use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal256, Timestamp};
 use serde::{Deserialize, Serialize};
 
-// Mock data structure for testing OracleData<T>
+// Mock data structure for testing data publishing and consensus calculations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct MockData {
     pub value1: SignedDecimal256,
@@ -183,7 +183,7 @@ fn test_try_consensus() {
         .is_none());
     }
 
-    // Test 5: Consensus with more than threshold oracles
+    // Test 5: Consensus with more than threshold messengers
     {
         let config = create_test_config();
         let data_multiple = vec![
@@ -525,7 +525,7 @@ fn test_state_publish_data() {
         "Second oracle should be able to publish data"
     );
 
-    // Test 4: Third oracle publishes data (all oracles have now published)
+    // Test 4: Third oracle publishes data (all messengers have now published)
     let oracle3 = Addr::unchecked("oracle3");
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
@@ -678,7 +678,7 @@ fn test_state_get_last_published_data() {
     let result = state.get_last_published_data(&env, &deps).unwrap();
     assert!(result.is_none(), "No data should be published initially");
 
-    // Test 2: Publish data from all oracles
+    // Test 2: Publish data from all messengers
     let oracle1 = Addr::unchecked("oracle1");
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -734,7 +734,7 @@ fn test_state_get_last_published_data() {
     let result = state.get_last_published_data(&env, &deps).unwrap();
     assert!(
         result.is_some(),
-        "Data should be published after all oracles submit"
+        "Data should be published after all messengers submit"
     );
     let data = result.unwrap();
     assert_eq!(data.round, 1, "Published data should be for round 1");

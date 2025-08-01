@@ -18,39 +18,11 @@ pub enum ContractError {
     #[error("Invalid Binance data: {msg:?}")]
     InvalidBinanceData { msg: String },
 
-    #[error("Price is invalid")]
-    InvalidPrice,
-
     #[error("Failed to convert value to Decimal256")]
     Decimal256ConversionError,
 
-    #[error("Too many Decimal256s from oracle responce, exceeds u32 allowance")]
-    TooManyDecimal256s,
-
-    #[error("Market {symbol}, {quote} did not return an block height")]
-    PriceAgeUnavailable { symbol: String, quote: String },
-
-    #[error("Market {symbol}, {quote} did not return a block height")]
-    PriceNotAvailable { symbol: String, quote: String },
-
-    #[error("Market {symbol}, {quote} returned a nil price")]
-    PriceIsNil { symbol: String, quote: String },
-
-    #[error("Timestamp for {symbol}, {quote} price is nil")]
-    TimestampIsNil { symbol: String, quote: String },
-
-    #[error("Market {symbol}, {quote} is older than {max_seconds} seconds")]
-    PriceTooOld {
-        symbol: String,
-        quote: String,
-        max_seconds: u64,
-    },
-
     #[error("Published data is too old")]
     PublishedDataTooOld {},
-
-    #[error("Price cannot be negative")]
-    PriceIsNegative,
 
     #[error("Msg sender must be the contract owner")]
     Unauthorized,

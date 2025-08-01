@@ -4,7 +4,9 @@ use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
 use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS_STATE};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
-use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
+use consensus::consensus::{
+    Config as ConsensusConfig, ConsensusData, ConsensusOutcome, Round, State,
+};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
@@ -281,7 +283,7 @@ fn test_execute_publish_data() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(publish_consensus_attr.is_some());
 
     let round_attr = response.attributes.iter().find(|attr| attr.key == "round");
@@ -315,13 +317,13 @@ fn test_execute_publish_data() {
 
 #[test]
 fn test_execute_publish_data_time_based_consensus() {
-    // Set up test environment
+    // Set up a test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with a custom config
+    // Set up the initial state with a custom config
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
     // Modify the config to use threshold instead of all messengers for consensus
@@ -406,7 +408,7 @@ fn test_execute_publish_data_time_based_consensus() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(publish_consensus_attr.is_some());
 }
 
@@ -694,7 +696,7 @@ fn test_all_messengers_consensus_round_not_increased() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"
@@ -812,7 +814,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"
@@ -1443,7 +1445,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"
@@ -1548,6 +1550,22 @@ fn test_query_get_aum_basic() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data
     let binance_data = BinanceData {
@@ -1577,7 +1595,7 @@ fn test_query_get_aum_basic() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -1626,6 +1644,22 @@ fn test_query_get_aum_with_expired_data() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with an old timestamp
     let current_time = 1700000000;
@@ -1638,7 +1672,7 @@ fn test_query_get_aum_with_expired_data() {
         withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
     };
 
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: 0,
         data: binance_data,
@@ -1703,6 +1737,22 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with negative equity
     let binance_data = BinanceData {
@@ -1722,7 +1772,7 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -1754,9 +1804,9 @@ fn test_query_get_aum_with_negative_equity() {
 #[test]
 fn test_execute_update_config_admin_only() {
     let mut deps = mock_dependencies();
-    let env = mock_env();
+    let mut env = mock_env();
 
-    // Set up initial state
+    // Set up the initial state
     let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
     setup_test_state(
@@ -1834,7 +1884,42 @@ fn test_execute_update_config_admin_only() {
     );
     assert_eq!(updated_contract_config.price_oracle_contract, price_oracle);
 
-    // Verify consensus config was updated
+    // Verify consensus config was not updated because a round was not switched yet
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        consensus_config_after.messengers,
+        consensus_config.messengers
+    );
+    assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
+    assert_eq!(
+        consensus_config_after.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    );
+    assert_eq!(
+        consensus_config_after.round_length,
+        consensus_config.round_length
+    );
+
+    // Submit some to switch round
+    let messenger1_info = message_info("messenger1", &[]);
+    let mut test_data1 = create_test_data(
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
+    );
+    // change default submitting data to reflect changes in the config
+    test_data1.positions[0].symbol = "ETHUSDT".to_string();
+    test_data1.spot_balances[0].asset = "ETH".to_string();
+
+    let msg = ExecuteMsg::PublishData {
+        new_data: test_data1,
+    };
+    env.block.time = env.block.time.plus_days(1);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
+    assert!(result.is_ok());
+
+    // Verify consensus config was updated after the round switch
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
     assert_eq!(
         updated_consensus_config.messengers,
@@ -1843,12 +1928,18 @@ fn test_execute_update_config_admin_only() {
     assert_eq!(updated_consensus_config.threshold, 1);
     assert_eq!(updated_consensus_config.data_delta_ppm, 5000);
     assert_eq!(updated_consensus_config.round_length, 1800);
+    //pending config must be cleared
+    assert!(CONSENSUS_STATE
+        .pending_config
+        .may_load(deps.as_ref().storage)
+        .unwrap()
+        .is_none());
 }
 
 #[test]
 fn test_execute_update_config_partial_updates() {
     let mut deps = mock_dependencies();
-    let env = mock_env();
+    let mut env = mock_env();
 
     // Set up initial state
     let consensus_config = create_test_consensus_config();
@@ -1933,7 +2024,38 @@ fn test_execute_update_config_partial_updates() {
     let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
     assert!(result.is_ok());
 
-    // Verify only specified consensus fields were updated
+    // Verify consensus config was not updated because a round was not switched yet
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        consensus_config_after.messengers,
+        consensus_config.messengers
+    );
+    assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
+    assert_eq!(
+        consensus_config_after.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    );
+    assert_eq!(
+        consensus_config_after.round_length,
+        consensus_config.round_length
+    );
+
+    // Submit some to switch round
+    let messenger1_info = message_info("messenger1", &[]);
+    let test_data1 = create_test_data(
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
+    );
+    let msg = ExecuteMsg::PublishData {
+        new_data: test_data1,
+    };
+    env.block.time = env.block.time.plus_days(1);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
+    assert!(result.is_ok());
+
+    // Verify only specified consensus fields were updated after the round switch
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
     assert_eq!(
         updated_consensus_config.messengers,
@@ -1948,8 +2070,14 @@ fn test_execute_update_config_partial_updates() {
         updated_consensus_config.round_length,
         consensus_config.round_length
     ); // unchanged
+       //pending config must be cleared
+    assert!(CONSENSUS_STATE
+        .pending_config
+        .may_load(deps.as_ref().storage)
+        .unwrap()
+        .is_none());
 
-    // Verify contract config was not changed from previous update
+    // Verify contract config was not changed from the previous update
     let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
     assert_eq!(contract_config_after.consensus_data_valid_period, 3600); // still updated value
     assert_eq!(contract_config_after.price_data_valid_period, 150); // still updated value
@@ -2145,6 +2273,22 @@ fn test_query_get_aum_with_large_values() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with large values
     let binance_data = BinanceData {
@@ -2166,7 +2310,7 @@ fn test_query_get_aum_with_large_values() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -2275,6 +2419,22 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data
     let binance_data = BinanceData {
@@ -2304,7 +2464,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,

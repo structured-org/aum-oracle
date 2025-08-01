@@ -1,9 +1,8 @@
 .idea
 target
-app/config.yaml
-app/aum-oracle
 aum_messenger/config.yaml
 aum_messenger/aum-messenger
+config.yaml
 
 artifacts
 
