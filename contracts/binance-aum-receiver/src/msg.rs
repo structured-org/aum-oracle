@@ -73,7 +73,7 @@ pub enum QueryMsg {
     /// Returns the latest published data
     #[returns(GetDataResponse)]
     GetData {},
-    /// Returns the latest total AUM in Binance reported by oracles.
+    /// Returns the latest total AUM in Binance reported by messengers.
     /// Returns an error if published data by messengers are too old,
     /// or token prices reported by price oracle contract are too old
     #[returns(GetAumResponse)]
