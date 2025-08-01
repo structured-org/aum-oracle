@@ -124,7 +124,7 @@ fn execute_update_config(
     // Load current contract config
     let mut contract_config = CONFIG.load(deps.storage)?;
 
-    // Only admin can update config
+    // Only owner can update config
     if info.sender != contract_config.owner {
         return Err(ContractError::Unauthorized {});
     }
