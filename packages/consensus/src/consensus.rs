@@ -61,7 +61,7 @@ pub struct State<T: ConsensusData> {
     pub pending_config: Item<Config>,
     /// the pending data for the current round
     pub pending_data: Map<Addr, OracleData<T>>,
-    /// the last published data oracles agreed on
+    /// the last published data messengers agreed on
     pub last_published_data: Item<OracleData<T>>,
 }
 
@@ -130,7 +130,7 @@ impl<T: ConsensusData> State<T> {
         self.pending_config.save(storage, &new_config)
     }
 
-    /// Returns the last consensus data oracles agreed on
+    /// Returns the last consensus data messengers agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(

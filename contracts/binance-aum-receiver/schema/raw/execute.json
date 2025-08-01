@@ -148,7 +148,7 @@
           "minimum": 0.0
         },
         "messengers": {
-          "description": "A new list of oracles that are allowed to publish data",
+          "description": "A new list of messengers that are allowed to publish data",
           "type": [
             "array",
             "null"
