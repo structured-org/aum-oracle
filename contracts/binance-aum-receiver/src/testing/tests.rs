@@ -1802,9 +1802,9 @@ fn test_query_get_aum_with_negative_equity() {
 #[test]
 fn test_execute_update_config_admin_only() {
     let mut deps = mock_dependencies();
-    let env = mock_env();
+    let mut env = mock_env();
 
-    // Set up initial state
+    // Set up the initial state
     let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
     setup_test_state(
@@ -1882,7 +1882,42 @@ fn test_execute_update_config_admin_only() {
     );
     assert_eq!(updated_contract_config.price_oracle_contract, price_oracle);
 
-    // Verify consensus config was updated
+    // Verify consensus config was not updated because a round was not switched yet
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        consensus_config_after.messengers,
+        consensus_config.messengers
+    );
+    assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
+    assert_eq!(
+        consensus_config_after.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    );
+    assert_eq!(
+        consensus_config_after.round_length,
+        consensus_config.round_length
+    );
+
+    // Submit some to switch round
+    let messenger1_info = message_info("messenger1", &[]);
+    let mut test_data1 = create_test_data(
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
+    );
+    // change default submitting data to reflect changes in the config
+    test_data1.positions[0].symbol = "ETHUSDT".to_string();
+    test_data1.spot_balances[0].asset = "ETH".to_string();
+
+    let msg = ExecuteMsg::PublishData {
+        new_data: test_data1,
+    };
+    env.block.time = env.block.time.plus_days(1);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
+    assert!(result.is_ok());
+
+    // Verify consensus config was updated after the round switch
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
     assert_eq!(
         updated_consensus_config.messengers,
@@ -1891,12 +1926,18 @@ fn test_execute_update_config_admin_only() {
     assert_eq!(updated_consensus_config.threshold, 1);
     assert_eq!(updated_consensus_config.data_delta_ppm, 5000);
     assert_eq!(updated_consensus_config.round_length, 1800);
+    //pending config must be cleared
+    assert!(CONSENSUS_STATE
+        .pending_config
+        .may_load(deps.as_ref().storage)
+        .unwrap()
+        .is_none());
 }
 
 #[test]
 fn test_execute_update_config_partial_updates() {
     let mut deps = mock_dependencies();
-    let env = mock_env();
+    let mut env = mock_env();
 
     // Set up initial state
     let consensus_config = create_test_consensus_config();
@@ -1981,7 +2022,38 @@ fn test_execute_update_config_partial_updates() {
     let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
     assert!(result.is_ok());
 
-    // Verify only specified consensus fields were updated
+    // Verify consensus config was not updated because a round was not switched yet
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(
+        consensus_config_after.messengers,
+        consensus_config.messengers
+    );
+    assert_eq!(consensus_config_after.threshold, consensus_config.threshold);
+    assert_eq!(
+        consensus_config_after.data_delta_ppm,
+        consensus_config.data_delta_ppm
+    );
+    assert_eq!(
+        consensus_config_after.round_length,
+        consensus_config.round_length
+    );
+
+    // Submit some to switch round
+    let messenger1_info = message_info("messenger1", &[]);
+    let test_data1 = create_test_data(
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
+    );
+    let msg = ExecuteMsg::PublishData {
+        new_data: test_data1,
+    };
+    env.block.time = env.block.time.plus_days(1);
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
+    assert!(result.is_ok());
+
+    // Verify only specified consensus fields were updated after the round switch
     let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
     assert_eq!(
         updated_consensus_config.messengers,
@@ -1996,8 +2068,14 @@ fn test_execute_update_config_partial_updates() {
         updated_consensus_config.round_length,
         consensus_config.round_length
     ); // unchanged
+       //pending config must be cleared
+    assert!(CONSENSUS_STATE
+        .pending_config
+        .may_load(deps.as_ref().storage)
+        .unwrap()
+        .is_none());
 
-    // Verify contract config was not changed from previous update
+    // Verify contract config was not changed from the previous update
     let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
     assert_eq!(contract_config_after.consensus_data_valid_period, 3600); // still updated value
     assert_eq!(contract_config_after.price_data_valid_period, 150); // still updated value

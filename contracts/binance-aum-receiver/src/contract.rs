@@ -156,7 +156,7 @@ fn execute_update_config(
     }
 
     // Save updated consensus config
-    CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
+    CONSENSUS_STATE.save_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }

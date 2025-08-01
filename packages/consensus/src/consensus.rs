@@ -57,6 +57,8 @@ pub struct State<T: ConsensusData> {
     pub pending_round: Item<Round>,
     /// the configration of the consensus
     pub config: Item<Config>,
+    /// the pending configuration for the next round that will be applied on round switch
+    pub pending_config: Item<Config>,
     /// the pending data for the current round
     pub pending_data: Map<Addr, OracleData<T>>,
     /// the last published data oracles agreed on
@@ -67,6 +69,7 @@ const PENDING_ROUND_KEY: &str = "consensus__pending_round";
 const CONFIG_KEY: &str = "consensus__config";
 const PENDING_DATA_KEY: &str = "consensus__pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
+const PENDING_CONFIG_KEY: &str = "consensus__pending_config";
 
 impl<T: ConsensusData> State<T> {
     /// State constructor
@@ -76,6 +79,7 @@ impl<T: ConsensusData> State<T> {
             pending_data: Map::new(PENDING_DATA_KEY),
             last_published_data: Item::new(LAST_PUBLISHED_DATA_KEY),
             config: Item::new(CONFIG_KEY),
+            pending_config: Item::new(PENDING_CONFIG_KEY),
         }
     }
 
@@ -118,9 +122,12 @@ impl<T: ConsensusData> State<T> {
         self.pending_round.load(storage)
     }
 
-    /// Updates the consensus configuration
-    pub fn update_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
-        self.config.save(storage, &new_config)
+    /// Saves the new consensus configuration
+    /// New configuration will be applied only on **the next round**
+    /// This mechanism guarantees all messengers use the same config and no consensus changes
+    /// can happen in the middle of a round unexpectedly
+    pub fn save_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
+        self.pending_config.save(storage, &new_config)
     }
 
     /// Returns the last consensus data oracles agreed on
@@ -185,7 +192,7 @@ impl<T: ConsensusData> State<T> {
 
         let mut consensus_data = PublishResult::ConsensusNotReached;
 
-        // if pending round is passed:
+        // if the pending round is passed:
         // * process pending data for the passed round
         // * if consensus for the pending data is reached, publish it
         // * clear pending data
@@ -216,6 +223,13 @@ impl<T: ConsensusData> State<T> {
                 start: env.block.time.seconds(),
             };
             self.pending_round.save(storage, &pending_round)?;
+
+            // if there is some pending config, we need to write to the main config storage on round switch
+            if let Some(pending_config) = self.pending_config.may_load(storage)? {
+                self.config.save(storage, &pending_config)?;
+                // clear pending config
+                self.pending_config.remove(storage);
+            }
 
             // Reset pending data
             self.pending_data.clear(storage);
