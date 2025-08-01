@@ -200,8 +200,7 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
 pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
     let last_published_data = CONSENSUS_STATE
-        .last_published_data
-        .may_load(deps.storage)?
+        .get_last_published_data(&env, deps.storage)?
         .ok_or_else(|| StdError::generic_err("No published data"))?;
     if last_published_data.timestamp + config.consensus_data_valid_period < env.block.time.seconds()
     {

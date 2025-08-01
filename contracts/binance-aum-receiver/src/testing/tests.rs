@@ -1548,6 +1548,22 @@ fn test_query_get_aum_basic() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data
     let binance_data = BinanceData {
@@ -1626,6 +1642,22 @@ fn test_query_get_aum_with_expired_data() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with an old timestamp
     let current_time = 1700000000;
@@ -1703,6 +1735,22 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with negative equity
     let binance_data = BinanceData {
@@ -2145,6 +2193,22 @@ fn test_query_get_aum_with_large_values() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data with large values
     let binance_data = BinanceData {
@@ -2275,6 +2339,22 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
+    let consensus_config = create_test_consensus_config();
+    CONSENSUS_STATE
+        .config
+        .save(deps.as_mut().storage, &consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
 
     // Set up consensus state data
     let binance_data = BinanceData {
