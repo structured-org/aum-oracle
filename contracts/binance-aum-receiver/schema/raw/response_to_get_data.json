@@ -7,7 +7,7 @@
       "description": "The latest published data (can be null if there was no consensus reached)",
       "anyOf": [
         {
-          "$ref": "#/definitions/OracleData_for_BinanceData"
+          "$ref": "#/definitions/ConsensusOutcome_for_BinanceData"
         },
         {
           "type": "null"
@@ -55,8 +55,8 @@
       },
       "additionalProperties": false
     },
-    "OracleData_for_BinanceData": {
-      "description": "Data submitted by a messenger",
+    "ConsensusOutcome_for_BinanceData": {
+      "description": "The outcome of the consensus algorithm for data with type T",
       "type": "object",
       "required": [
         "data",
@@ -65,7 +65,7 @@
       ],
       "properties": {
         "data": {
-          "description": "The data submitted by the messenger",
+          "description": "The data submitted by the messengers",
           "allOf": [
             {
               "$ref": "#/definitions/BinanceData"
@@ -73,13 +73,13 @@
           ]
         },
         "round": {
-          "description": "The round number a messenger tries to submit data for",
+          "description": "The round number when the consensus was reached",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
         "timestamp": {
-          "description": "The UNIX timestamp in seconds when the messenger submitted the data",
+          "description": "The UNIX timestamp in seconds when the consensus was reached",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0

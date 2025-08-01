@@ -4,7 +4,7 @@ use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal256, Timestamp};
 use serde::{Deserialize, Serialize};
 
-// Mock data structure for testing OracleData<T>
+// Mock data structure for testing data publishing and consensus calculations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct MockData {
     pub value1: SignedDecimal256,

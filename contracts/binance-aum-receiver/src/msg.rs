@@ -1,5 +1,5 @@
 use crate::state::{BinanceData, Config};
-use consensus::consensus::{Config as ConsensusConfig, OracleData, Round};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Int256;
 
@@ -97,7 +97,7 @@ pub struct RoundInfoResponse {
 #[cw_serde]
 pub struct GetDataResponse {
     /// The latest published data (can be null if there was no consensus reached)
-    pub last_published_data: Option<OracleData<BinanceData>>,
+    pub last_published_data: Option<ConsensusOutcome<BinanceData>>,
 }
 
 #[cw_serde]

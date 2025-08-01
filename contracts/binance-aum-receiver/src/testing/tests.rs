@@ -4,7 +4,9 @@ use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
 use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS_STATE};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
-use consensus::consensus::{Config as ConsensusConfig, ConsensusData, OracleData, Round, State};
+use consensus::consensus::{
+    Config as ConsensusConfig, ConsensusData, ConsensusOutcome, Round, State,
+};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
@@ -1593,7 +1595,7 @@ fn test_query_get_aum_basic() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -1670,7 +1672,7 @@ fn test_query_get_aum_with_expired_data() {
         withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
     };
 
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: 0,
         data: binance_data,
@@ -1770,7 +1772,7 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -2308,7 +2310,7 @@ fn test_query_get_aum_with_large_values() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -2462,7 +2464,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = OracleData {
+    let oracle_data = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
