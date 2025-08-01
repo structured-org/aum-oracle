@@ -281,7 +281,7 @@ fn test_execute_publish_data() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(publish_consensus_attr.is_some());
 
     let round_attr = response.attributes.iter().find(|attr| attr.key == "round");
@@ -315,13 +315,13 @@ fn test_execute_publish_data() {
 
 #[test]
 fn test_execute_publish_data_time_based_consensus() {
-    // Set up test environment
+    // Set up a test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
 
-    // Set up initial state with a custom config
+    // Set up the initial state with a custom config
     let mut consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
     // Modify the config to use threshold instead of all messengers for consensus
@@ -406,7 +406,7 @@ fn test_execute_publish_data_time_based_consensus() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(publish_consensus_attr.is_some());
 }
 
@@ -694,7 +694,7 @@ fn test_all_messengers_consensus_round_not_increased() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"
@@ -812,7 +812,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"
@@ -1443,7 +1443,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let publish_consensus_attr = response
         .attributes
         .iter()
-        .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
+        .find(|attr| attr.key == "consensus_reached" && attr.value == "1");
     assert!(
         publish_consensus_attr.is_some(),
         "Consensus should be reached when all messengers submit data"

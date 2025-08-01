@@ -88,11 +88,9 @@ fn execute_publish_data(
 
     let mut res = Response::new();
 
-    // If we have new published data for the current round, consensus was reached
-    if let PublishResult::ConsensusReached(_) = result {
-        res = res.add_attribute("consensus_reached", "true");
-    } else {
-        res = res.add_attribute("consensus_reached", "false");
+    // If we have newly published data for the current round, consensus was reached
+    if let PublishResult::ConsensusReached(data) = result {
+        res = res.add_attribute("consensus_reached", data.round.to_string());
     }
 
     res = res.add_attributes([
