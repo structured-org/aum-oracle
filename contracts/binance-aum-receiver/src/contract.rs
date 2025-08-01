@@ -90,10 +90,13 @@ fn execute_publish_data(
 
     // If we have new published data for the current round, consensus was reached
     if let PublishResult::ConsensusReached(_) = result {
-        res = res.add_attribute("action", "publish_consensus");
+        res = res.add_attribute("consensus_reached", "true");
+    } else {
+        res = res.add_attribute("consensus_reached", "false");
     }
 
     res = res.add_attributes([
+        attr("action", "publish_data"),
         attr(
             "next_round",
             pending_round
