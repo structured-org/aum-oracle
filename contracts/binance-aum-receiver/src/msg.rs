@@ -56,7 +56,7 @@ pub struct UpdateConfig {
     /// New price oracle contract address
     pub price_oracle_contract: Option<String>,
 
-    /// A new list of oracles that are allowed to publish data
+    /// A new list of messengers that are allowed to publish data
     pub messengers: Option<Vec<String>>,
     /// A new threshold value for the consensus
     pub threshold: Option<u32>,
