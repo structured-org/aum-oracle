@@ -75,7 +75,7 @@ pub enum QueryMsg {
     GetData {},
     /// Returns the latest total AUM in Binance reported by oracles.
     /// Returns an error if published data by messengers are too old,
-    /// or token prices reported by Slinky are too old
+    /// or token prices reported by price oracle contract are too old
     #[returns(GetAumResponse)]
     GetAum {},
     /// Returns current round info
