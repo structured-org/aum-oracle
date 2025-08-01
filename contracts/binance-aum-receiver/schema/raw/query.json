@@ -17,7 +17,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Returns the latest total AUM in Binance reported by messengers",
+      "description": "Returns the latest total AUM in Binance reported by messengers. Returns an error if published data by messengers are too old, or token prices reported by Slinky are too old",
       "type": "object",
       "required": [
         "get_aum"

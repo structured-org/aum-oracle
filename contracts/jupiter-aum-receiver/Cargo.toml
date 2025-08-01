@@ -2,7 +2,7 @@
 authors = []
 description = "Neutron Jupiter AUM Oracle Receiver contract"
 edition = "2021"
-name = "jupiter-aum-receiver-contract"
+name = "jupiter-aum-receiver"
 repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.0"
 
