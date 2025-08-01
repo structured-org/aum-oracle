@@ -144,7 +144,7 @@ fn test_execute_publish_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
 
-    // Test 1: Unauthorized oracle rejection
+    // Test 1: Unauthorized messenger rejection
     let unauthorized_info = message_info("unauthorized", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data.clone(),
@@ -154,7 +154,7 @@ fn test_execute_publish_data() {
     assert_eq!(result.unwrap_err(), ContractError::Unauthorized {});
 
     // Test 2: Invalid positions
-    let oracle_info = message_info("messenger1", &[]);
+    let messenger_info = message_info("messenger1", &[]);
     let mut invalid_positions_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -177,7 +177,7 @@ fn test_execute_publish_data() {
     let msg = ExecuteMsg::PublishData {
         new_data: invalid_positions_data,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
         ContractError::ConsensusError(ConsensusError::PrepublishError { msg }) => {
@@ -187,7 +187,7 @@ fn test_execute_publish_data() {
     }
 
     // Test 2: Invalid spot balances
-    let oracle_info = message_info("messenger1", &[]);
+    let messenger_info = message_info("messenger1", &[]);
     let mut invalid_spot_balances_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -208,7 +208,7 @@ fn test_execute_publish_data() {
     let msg = ExecuteMsg::PublishData {
         new_data: invalid_spot_balances_data,
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger_info.clone(), msg);
     assert!(result.is_err());
     match result.unwrap_err() {
         ContractError::ConsensusError(ConsensusError::PrepublishError { msg }) => {
@@ -218,11 +218,11 @@ fn test_execute_publish_data() {
     }
 
     // Test 2: Valid submission acceptance
-    let oracle_info = message_info("messenger1", &[]);
+    let messenger_info = message_info("messenger1", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data.clone(),
     };
-    let result = execute(deps.as_mut(), env.clone(), oracle_info.clone(), msg);
+    let result = execute(deps.as_mut(), env.clone(), messenger_info.clone(), msg);
     assert!(result.is_ok());
 
     // Test 3: Submit data from all messengers to reach consensus
@@ -264,7 +264,7 @@ fn test_execute_publish_data() {
     let result = execute(deps.as_mut(), env.clone(), messenger2_info, msg);
     assert!(result.is_ok());
 
-    // Submit data from the third oracle to reach consensus (all messengers)
+    // Submit data from the third messenger to reach consensus (all messengers)
     let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
@@ -348,7 +348,7 @@ fn test_execute_publish_data_time_based_consensus() {
         SignedDecimal256::from_ratio(500, 1),
     );
 
-    // Test 1: Submit data from one oracle
+    // Test 1: Submit data from one messenger
     let messenger1_info = message_info("messenger1", &[]);
     let msg = ExecuteMsg::PublishData {
         new_data: test_data1,
@@ -356,7 +356,7 @@ fn test_execute_publish_data_time_based_consensus() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
-    // Test 2: No consensus yet (only one oracle submitted)
+    // Test 2: No consensus yet (only one messenger submitted)
     let response = result.unwrap();
     // Check that no consensus was reached (no publish_consensus action)
     let publish_consensus_attr = response
@@ -365,7 +365,7 @@ fn test_execute_publish_data_time_based_consensus() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(publish_consensus_attr.is_none());
 
-    // Test 3: Submit data from another oracle with identical data
+    // Test 3: Submit data from another messenger with identical data
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),   // Identical to test_data1
         SignedDecimal256::from_ratio(1000, 1), // Identical to test_data1
@@ -388,7 +388,7 @@ fn test_execute_publish_data_time_based_consensus() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(publish_consensus_attr.is_none());
 
-    // Test 5: Submit data from the third oracle with identical data
+    // Test 5: Submit data from the third messenger with identical data
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(5, 10), // Identical to test_data1 and test_data2
         SignedDecimal256::from_ratio(1000, 1), // Identical to test_data1 and test_data2
@@ -748,7 +748,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
         round.start,
     );
 
-    // Submit data from first oracle
+    // Submit data from first messenger
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -762,7 +762,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
-    // Verify no consensus yet (only one oracle)
+    // Verify no consensus yet (only one messenger)
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
@@ -770,10 +770,10 @@ fn test_partial_messengers_consensus_round_not_increased() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(
         publish_consensus_attr.is_none(),
-        "No consensus should be reached with only one oracle"
+        "No consensus should be reached with only one messenger"
     );
 
-    // Submit data from second oracle (should reach threshold)
+    // Submit data from second messenger (should reach the threshold)
     let messenger2_info = message_info("messenger2", &[]);
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
@@ -795,7 +795,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(publish_consensus_attr.is_none(), "No consensus should be reached with only threshold messengers (need all messengers or round to pass)");
 
-    // Submit data from third oracle (all messengers now)
+    // Submit data from third messenger (all messengers now)
     let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
@@ -866,7 +866,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
         round.start,
     );
 
-    // Submit data from only one oracle (below threshold)
+    // Submit data from only one messenger (below the threshold)
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -880,7 +880,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
-    // Verify no consensus yet (only one oracle, below threshold)
+    // Verify no consensus yet (only one messenger, below the threshold)
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
@@ -888,7 +888,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(
         publish_consensus_attr.is_none(),
-        "No consensus should be reached with only one oracle (below threshold)"
+        "No consensus should be reached with only one messenger (below the threshold)"
     );
 
     // Advance time past round length to trigger round change
@@ -920,7 +920,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
 
     // Verify no consensus was reached for the previous round
     // This is implicit since we couldn't even submit for the previous round
-    // and there was only one oracle's data (below threshold)
+    // and there was only one messenger's data (below the threshold)
 
     // We can also check that no consensus is reached yet for the new round
     let publish_consensus_attr = response
@@ -957,7 +957,7 @@ fn test_multiple_rounds_passing() {
         round.start,
     );
 
-    // Submit data from one oracle for round 1
+    // Submit data from one messenger for round 1
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -1038,7 +1038,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
         "No data should be published initially"
     );
 
-    // Oracle 1 submits data for round 1
+    // Messenger 1 submits data for round 1
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -1052,14 +1052,14 @@ fn test_messengers_submitting_across_multiple_rounds() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info.clone(), msg);
     assert!(result.is_ok());
 
-    // Check data after one oracle submission - should still be None (below threshold)
-    let data_after_one_oracle = query_last_published_data(deps.as_ref(), env.clone());
+    // Check data after one messenger submission - should still be None (below threshold)
+    let data_after_one_messenger = query_last_published_data(deps.as_ref(), env.clone());
     assert!(
-        data_after_one_oracle.last_published_data.is_none(),
-        "No data should be published with only one oracle (below threshold)"
+        data_after_one_messenger.last_published_data.is_none(),
+        "No data should be published with only one messenger (below threshold)"
     );
 
-    // Oracle 2 submits data for round 1 (reaching threshold)
+    // Messenger 2 submits data for round 1 (reaching threshold)
     let messenger2_info = message_info("messenger2", &[]);
     let test_data1_2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
@@ -1080,7 +1080,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
         "No data should be published with only threshold messengers (round not passed)"
     );
 
-    // Oracle 3 submits data for round 1 (all messengers)
+    // Messenger 3 submits data for round 1 (all messengers)
     let messenger3_info = message_info("messenger3", &[]);
     let test_data1_3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
@@ -1110,7 +1110,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
     // Advance time to round 2
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
-    // Oracle 2 submits data for round 2
+    // Messenger 2 submits data for round 2
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -1132,7 +1132,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
     // Advance time to round 3
     env.block.time = Timestamp::from_seconds(start_time + (2 * consensus_config.round_length) + 1);
 
-    // Oracle 1 submits data for round 3
+    // Messenger 1 submits data for round 3
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(504, 1000),
         SignedDecimal256::from_ratio(1004, 1),
@@ -1151,7 +1151,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
     assert!(round_attr.is_some());
     assert_eq!(round_attr.unwrap().value, "3", "Round should be 3");
 
-    // Oracle 2 also submits data for round 3 (reaching threshold)
+    // Messenger 2 also submits data for round 3 (reaching threshold)
     let test_data3_2 = create_test_data(
         SignedDecimal256::from_ratio(504, 1000),
         SignedDecimal256::from_ratio(1004, 1),
@@ -1196,7 +1196,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
         "Published data should be updated to round 3"
     );
 
-    // Oracle 3 submits data for round 4
+    // Messenger 3 submits data for round 4
     let test_data4 = create_test_data(
         SignedDecimal256::from_ratio(51, 100),
         SignedDecimal256::from_ratio(1010, 1),
@@ -1241,7 +1241,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
         "Published data should still be from round 3 (round 4 had below threshold submissions)"
     );
 
-    // Oracle 3 submits data for round 5
+    // Messenger 3 submits data for round 5
     let test_data5 = create_test_data(
         SignedDecimal256::from_ratio(50, 100),
         SignedDecimal256::from_ratio(1000, 1),
@@ -1272,7 +1272,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
 }
 
 #[test]
-fn test_oracle_cannot_publish_twice_for_same_round() {
+fn test_messenger_cannot_publish_twice_for_same_round() {
     // Set up test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
@@ -1294,7 +1294,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
         round.start,
     );
 
-    // Oracle 1 submits data for round 1
+    // Messenger 1 submits data for round 1
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -1308,7 +1308,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info.clone(), msg);
     assert!(result.is_ok(), "First submission should succeed");
 
-    // Oracle 1 tries to submit data for round 1 again (should fail)
+    // Messsenger 1 tries to submit data for round 1 again (should fail)
     let test_data1_again = create_test_data(
         SignedDecimal256::from_ratio(51, 100),
         SignedDecimal256::from_ratio(1010, 1),
@@ -1331,7 +1331,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
     // Advance time to round 2
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
-    // Oracle 1 submits data for round 2 (should succeed)
+    // Messenger 1 submits data for round 2 (should succeed)
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(52, 100),
         SignedDecimal256::from_ratio(1020, 1),
@@ -1352,7 +1352,7 @@ fn test_oracle_cannot_publish_twice_for_same_round() {
 }
 
 #[test]
-fn test_delayed_oracle_submissions_within_round() {
+fn test_delayed_messenger_submissions_within_round() {
     // Set up test environment
     let mut deps = mock_dependencies();
     let mut env = mock_env();
@@ -1375,7 +1375,7 @@ fn test_delayed_oracle_submissions_within_round() {
         round.start,
     );
 
-    // Oracle 1 submits data at the beginning of round 1
+    // Messenger 1 submits data at the beginning of round 1
     let messenger1_info = message_info("messenger1", &[]);
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
@@ -1389,7 +1389,7 @@ fn test_delayed_oracle_submissions_within_round() {
     let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
     assert!(result.is_ok());
 
-    // Verify no consensus yet (only one oracle)
+    // Verify no consensus yet (only one messenger)
     let response = result.unwrap();
     let publish_consensus_attr = response
         .attributes
@@ -1397,13 +1397,13 @@ fn test_delayed_oracle_submissions_within_round() {
         .find(|attr| attr.key == "consensus_reached" && attr.value == "true");
     assert!(
         publish_consensus_attr.is_none(),
-        "No consensus should be reached with only one oracle"
+        "No consensus should be reached with only one messenger"
     );
 
     // Advance time within the same round (but not past round length)
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length / 2);
 
-    // Oracle 2 submits data in the middle of round 1
+    // Messenger 2 submits data in the middle of round 1
     let messenger2_info = message_info("messenger2", &[]);
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
@@ -1426,7 +1426,7 @@ fn test_delayed_oracle_submissions_within_round() {
     // Advance time to just before the end of round 1
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length - 10);
 
-    // Oracle 3 submits data near the end of round 1
+    // Messenger 3 submits data near the end of round 1
     let messenger3_info = message_info("messenger3", &[]);
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
@@ -1459,7 +1459,7 @@ fn test_delayed_oracle_submissions_within_round() {
     // Advance time to round 2
     env.block.time = Timestamp::from_seconds(start_time + consensus_config.round_length + 1);
 
-    // Oracle 3 submits data for round 2
+    // Messenger 3 submits data for round 2
     let test_data4 = create_test_data(
         SignedDecimal256::from_ratio(51, 100),
         SignedDecimal256::from_ratio(1010, 1),
@@ -1595,7 +1595,7 @@ fn test_query_get_aum_basic() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = ConsensusOutcome {
+    let outcome = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -1603,7 +1603,7 @@ fn test_query_get_aum_basic() {
 
     CONSENSUS_STATE
         .last_published_data
-        .save(deps.as_mut().storage, &oracle_data)
+        .save(deps.as_mut().storage, &outcome)
         .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
@@ -1672,7 +1672,7 @@ fn test_query_get_aum_with_expired_data() {
         withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
     };
 
-    let oracle_data = ConsensusOutcome {
+    let outcome = ConsensusOutcome {
         round: 1,
         timestamp: 0,
         data: binance_data,
@@ -1680,7 +1680,7 @@ fn test_query_get_aum_with_expired_data() {
 
     CONSENSUS_STATE
         .last_published_data
-        .save(deps.as_mut().storage, &oracle_data)
+        .save(deps.as_mut().storage, &outcome)
         .unwrap();
 
     // Create an environment with a timestamp that's beyond the valid period
@@ -1772,7 +1772,7 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = ConsensusOutcome {
+    let outcome = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -1780,7 +1780,7 @@ fn test_query_get_aum_with_negative_equity() {
 
     CONSENSUS_STATE
         .last_published_data
-        .save(deps.as_mut().storage, &oracle_data)
+        .save(deps.as_mut().storage, &outcome)
         .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
@@ -2310,7 +2310,7 @@ fn test_query_get_aum_with_large_values() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = ConsensusOutcome {
+    let outcome = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -2318,7 +2318,7 @@ fn test_query_get_aum_with_large_values() {
 
     CONSENSUS_STATE
         .last_published_data
-        .save(deps.as_mut().storage, &oracle_data)
+        .save(deps.as_mut().storage, &outcome)
         .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
@@ -2464,7 +2464,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     let current_time = 1700000000;
-    let oracle_data = ConsensusOutcome {
+    let outcome = ConsensusOutcome {
         round: 1,
         timestamp: current_time,
         data: binance_data,
@@ -2472,7 +2472,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
 
     CONSENSUS_STATE
         .last_published_data
-        .save(deps.as_mut().storage, &oracle_data)
+        .save(deps.as_mut().storage, &outcome)
         .unwrap();
 
     // Create an environment with a timestamp that's within the valid period

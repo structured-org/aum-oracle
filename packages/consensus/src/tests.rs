@@ -67,9 +67,9 @@ impl ConsensusData<MockConfig> for MockData {
 fn create_test_config() -> Config {
     Config {
         messengers: vec![
-            Addr::unchecked("oracle1"),
-            Addr::unchecked("oracle2"),
-            Addr::unchecked("oracle3"),
+            Addr::unchecked("messenger1"),
+            Addr::unchecked("messenger2"),
+            Addr::unchecked("messenger3"),
         ],
         threshold: 2,
         data_delta_ppm: 10000, // 1%
@@ -480,33 +480,33 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
 
-    // Test 1: Oracle publishes data
-    let oracle1 = Addr::unchecked("oracle1");
+    // Test 1: Messenger publishes data
+    let messenger1 = Addr::unchecked("messenger1");
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle1.clone(),
+        messenger1.clone(),
         test_data.clone(),
         create_mock_config(),
     );
-    assert!(result.is_ok(), "Oracle should be able to publish data");
+    assert!(result.is_ok(), "Messenger should be able to publish data");
 
-    // Test 2: Oracle tries to publish data again for the same round (should fail)
+    // Test 2: Messenger tries to publish data again for the same round (should fail)
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle1.clone(),
+        messenger1.clone(),
         test_data.clone(),
         create_mock_config(),
     );
     assert!(
         result.is_err(),
-        "Oracle should not be able to publish data twice for the same round"
+        "Messenger should not be able to publish data twice for the same round"
     );
     assert_eq!(result.err().unwrap(), ConsensusError::DoubleSubmission {});
 
-    // Test 3: Another oracle publishes data
-    let oracle2 = Addr::unchecked("oracle2");
+    // Test 3: Another messenger publishes data
+    let messenger2 = Addr::unchecked("messenger2");
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -516,17 +516,17 @@ fn test_state_publish_data() {
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle2.clone(),
+        messenger2.clone(),
         test_data2,
         create_mock_config(),
     );
     assert!(
         result.is_ok(),
-        "Second oracle should be able to publish data"
+        "Second messenger should be able to publish data"
     );
 
-    // Test 4: Third oracle publishes data (all messengers have now published)
-    let oracle3 = Addr::unchecked("oracle3");
+    // Test 4: Third messenger publishes data (all messengers have now published)
+    let messenger3 = Addr::unchecked("messenger3");
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -536,13 +536,13 @@ fn test_state_publish_data() {
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle3.clone(),
+        messenger3.clone(),
         test_data3,
         create_mock_config(),
     );
     assert!(
         result.is_ok(),
-        "Third oracle should be able to publish data"
+        "Third messenger should be able to publish data"
     );
 
     // Test 5: Verify consensus was reached and data was published
@@ -594,8 +594,8 @@ fn test_state_round_advancement() {
     // Test 1: Advance time to trigger round change
     env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
 
-    // Oracle publishes data for the new round
-    let oracle1 = Addr::unchecked("oracle1");
+    // Messenger publishes data for the new round
+    let messenger1 = Addr::unchecked("messenger1");
     let test_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -605,13 +605,13 @@ fn test_state_round_advancement() {
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle1.clone(),
+        messenger1.clone(),
         test_data,
         create_mock_config(),
     );
     assert!(
         result.is_ok(),
-        "Oracle should be able to publish data for the new round"
+        "Messenger should be able to publish data for the new round"
     );
 
     // Verify round has advanced
@@ -626,7 +626,7 @@ fn test_state_round_advancement() {
     // Test 2: Advance time by multiple rounds
     env.block.time = Timestamp::from_seconds(start_time + 3 * config.round_length + 1);
 
-    // Oracle publishes data for the new round
+    // Messenger publishes data for the new round
     let test_data_multi = create_test_data(
         SignedDecimal256::from_ratio(51, 100),
         SignedDecimal256::from_ratio(1010, 1),
@@ -636,13 +636,13 @@ fn test_state_round_advancement() {
     let result = state.publish_data(
         &mut deps,
         &env,
-        oracle1.clone(),
+        messenger1.clone(),
         test_data_multi,
         create_mock_config(),
     );
     assert!(
         result.is_ok(),
-        "Oracle should be able to publish data after multiple round advances"
+        "Messenger should be able to publish data after multiple round advances"
     );
 
     // Verify round has advanced by one step, but the start time of the round has advanced by multiple steps
@@ -679,7 +679,7 @@ fn test_state_get_last_published_data() {
     assert!(result.is_none(), "No data should be published initially");
 
     // Test 2: Publish data from all messengers
-    let oracle1 = Addr::unchecked("oracle1");
+    let messenger1 = Addr::unchecked("messenger1");
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -690,13 +690,13 @@ fn test_state_get_last_published_data() {
         .publish_data(
             &mut deps,
             &env,
-            oracle1.clone(),
+            messenger1.clone(),
             test_data1,
             create_mock_config(),
         )
         .unwrap();
 
-    let oracle2 = Addr::unchecked("oracle2");
+    let messenger2 = Addr::unchecked("messenger2");
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -707,13 +707,13 @@ fn test_state_get_last_published_data() {
         .publish_data(
             &mut deps,
             &env,
-            oracle2.clone(),
+            messenger2.clone(),
             test_data2,
             create_mock_config(),
         )
         .unwrap();
 
-    let oracle3 = Addr::unchecked("oracle3");
+    let messenger3 = Addr::unchecked("messenger3");
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -724,7 +724,7 @@ fn test_state_get_last_published_data() {
         .publish_data(
             &mut deps,
             &env,
-            oracle3.clone(),
+            messenger3.clone(),
             test_data3,
             create_mock_config(),
         )
@@ -747,7 +747,7 @@ fn test_state_get_last_published_data() {
     // Test 3: Advance time to next round but don't publish enough data
     env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
 
-    // Only one oracle publishes data (below threshold)
+    // Only one messenger publishes data (below the threshold)
     let test_data4 = create_test_data(
         SignedDecimal256::from_ratio(52, 100),
         SignedDecimal256::from_ratio(1020, 1),
@@ -758,7 +758,7 @@ fn test_state_get_last_published_data() {
         .publish_data(
             &mut deps,
             &env,
-            oracle1.clone(),
+            messenger1.clone(),
             test_data4,
             create_mock_config(),
         )
@@ -781,7 +781,7 @@ fn test_state_get_last_published_data() {
         .publish_data(
             &mut deps,
             &env,
-            oracle2.clone(),
+            messenger2.clone(),
             test_data5,
             create_mock_config(),
         )

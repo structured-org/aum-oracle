@@ -1,5 +1,5 @@
 use crate::types::SolanaData;
-use consensus::consensus::{OracleData, Round};
+use consensus::consensus::{ConsensusOutcome, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Int256};
 
@@ -94,9 +94,9 @@ pub struct ConfigResponse {
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
     pub price_data_validity_period: u64,
-    /// a list of oracles that can submit data for consensus
-    pub oracles: Vec<Addr>,
-    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    /// a list of messengers that can submit data for consensus
+    pub messengers: Vec<Addr>,
+    /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
@@ -108,7 +108,7 @@ pub struct ConfigResponse {
 #[cw_serde]
 pub struct GetDataResponse {
     /// The finalized Solana data, if available.
-    pub last_published_data: Option<OracleData<SolanaData>>,
+    pub last_published_data: Option<ConsensusOutcome<SolanaData>>,
 }
 
 /// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)

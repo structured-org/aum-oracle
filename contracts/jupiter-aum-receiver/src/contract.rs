@@ -80,30 +80,30 @@ fn update_config(
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> Result<Response, ContractError> {
-    let mut config = CONFIG.load(deps.storage)?;
+    let mut contract_config = CONFIG.load(deps.storage)?;
 
-    if info.sender != config.owner {
+    if info.sender != contract_config.owner {
         return Err(ContractError::Unauthorized {});
     }
 
     if let Some(new_owner) = new_config.owner {
-        config.owner = deps.api.addr_validate(&new_owner)?;
+        contract_config.owner = deps.api.addr_validate(&new_owner)?;
     }
 
     if let Some(new_consensus_data_validity_period) = new_config.consensus_data_validity_period {
-        config.consensus_data_validity_period = new_consensus_data_validity_period;
+        contract_config.consensus_data_validity_period = new_consensus_data_validity_period;
     }
 
     if let Some(new_required_custody_assets) = new_config.required_custody_assets {
-        config.required_custody_assets = new_required_custody_assets;
+        contract_config.required_custody_assets = new_required_custody_assets;
     }
 
     if let Some(new_price_data_validity_period) = new_config.price_data_validity_period {
-        config.price_data_validity_period = new_price_data_validity_period;
+        contract_config.price_data_validity_period = new_price_data_validity_period;
     }
 
-    config.validate()?;
-    CONFIG.save(deps.storage, &config)?;
+    contract_config.validate()?;
+    CONFIG.save(deps.storage, &contract_config)?;
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
@@ -124,7 +124,7 @@ fn update_config(
         consensus_config.round_length = round_length;
     }
 
-    CONSENSUS_STATE.update_config(deps.storage, consensus_config)?;
+    CONSENSUS_STATE.save_config(deps.storage, consensus_config)?;
 
     Ok(Response::new().add_attribute("action", "update_config"))
 }
@@ -188,7 +188,7 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
         consensus_data_validity_period: config.consensus_data_validity_period,
         required_custody_assets: config.required_custody_assets,
         price_data_validity_period: config.price_data_validity_period,
-        oracles: consensus_config.messengers,
+        messengers: consensus_config.messengers,
         threshold: consensus_config.threshold,
         data_delta_ppm: consensus_config.data_delta_ppm,
         round_length: consensus_config.round_length,
