@@ -1,5 +1,5 @@
 use crate::types::SolanaData;
-use consensus::consensus::{OracleData, Round};
+use consensus::consensus::{ConsensusOutcome, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Int256};
 
@@ -108,7 +108,7 @@ pub struct ConfigResponse {
 #[cw_serde]
 pub struct GetDataResponse {
     /// The finalized Solana data, if available.
-    pub last_published_data: Option<OracleData<SolanaData>>,
+    pub last_published_data: Option<ConsensusOutcome<SolanaData>>,
 }
 
 /// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)

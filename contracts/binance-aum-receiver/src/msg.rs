@@ -1,5 +1,5 @@
 use crate::state::{BinanceData, Config};
-use consensus::consensus::{Config as ConsensusConfig, OracleData, Round};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Int256;
 
@@ -75,7 +75,7 @@ pub enum QueryMsg {
     GetData {},
     /// Returns the latest total AUM in Binance reported by messengers.
     /// Returns an error if published data by messengers are too old,
-    /// or token prices reported by Slinky are too old
+    /// or token prices reported by price oracle contract are too old
     #[returns(GetAumResponse)]
     GetAum {},
     /// Returns current round info
@@ -97,7 +97,7 @@ pub struct RoundInfoResponse {
 #[cw_serde]
 pub struct GetDataResponse {
     /// The latest published data (can be null if there was no consensus reached)
-    pub last_published_data: Option<OracleData<BinanceData>>,
+    pub last_published_data: Option<ConsensusOutcome<BinanceData>>,
 }
 
 #[cw_serde]

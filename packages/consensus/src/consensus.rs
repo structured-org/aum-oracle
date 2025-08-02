@@ -48,7 +48,7 @@ impl Round {
     }
 }
 
-/// Describes a data you want to get a consensus for.
+/// Describes the data you want to get a consensus for.
 /// The structure must be Clonable, Serialized and Deserialized to store it in the CosmWasm storage.
 pub trait ConsensusData<O>: Serialize + DeserializeOwned + Clone {
     /// The method sorts and cleans incoming data, and checks for all required fields present.
@@ -63,10 +63,12 @@ pub struct State<T: ConsensusData<O>, O> {
     pub pending_round: Item<Round>,
     /// the configuration of the consensus
     pub config: Item<Config>,
+    /// the pending configuration for the next round that will be applied on round switch
+    pub pending_config: Item<Config>,
     /// the pending data for the current round
-    pub pending_data: Map<Addr, OracleData<T>>,
+    pub pending_data: Map<Addr, ConsensusOutcome<T>>,
     /// the last published data messengers agreed on
-    pub last_published_data: Item<OracleData<T>>,
+    pub last_published_data: Item<ConsensusOutcome<T>>,
     /// necessary to allow trait constraint
     pub phantom_data: Option<PhantomData<O>>,
 }
@@ -75,6 +77,7 @@ const PENDING_ROUND_KEY: &str = "consensus__pending_round";
 const CONFIG_KEY: &str = "consensus__config";
 const PENDING_DATA_KEY: &str = "consensus__pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
+const PENDING_CONFIG_KEY: &str = "consensus__pending_config";
 
 impl<T: ConsensusData<O>, O> State<T, O> {
     /// State constructor
@@ -84,6 +87,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
             pending_data: Map::new(PENDING_DATA_KEY),
             last_published_data: Item::new(LAST_PUBLISHED_DATA_KEY),
             config: Item::new(CONFIG_KEY),
+            pending_config: Item::new(PENDING_CONFIG_KEY),
             phantom_data: None,
         }
     }
@@ -110,8 +114,8 @@ impl<T: ConsensusData<O>, O> State<T, O> {
     }
 
     /// Returns all pending data
-    fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<OracleData<T>>> {
-        let mut v: Vec<OracleData<T>> = Vec::new();
+    fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<ConsensusOutcome<T>>> {
+        let mut v: Vec<ConsensusOutcome<T>> = Vec::new();
         for data in self
             .pending_data
             .range(storage, None, None, Order::Ascending)
@@ -127,9 +131,12 @@ impl<T: ConsensusData<O>, O> State<T, O> {
         self.pending_round.load(storage)
     }
 
-    /// Updates the consensus configuration
-    pub fn update_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
-        self.config.save(storage, &new_config)
+    /// Saves the new consensus configuration
+    /// New configuration will be applied only on **the next round**
+    /// This mechanism guarantees all messengers use the same config and no consensus changes
+    /// can happen in the middle of a round unexpectedly
+    pub fn save_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
+        self.pending_config.save(storage, &new_config)
     }
 
     /// Returns the last consensus data messengers agreed on
@@ -139,7 +146,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
         &self,
         env: &Env,
         storage: &dyn Storage,
-    ) -> StdResult<Option<OracleData<T>>> {
+    ) -> StdResult<Option<ConsensusOutcome<T>>> {
         let config = self.config.load(storage)?;
 
         let pending_round = self.pending_round.load(storage)?;
@@ -148,17 +155,14 @@ impl<T: ConsensusData<O>, O> State<T, O> {
         if pending_round.is_passed(env, config.round_length) {
             let pending = self.get_all_pending_data(storage)?;
 
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
+            let data: Vec<T> = pending.iter().map(|outcome| outcome.data.clone()).collect();
 
             if let Some(consensus) = ConsensusData::try_consensus(
                 &data,
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                return Ok(Some(OracleData {
+                return Ok(Some(ConsensusOutcome {
                     round: pending_round.round,
                     timestamp: pending_round.start + config.round_length,
                     data: consensus,
@@ -178,7 +182,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
     /// * a messenger tries to publish data for the same round more than once;
     /// * a messenger tries to publish data for the past or future round;
     ///
-    /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
+    /// The method returns `PublishResult::ConsensusReached(ConsensusOutcome<T>)` if the call
     /// and `PublishResult::ConsensusNotReached` in case it did not as the first argument
     /// and the current pending round as the second
     pub fn publish_data(
@@ -197,30 +201,27 @@ impl<T: ConsensusData<O>, O> State<T, O> {
 
         let mut consensus_data = PublishResult::ConsensusNotReached;
 
-        // if pending round is passed:
+        // if the pending round is passed:
         // * process pending data for the passed round
         // * if consensus for the pending data is reached, publish it
         // * clear pending data
         if pending_round.is_passed(env, config.round_length) {
             let pending = self.get_all_pending_data(storage)?;
 
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
+            let data: Vec<T> = pending.iter().map(|outcome| outcome.data.clone()).collect();
 
             if let Some(consensus) = ConsensusData::try_consensus(
                 &data,
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                let oracle_data = OracleData {
+                let outcome = ConsensusOutcome {
                     round: pending_round.round,
                     timestamp: env.block.time.seconds(),
                     data: consensus,
                 };
-                self.last_published_data.save(storage, &oracle_data)?;
-                consensus_data = ConsensusReached(oracle_data);
+                self.last_published_data.save(storage, &outcome)?;
+                consensus_data = ConsensusReached(outcome);
             }
 
             pending_round = Round {
@@ -228,6 +229,13 @@ impl<T: ConsensusData<O>, O> State<T, O> {
                 start: env.block.time.seconds(),
             };
             self.pending_round.save(storage, &pending_round)?;
+
+            // if there is some pending config, we need to write to the main config storage on round switch
+            if let Some(pending_config) = self.pending_config.may_load(storage)? {
+                self.config.save(storage, &pending_config)?;
+                // clear pending config
+                self.pending_config.remove(storage);
+            }
 
             // Reset pending data
             self.pending_data.clear(storage);
@@ -245,7 +253,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
         self.pending_data.save(
             storage,
             messenger.clone(),
-            &OracleData {
+            &ConsensusOutcome {
                 round: pending_round.round,
                 timestamp: env.block.time.seconds(),
                 data: new_data,
@@ -256,23 +264,20 @@ impl<T: ConsensusData<O>, O> State<T, O> {
 
         // Try forming consensus if we have all messengers published their data for the round
         if pending.len() == config.messengers.len() {
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
+            let data: Vec<T> = pending.iter().map(|outcome| outcome.data.clone()).collect();
 
             if let Some(consensus) = ConsensusData::try_consensus(
                 &data,
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                let oracle_data = OracleData {
+                let outcome = ConsensusOutcome {
                     round: pending_round.round,
                     timestamp: env.block.time.seconds(),
                     data: consensus,
                 };
-                self.last_published_data.save(storage, &oracle_data)?;
-                consensus_data = ConsensusReached(oracle_data);
+                self.last_published_data.save(storage, &outcome)?;
+                consensus_data = ConsensusReached(outcome);
             }
 
             self.pending_data.clear(storage);
@@ -284,20 +289,20 @@ impl<T: ConsensusData<O>, O> State<T, O> {
 
 /// Result of the `publish_data` method
 pub enum PublishResult<T> {
-    /// The consensus was reached for the OracleData
-    ConsensusReached(OracleData<T>),
+    /// The consensus was reached for the ConsensusOutcome<T> data
+    ConsensusReached(ConsensusOutcome<T>),
     /// The consensus was not reached
     ConsensusNotReached,
 }
 
-/// Data submitted by a messenger
+/// The outcome of the consensus algorithm for data with type T
 #[cw_serde]
-pub struct OracleData<T> {
-    /// The round number a messenger tries to submit data for
+pub struct ConsensusOutcome<T> {
+    /// The round number when the consensus was reached
     pub round: u64,
-    /// The UNIX timestamp in seconds when the messenger submitted the data
+    /// The UNIX timestamp in seconds when the consensus was reached
     pub timestamp: u64,
-    /// The data submitted by the messenger
+    /// The data submitted by the messengers
     pub data: T,
 }
 

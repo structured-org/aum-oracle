@@ -37,8 +37,8 @@ The primary entry point for messengers to submit their data. This function handl
 *   Attempting to form consensus based on the `threshold` and `data_delta_ppm`.
 *   Updating the `last_published_data` and advancing the `pending_round` when consensus is reached.
 
-### `OracleData`
-A structure that encapsulates the data submitted by an oracle, including the `round` number, `timestamp` of submission, and the `data` itself.
+### `ConsensusOutcome`
+A structure that encapsulates the data submitted by oracles (and for which the consensus was reached), including the `round` number for which the consensus was reached, `timestamp` when the consensus was reached, and the `data` itself.
 
 ### `consensus_on_items`
 A utility function for `SignedDecimal256` values that implements a specific algorithm to find a consensus value. It sorts the submitted data and identifies the largest subset of values that fall within the `data_delta_ppm` range, then calculates the median of that subset.

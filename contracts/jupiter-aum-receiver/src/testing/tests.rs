@@ -77,7 +77,8 @@ fn test_update_config() {
     assert_eq!(config.required_custody_assets, vec!["BTC"]);
     assert_eq!(config.price_data_validity_period, 999);
 
-    let consensus = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+    // Pending config also updated
+    let consensus = CONSENSUS_STATE.pending_config.load(&deps.storage).unwrap();
     assert_eq!(consensus.threshold, 1);
     assert_eq!(consensus.data_delta_ppm, 1234);
     assert_eq!(consensus.round_length, 99);

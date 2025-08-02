@@ -485,7 +485,7 @@
           "description": "The finalized Solana data, if available.",
           "anyOf": [
             {
-              "$ref": "#/definitions/OracleData_for_SolanaData"
+              "$ref": "#/definitions/ConsensusOutcome_for_SolanaData"
             },
             {
               "type": "null"
@@ -495,6 +495,38 @@
       },
       "additionalProperties": false,
       "definitions": {
+        "ConsensusOutcome_for_SolanaData": {
+          "description": "The outcome of the consensus algorithm for data with type T",
+          "type": "object",
+          "required": [
+            "data",
+            "round",
+            "timestamp"
+          ],
+          "properties": {
+            "data": {
+              "description": "The data submitted by the messengers",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SolanaData"
+                }
+              ]
+            },
+            "round": {
+              "description": "The round number when the consensus was reached",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "timestamp": {
+              "description": "The UNIX timestamp in seconds when the consensus was reached",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
         "CustodyAsset": {
           "type": "object",
           "required": [
@@ -529,38 +561,6 @@
             },
             "owned": {
               "description": "Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>",
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          },
-          "additionalProperties": false
-        },
-        "OracleData_for_SolanaData": {
-          "description": "Data submitted by a messenger",
-          "type": "object",
-          "required": [
-            "data",
-            "round",
-            "timestamp"
-          ],
-          "properties": {
-            "data": {
-              "description": "The data submitted by the messenger",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/SolanaData"
-                }
-              ]
-            },
-            "round": {
-              "description": "The round number a messenger tries to submit data for",
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "timestamp": {
-              "description": "The UNIX timestamp in seconds when the messenger submitted the data",
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
