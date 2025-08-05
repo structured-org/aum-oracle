@@ -210,7 +210,7 @@ fn query_aum_single_oracle() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_btc, Uint128::from(1000000u128));
+    assert_eq!(res.aum_in_wbtc, Uint128::from(1000000u128));
 }
 
 #[test]
@@ -230,11 +230,11 @@ fn query_aum_multiple_oracles() {
         } => {
             let res = if contract_addr.as_str() == oracle1.as_str() {
                 GetAumResponse {
-                    aum_in_btc: Uint128::from(1000000u128), // 0.01 BTC
+                    aum_in_wbtc: Uint128::from(1000000u128), // 0.01 BTC
                 }
             } else if contract_addr.as_str() == oracle2.as_str() {
                 GetAumResponse {
-                    aum_in_btc: Uint128::from(2000000u128), // 0.02 BTC
+                    aum_in_wbtc: Uint128::from(2000000u128), // 0.02 BTC
                 }
             } else {
                 unreachable!()
@@ -248,7 +248,7 @@ fn query_aum_multiple_oracles() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_btc, Uint128::from(3000000u128)); // 0.03 BTC total
+    assert_eq!(res.aum_in_wbtc, Uint128::from(3000000u128)); // 0.03 BTC total
 }
 
 #[test]
@@ -1078,12 +1078,12 @@ fn setup_contract_with_supply(
 
 /// Mock oracle response helper
 fn mock_oracle_response(
-    aum_in_btc: u128,
+    aum_in_wbtc: u128,
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
         WasmQuery::Smart { msg: _, .. } => {
             let res = GetAumResponse {
-                aum_in_btc: Uint128::from(aum_in_btc),
+                aum_in_wbtc: Uint128::from(aum_in_wbtc),
             };
             let bin = to_json_binary(&res).unwrap();
             SystemResult::Ok(ContractResult::Ok(bin))

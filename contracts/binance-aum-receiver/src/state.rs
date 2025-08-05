@@ -5,6 +5,13 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, Int256, SignedDecimal256};
 use cw_storage_plus::Item;
 
+
+pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();
+
+pub const AUM_IN_WBTC: Item<AumInWBTC> = Item::new("aum_in_wbtc");
+
 #[cw_serde]
 pub struct Config {
     /// owner of the contract
@@ -192,9 +199,3 @@ pub struct AumInWBTC {
     /// Timestamp when aum was calculated
     pub timestamp: u64,
 }
-
-pub const CONFIG: Item<Config> = Item::new("config");
-
-pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();
-
-pub const AUM_IN_WBTC: Item<AumInWBTC> = Item::new("aum_in_wbtc");

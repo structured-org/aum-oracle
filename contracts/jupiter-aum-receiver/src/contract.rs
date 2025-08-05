@@ -221,7 +221,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> 
     }
 
     Ok(GetAumResponse {
-        aum_in_btc: aum_data.amount,
+        aum_in_wbtc: aum_data.amount,
         decimals: WBTC_DECIMALS,
     })
 }
@@ -276,7 +276,7 @@ fn query_btc_price_in_usd(
 }
 
 /// Computes the AUM in wBTC units using Solana data and BTC/USD price.
-pub fn calculate_aum_in_btc(
+pub fn calculate_aum_in_wbtc(
     data: SolanaData,
     btc_price_in_usd: SignedDecimal256,
 ) -> Result<Int256, ContractError> {
@@ -309,6 +309,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
-    let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
+    let aum_in_btc = calculate_aum_in_wbtc(data, btc_price_in_usd)?;
     Ok(aum_in_btc)
 }

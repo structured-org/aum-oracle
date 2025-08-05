@@ -10,7 +10,7 @@ export async function queryAum(
   client: CosmWasmClient,
 ): Promise<number> {
   const res = await client.queryContractSmart(contract, { get_aum: {} });
-  return +res.aum_in_btc;
+  return +res.aum_in_wbtc;
 }
 
 export async function queryLastPublishedData<T>(

@@ -1,4 +1,4 @@
-use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
+use crate::contract::{calculate_aum_in_wbtc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
 use consensus::error::ConsensusError;
@@ -88,7 +88,7 @@ fn test_update_config() {
 }
 
 #[test]
-fn test_calculate_aum_in_btc() {
+fn test_calculate_aum_in_wbtc() {
     // Test case 1: Standard calculation
     let data1 = SolanaData {
         custody_assets: vec![],
@@ -102,7 +102,7 @@ fn test_calculate_aum_in_btc() {
                                                                             // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
                                                                             // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
                                                                             // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
-    let res1 = calculate_aum_in_btc(data1, btc_price_in_usd1);
+    let res1 = calculate_aum_in_wbtc(data1, btc_price_in_usd1);
     assert_eq!(
         res1.unwrap(),
         Int256::from(20_000_000_000_i128),
@@ -122,7 +122,7 @@ fn test_calculate_aum_in_btc() {
                                                                             // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
                                                                             // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
                                                                             // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
-    let res2 = calculate_aum_in_btc(data2, btc_price_in_usd2);
+    let res2 = calculate_aum_in_wbtc(data2, btc_price_in_usd2);
     assert_eq!(
         res2.unwrap(),
         Int256::from(800_000_000_000_i128),
@@ -139,7 +139,7 @@ fn test_calculate_aum_in_btc() {
         strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd3 = SignedDecimal256::from_str("1.0").unwrap();
-    let err3 = calculate_aum_in_btc(data3, btc_price_in_usd3).unwrap_err();
+    let err3 = calculate_aum_in_wbtc(data3, btc_price_in_usd3).unwrap_err();
     assert!(
         matches!(&err3, ContractError::CheckedDiv(_)),
         "Test Case 3 Failed: {:?}",
@@ -156,7 +156,7 @@ fn test_calculate_aum_in_btc() {
         strategy_jlp_balance_decimals: 6,
     };
     let btc_price_in_usd4 = SignedDecimal256::from_str("0.0").unwrap(); // Zero BTC price
-    let err4 = calculate_aum_in_btc(data4, btc_price_in_usd4).unwrap_err();
+    let err4 = calculate_aum_in_wbtc(data4, btc_price_in_usd4).unwrap_err();
     assert!(
         matches!(&err4, ContractError::CheckedDiv(_)),
         "Test Case 4 Failed: {:?}",
@@ -271,7 +271,10 @@ fn test_query_get_aum_behavior() {
     // jlp_balance_in_usd = 500_000_000 * 10_000 = 5_000_000_000_000
     // aum_in_btc = 5_000_000_000_000 / 25_000 = 200_000_000
     // scaled by 8 decimals (wbtc precision): 200_000_000_000_000_00
-    assert_eq!(parsed.aum_in_btc, Int256::from(20_000_000_000_000_000_i128));
+    assert_eq!(
+        parsed.aum_in_wbtc,
+        Int256::from(20_000_000_000_000_000_i128)
+    );
 }
 
 #[test]

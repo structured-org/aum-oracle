@@ -116,10 +116,10 @@ pub struct GetDataResponse {
 pub struct GetAumResponse {
     /// The latest AUM in Jupiter reported by messengers
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
-    pub aum_in_btc: Int256,
-    /// Represents the number of decimals that the aum_in_btc is
+    pub aum_in_wbtc: Int256,
+    /// Represents the number of decimals that the aum_in_wbtc is
     /// represented in. It is used to scale the aum_in_btc to its base BTC value.
-    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
+    /// E.g. `base_aum_in_wbtc = aum_in_wbtc / 10^decimals`
     pub decimals: u32,
 }
 

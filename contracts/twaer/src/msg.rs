@@ -91,7 +91,7 @@ pub enum QueryMsg {
 pub struct GetAumResponse {
     /// The total BTC AUM reported by oracles.
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
-    pub aum_in_btc: Uint128,
+    pub aum_in_wbtc: Uint128,
 }
 
 #[cw_serde]

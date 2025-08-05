@@ -1588,7 +1588,7 @@ fn test_query_get_aum_basic() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[test]
@@ -1770,7 +1770,7 @@ fn test_query_get_aum_with_negative_equity() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[test]
@@ -2327,7 +2327,7 @@ fn test_query_get_aum_with_large_values() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -2499,7 +2499,7 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 fn mock_price_responses() -> Vec<(String, String, String, cosmwasm_std::Binary)> {

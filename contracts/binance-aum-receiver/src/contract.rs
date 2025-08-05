@@ -196,7 +196,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     }
 
     Ok(GetAumResponse {
-        aum_in_btc: aum_data.amount,
+        aum_in_wbtc: aum_data.amount,
         decimals: WBTC_DECIMALS,
     })
 }
