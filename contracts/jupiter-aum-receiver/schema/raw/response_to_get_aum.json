@@ -9,7 +9,7 @@
   ],
   "properties": {
     "aum_in_btc": {
-      "description": "The latest AUM in Jupiter reported by oracles The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
+      "description": "The latest AUM in Jupiter reported by messengers The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
       "allOf": [
         {
           "$ref": "#/definitions/Int256"

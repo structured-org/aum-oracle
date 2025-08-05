@@ -13,9 +13,6 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Invalid threshold: {threshold} is greater than the number of oracles {oracles}")]
-    InvalidThreshold { threshold: u32, oracles: usize },
-
     #[error("Consensus period should be greater than 0")]
     InvalidConsensusPeriod {},
 

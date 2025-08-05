@@ -73,7 +73,7 @@ pub enum QueryMsg {
     /// Returns error if data is not valid.
     #[returns(GetAumResponse)]
     GetAum {},
-    /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
+    /// GetRoundInfo returns round info that is needed for messengers to know when to publish data
     #[returns(RoundInfoResponse)]
     GetRoundInfo {},
     /// Config returns the current contract configuration.
@@ -114,7 +114,7 @@ pub struct GetDataResponse {
 /// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
 #[cw_serde]
 pub struct GetAumResponse {
-    /// The latest AUM in Jupiter reported by oracles
+    /// The latest AUM in Jupiter reported by messengers
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
     /// Represents the number of decimals that the aum_in_btc is

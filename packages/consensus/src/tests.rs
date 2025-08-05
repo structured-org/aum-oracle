@@ -734,7 +734,7 @@ fn test_state_get_last_published_data() {
     let result = state.get_last_published_data(&env, &deps).unwrap();
     assert!(
         result.is_some(),
-        "Data should be published after all messengers submit"
+        "Data must be published after all messengers submit"
     );
     let data = result.unwrap();
     assert_eq!(data.round, 1, "Published data should be for round 1");

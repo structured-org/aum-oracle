@@ -2,13 +2,12 @@ package jupiter
 
 import (
 	"context"
+	"cosmossdk.io/math"
 	"errors"
 	"fmt"
-	"sync"
-
-	"cosmossdk.io/math"
-	solana "github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
+	"sync"
 )
 
 // JupiterConfig is the configuration for the Jupiter Oracle Messenger.
@@ -97,7 +96,6 @@ func fetchJupiterAumData(
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		supply, err := solanaClient.GetTokenAccountBalance(ctx, jupiterConfig.Token, jupiterConfig.Strategy)
 		if err != nil {
 			errsMu.Lock()

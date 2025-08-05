@@ -71,8 +71,8 @@ NEUTRON_STAKING_REWARDS_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_rewards
 NEUTRON_STAKING_INFO_PROXY_CONTRACT=$CONTRACTS_BINARIES_DIR/neutron_staking_info_proxy.wasm
 
 SLINKY_CONTRACT=$CONTRACTS_BINARIES_DIR/slinky_oracle.wasm
-BINANCE_AUM_RECEIVER_CONTRACT=$CONTRACTS_BINARIES_DIR/binance_aum_receiver_contract.wasm
-JUPITER_AUM_RECEIVER_CONTRACT=$CONTRACTS_BINARIES_DIR/jupiter_aum_receiver_contract.wasm
+BINANCE_AUM_RECEIVER_CONTRACT=$CONTRACTS_BINARIES_DIR/binance_aum_receiver.wasm
+JUPITER_AUM_RECEIVER_CONTRACT=$CONTRACTS_BINARIES_DIR/jupiter_aum_receiver.wasm
 
 # Slinky genesis configs
 USE_CORE_MARKETS=${USE_CORE_MARKETS:-true}
@@ -721,10 +721,10 @@ AUM_MSGR_3_ADDRESS=$($BINARY keys show aum_msgr_3 -a --home "$CHAIN_DIR" --keyri
 SLINKY_INIT_MSG='{}'
 BINANCE_AUM_RECEIVER_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
-  "threshold": 1,
+  "messengers": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
+  "threshold": 2,
   "data_delta_ppm": 10000,
-  "round_length": 5,
+  "round_length": 15,
   "consensus_data_valid_period": 60,
   "price_data_valid_period": 100,
   "required_binance_positions": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
@@ -733,10 +733,10 @@ BINANCE_AUM_RECEIVER_INIT_MSG='{
 }'
 JUPITER_AUM_RECEIVER_INIT_MSG='{
   "owner": "'"$ADMIN_ADDRESS"'",
-  "oracles": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
-  "threshold": 1,
+  "messengers": ["'"$AUM_MSGR_1_ADDRESS"'", "'"$AUM_MSGR_2_ADDRESS"'", "'"$AUM_MSGR_3_ADDRESS"'"],
+  "threshold": 2,
   "data_delta_ppm": 10000,
-  "round_length": 5,
+  "round_length": 15,
   "consensus_data_validity_period": 60,
   "required_custody_assets": ["SOL", "USDC", "USDT", "WBTC", "WETH"],
   "price_data_validity_period": 100

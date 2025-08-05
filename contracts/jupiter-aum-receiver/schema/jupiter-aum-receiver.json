@@ -337,7 +337,7 @@
         "additionalProperties": false
       },
       {
-        "description": "GetRoundInfo returns round info that is needed for oracles to know when to publish data",
+        "description": "GetRoundInfo returns round info that is needed for messengers to know when to publish data",
         "type": "object",
         "required": [
           "get_round_info"
@@ -380,7 +380,7 @@
       ],
       "properties": {
         "aum_in_btc": {
-          "description": "The latest AUM in Jupiter reported by oracles The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
+          "description": "The latest AUM in Jupiter reported by messengers The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
           "allOf": [
             {
               "$ref": "#/definitions/Int256"
