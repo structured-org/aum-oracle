@@ -261,12 +261,12 @@ fn record_er_at(
     }
 
     twa_aggr.window_end = new_timestamp;
-    if twa_aggr.total_duration > 0 {
-        twa_aggr.current_twa = twa_aggr
+    twa_aggr.current_twa = if twa_aggr.total_duration > 0 {
+        twa_aggr
             .weighted_sum
-            .checked_div(Decimal::from_ratio(twa_aggr.total_duration, 1u64))?;
+            .checked_div(Decimal::from_ratio(twa_aggr.total_duration, 1u64))?
     } else {
-        twa_aggr.current_twa = new_rate;
+       new_rate
     }
 
     let oldest_timestamp = ER_HISTORY
