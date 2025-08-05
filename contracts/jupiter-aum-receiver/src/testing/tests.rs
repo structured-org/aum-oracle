@@ -34,7 +34,6 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
 #[test]
 fn test_update_config() {
     let mut deps = mock_dependencies();
-
     let env = mock_env();
     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let msg = default_init_msg(&deps.api);
@@ -170,54 +169,21 @@ fn test_query_get_aum_behavior() {
     let mut deps = mock_dependencies();
     let mut env = mock_env();
 
-    let api = deps.api;
-    let owner_info = message_info(&api.addr_make("owner"), &[]);
-    let messenger1 = api.addr_make("messenger1");
-    let messenger2 = api.addr_make("messenger2");
-    let messenger3 = api.addr_make("messenger3");
-
-    let mut msg = default_init_msg(&api);
-    msg.consensus_data_valid_period = 1_000;
-    msg.price_data_valid_period = 100;
-
-    instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
-
-    deps.querier
-        .with_price_and_height("10000", env.block.height);
-
     // 1. error: no data published yet
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
+    let init_msg = default_init_msg(&deps.api);
+    instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(res, Err(ContractError::NoDataPublished {})));
 
-    // publish valid data
-    let data = dummy_solana_data();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger1, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger2, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger3, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
+    let current_height = env.block.height;
+    let (deps, exec_res) = publish_till_consensus(
+        mock_dependencies(),
+        &mut env,
+        "10000".to_string(),
+        current_height,
+    );
+    assert!(exec_res.is_ok());
 
     // 2. error: data published, but too old (time-based expiration)
     env.block.time = env.block.time.plus_seconds(10_000);
@@ -335,50 +301,16 @@ fn test_query_round_info() {
 
 #[test]
 fn test_query_get_aum_data_stale() {
-    let mut deps = mock_dependencies();
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
-
-    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
-    let messenger1 = deps.api.addr_make("messenger1");
-    let messenger2 = deps.api.addr_make("messenger2");
-    let messenger3 = deps.api.addr_make("messenger3");
-    let init_msg = default_init_msg(&deps.api);
-
-    instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
-
-    deps.querier
-        .with_price_and_height("10000", env.block.height);
-
-    let data = dummy_solana_data();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger1, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger2, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
-    execute(
-        deps.as_mut(),
-        env.clone(),
-        message_info(&messenger3, &[]),
-        ExecuteMsg::PublishData {
-            new_data: data.clone(),
-        },
-    )
-    .unwrap();
+    let (deps, exec_res) = publish_till_consensus(
+        mock_dependencies(),
+        &mut env,
+        "10000".to_string(),
+        start_time,
+    );
+    assert!(exec_res.is_ok());
 
     env.block.time = env.block.time.plus_seconds(10_000);
     let res = query(deps.as_ref(), env, QueryMsg::GetAum {});

@@ -5,7 +5,6 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, Int256, SignedDecimal256};
 use cw_storage_plus::Item;
 
-
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();

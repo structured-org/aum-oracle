@@ -376,11 +376,11 @@
       "title": "GetAumResponse",
       "type": "object",
       "required": [
-        "aum_in_btc",
+        "aum_in_wbtc",
         "decimals"
       ],
       "properties": {
-        "aum_in_btc": {
+        "aum_in_wbtc": {
           "description": "The latest AUM in Binance reported by messengers",
           "allOf": [
             {
