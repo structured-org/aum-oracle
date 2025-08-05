@@ -1,0 +1,10 @@
+aum_messenger/config.yaml
+aum_messenger/aum-messenger
+
+.idea
+
+artifacts
+target
+
+.DS_Store
+target/
