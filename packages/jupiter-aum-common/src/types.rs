@@ -134,11 +134,6 @@ impl ConsensusData<Config> for SolanaData {
         // check and assign custody assets properties
         let mut consensus_custody_assets = Vec::new();
         for (i, _) in data[0].custody_assets.iter().enumerate() {
-            let decimals_items = data
-                .iter()
-                .map(|d| d.custody_assets[i].decimals)
-                .collect::<Vec<u8>>();
-
             let guaranteed_usd_items = data
                 .iter()
                 .map(|d| d.custody_assets[i].guaranteed_usd)
@@ -161,16 +156,16 @@ impl ConsensusData<Config> for SolanaData {
             let consensus_owned = consensus_on_items_u64(&owned_items, threshold, delta_ppm)?;
             let consensus_locked = consensus_on_items_u64(&locked_items, threshold, delta_ppm)?;
             // because of the work we did to filter out non-majority over each custody asset, we can just take the first one
-            let consensus_decimals = decimals_items.first()?;
+            let consensus_decimals = data.first()?.custody_assets[i].decimals;
             // because we have a cleanup of custody assets to ensure their exact denoms, we are sure the data is already same and filtered
             // so no need for filtering, only sanity check
-            let consensus_denom = denom_items.first()?;
+            let consensus_denom = data.first()?.custody_assets[i].denom.to_string();
 
             consensus_custody_assets.push(CustodyAsset {
                 owned: consensus_owned,
                 locked: consensus_locked,
                 guaranteed_usd: consensus_guaranteed_usd,
-                decimals: *consensus_decimals,
+                decimals: consensus_decimals,
                 denom: consensus_denom.to_string(),
             });
         }
