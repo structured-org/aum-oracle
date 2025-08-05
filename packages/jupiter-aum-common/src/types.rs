@@ -146,10 +146,6 @@ impl ConsensusData<Config> for SolanaData {
                 .iter()
                 .map(|d| d.custody_assets[i].locked)
                 .collect::<Vec<u64>>();
-            let denom_items = data
-                .iter()
-                .map(|d| d.custody_assets[i].denom.clone())
-                .collect::<Vec<String>>();
 
             let consensus_guaranteed_usd =
                 consensus_on_items_u64(&guaranteed_usd_items, threshold, delta_ppm)?;
