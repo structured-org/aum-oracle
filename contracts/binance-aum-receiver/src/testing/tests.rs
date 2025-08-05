@@ -2265,7 +2265,7 @@ fn test_query_get_aum_with_large_values() {
         positions: vec![Position {
             symbol: "BTCUSDT".to_string(),
             amount: SignedDecimal256::from_str("1.5").unwrap(),
-            pnl: SignedDecimal256::from_str("10000.0").unwrap(), // Negative PnL
+            pnl: SignedDecimal256::from_str("10000.0").unwrap(),
         }],
         um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![

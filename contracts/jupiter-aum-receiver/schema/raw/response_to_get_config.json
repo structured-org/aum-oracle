@@ -4,17 +4,17 @@
   "description": "ConfigResponse contains the current contract configuration.",
   "type": "object",
   "required": [
-    "consensus_data_validity_period",
+    "consensus_data_valid_period",
     "data_delta_ppm",
     "messengers",
     "owner",
-    "price_data_validity_period",
+    "price_data_valid_period",
     "required_custody_assets",
     "round_length",
     "threshold"
   ],
   "properties": {
-    "consensus_data_validity_period": {
+    "consensus_data_valid_period": {
       "description": "The current valid period in seconds.",
       "type": "integer",
       "format": "uint64",
@@ -37,7 +37,7 @@
       "description": "The current owner address.",
       "type": "string"
     },
-    "price_data_validity_period": {
+    "price_data_valid_period": {
       "description": "How many blocks we consider the last price from oracle as valid",
       "type": "integer",
       "format": "uint64",
