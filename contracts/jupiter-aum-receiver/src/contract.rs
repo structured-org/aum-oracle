@@ -1,4 +1,4 @@
-use crate::state::{CONFIG, CONSENSUS_STATE};
+use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
@@ -150,7 +150,9 @@ fn execute_publish_data(
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
     match result {
-        PublishResult::ConsensusReached(_) => {
+        PublishResult::ConsensusReached(outcome) => {
+            let aum_in_btc = calculate_aum(deps.as_ref(), env, outcome.data)?;
+            AUM_IN_WBTC.save(deps.storage, &aum_in_btc)?;
             res = res.add_attribute("consensus_reached", "true");
         }
         PublishResult::ConsensusNotReached => {
@@ -205,20 +207,17 @@ fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError
 /// Calculates and returns the current AUM value in wBTC.
 fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let published_state = CONSENSUS_STATE
-        .get_last_published_data(&env, deps.storage)?
-        .ok_or(ContractError::NoDataPublished {})?;
-
-    if env.block.time.seconds() > published_state.timestamp + config.consensus_data_validity_period
-    {
-        return Err(ContractError::PublishedDataTooOld {});
+    let published_data = CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?;
+    if let Some(outcome) = published_data {
+        if env.block.time.seconds() > outcome.timestamp + config.consensus_data_validity_period {
+            return Err(ContractError::PublishedDataTooOld {});
+        }
+    } else {
+        return Err(ContractError::NoDataPublished {});
     }
 
-    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
-    let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
-
     Ok(GetAumResponse {
-        aum_in_btc,
+        aum_in_btc: AUM_IN_WBTC.load(deps.storage)?,
         decimals: WBTC_DECIMALS,
     })
 }
@@ -300,4 +299,12 @@ pub fn calculate_aum_in_btc(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
+}
+
+/// Calculates and returns the current AUM value in wBTC.
+fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
+    let aum_in_btc = calculate_aum_in_btc(data, btc_price_in_usd)?;
+    Ok(aum_in_btc)
 }

@@ -65,12 +65,13 @@ pub struct State<T: ConsensusData<O>, O> {
     pub config: Item<Config>,
     /// the pending configuration for the next round that will be applied on round switch
     pub pending_config: Item<Config>,
-    /// the pending data for the current round
-    pub pending_data: Map<Addr, ConsensusOutcome<T>>,
     /// the last published data messengers agreed on
     pub last_published_data: Item<ConsensusOutcome<T>>,
+    /// the pending data for the current round
+    pending_data: Map<Addr, ConsensusOutcome<T>>,
     /// necessary to allow trait constraint
-    pub phantom_data: Option<PhantomData<O>>,
+    #[allow(dead_code)]
+    phantom_data: Option<PhantomData<O>>,
 }
 
 const PENDING_ROUND_KEY: &str = "consensus__pending_round";

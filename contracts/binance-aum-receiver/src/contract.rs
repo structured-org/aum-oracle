@@ -3,12 +3,12 @@ use crate::msg::{
     ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, QueryMsg,
     RoundInfoResponse, UpdateConfig,
 };
-use crate::state::{BinanceData, Config, CONFIG, CONSENSUS_STATE};
+use crate::state::{BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
-    Response, SignedDecimal256, StdError, StdResult,
+    Response, SignedDecimal256, StdResult,
 };
 
 const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
@@ -83,8 +83,10 @@ fn execute_publish_data(
     let mut res = Response::new();
 
     // If we have newly published data for the current round, consensus was reached
-    if let PublishResult::ConsensusReached(data) = result {
-        res = res.add_attribute("consensus_reached", data.round.to_string());
+    if let PublishResult::ConsensusReached(outcome) = result {
+        let aum_in_btc = calculate_aum(deps.as_ref(), outcome.data)?;
+        AUM_IN_WBTC.save(deps.storage, &aum_in_btc)?;
+        res = res.add_attribute("consensus_reached", outcome.round.to_string());
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
@@ -180,16 +182,25 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
 
 pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let last_published_data = CONSENSUS_STATE
-        .get_last_published_data(&env, deps.storage)?
-        .ok_or_else(|| StdError::generic_err("No published data"))?;
-    if last_published_data.timestamp + config.consensus_data_valid_period < env.block.time.seconds()
-    {
-        return Err(ContractError::PublishedDataTooOld {});
+    let published_data = CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?;
+    if let Some(outcome) = published_data {
+        if env.block.time.seconds() > outcome.timestamp + config.consensus_data_valid_period {
+            return Err(ContractError::PublishedDataTooOld {});
+        }
+    } else {
+        return Err(ContractError::NoDataPublished {});
     }
 
-    let spot_total_balance_btc = last_published_data
-        .data
+    Ok(GetAumResponse {
+        aum_in_btc: AUM_IN_WBTC.load(deps.storage)?,
+        decimals: WBTC_DECIMALS,
+    })
+}
+
+pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {
+    let config = CONFIG.load(deps.storage)?;
+
+    let spot_total_balance_btc = data
         .spot_balances
         .iter()
         .map(|sb| {
@@ -213,8 +224,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     )?
     .price_0_to_1;
 
-    let aum_in_btc = (last_published_data.data.pm_account_actual_equity / btc_price_in_usd)
-        + spot_total_balance_btc;
+    let aum_in_btc = (data.pm_account_actual_equity / btc_price_in_usd) + spot_total_balance_btc;
 
     // here we convert the AUM in BTC to WBTC (uwBTC specifically)
     // since WBTC has 8 decimals, we need to adjust the decimal places accordingly
@@ -224,8 +234,5 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let aum_in_wbtc = aum_in_btc.atomics()
         / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
 
-    Ok(GetAumResponse {
-        aum_in_btc: aum_in_wbtc,
-        decimals: WBTC_DECIMALS,
-    })
+    Ok(aum_in_wbtc)
 }

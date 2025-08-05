@@ -2,7 +2,7 @@ use crate::error::ContractResult;
 use consensus::consensus::{consensus_on_field, consensus_on_items_dec256, ConsensusData, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Deps, SignedDecimal256};
+use cosmwasm_std::{Addr, Deps, Int256, SignedDecimal256};
 use cw_storage_plus::Item;
 
 #[cw_serde]
@@ -188,3 +188,5 @@ impl Config {
 pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();
+
+pub const AUM_IN_WBTC: Item<Int256> = Item::new("aum_in_wbtc");

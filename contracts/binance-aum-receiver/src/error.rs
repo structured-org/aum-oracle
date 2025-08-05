@@ -24,6 +24,9 @@ pub enum ContractError {
     #[error("Published data is too old")]
     PublishedDataTooOld {},
 
+    #[error("No data published")]
+    NoDataPublished {},
+
     #[error("Msg sender must be the contract owner")]
     Unauthorized,
 

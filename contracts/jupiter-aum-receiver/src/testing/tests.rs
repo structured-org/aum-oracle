@@ -1,9 +1,11 @@
 use crate::contract::{calculate_aum_in_btc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
-use crate::testing::mock_querier::mock_dependencies;
+use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
 use consensus::error::ConsensusError;
-use cosmwasm_std::testing::{message_info, mock_env, MockApi};
-use cosmwasm_std::{from_json, Int256, SignedDecimal256, Timestamp, Uint128};
+use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockStorage};
+use cosmwasm_std::{
+    from_json, Env, Int256, OwnedDeps, Response, SignedDecimal256, Timestamp, Uint128,
+};
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
@@ -214,31 +216,39 @@ fn test_query_get_aum_behavior() {
     env.block.height = 200;
 
     // 3. error: no BTC price returned from oracle
-    deps.querier.with_price_and_height("", 200); // empty string will trigger missing
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
+    let mut env = mock_env();
+    let (_, exec_res) = publish_till_consensus(mock_dependencies(), &mut env, "".to_string(), 200);
     assert!(matches!(
-        res,
+        exec_res,
         Err(ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ })
     ));
 
     // 4. error: BTC price is malformed
-    deps.querier.with_price_and_height("not_a_number", 200);
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
+    let (_, exec_res) = publish_till_consensus(
+        mock_dependencies(),
+        &mut env,
+        "not_a_number".to_string(),
+        200,
+    );
+    // let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
-        res,
+        exec_res,
         Err(ContractError::SlinkyBTCPriceIncorrect { .. })
     ));
 
     // 5. error: BTC price is too old (block_height + max_blocks_old < env.height)
-    deps.querier.with_price_and_height("25000", 50); // env.height is 200
-    let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
+    let (_, exec_res) =
+        publish_till_consensus(mock_dependencies(), &mut env, "25000".to_string(), 50);
+    // let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
-        res,
+        exec_res,
         Err(ContractError::SlinkyBTCPriceTooOld { .. })
     ));
 
     // 6. success: valid price and block height
-    deps.querier.with_price_and_height("25000", 150); // still fresh: 150 + 100 > 200
+    let (deps, exec_res) =
+        publish_till_consensus(mock_dependencies(), &mut env, "25000".to_string(), 150);
+    assert!(exec_res.is_ok());
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     let bin = res.unwrap();
     let parsed: msg::GetAumResponse = from_json(bin).unwrap();
@@ -361,4 +371,62 @@ fn dummy_solana_data() -> SolanaData {
         total_jlp_supply_decimals: 6,
         strategy_jlp_balance_decimals: 6,
     }
+}
+
+fn publish_till_consensus(
+    mut deps: OwnedDeps<MockStorage, MockApi, WasmMockQuerier>,
+    env: &mut Env,
+    price: String,
+    height: u64,
+) -> (
+    OwnedDeps<MockStorage, MockApi, WasmMockQuerier>,
+    Result<Response, ContractError>,
+) {
+    let api = deps.api;
+    let owner_info = message_info(&api.addr_make("owner"), &[]);
+    let messenger1 = api.addr_make("messenger1");
+    let messenger2 = api.addr_make("messenger2");
+    let messenger3 = api.addr_make("messenger3");
+
+    env.block.height = 200;
+    env.block.time = Timestamp::from_seconds(1000);
+
+    let mut msg = default_init_msg(&api);
+    msg.consensus_data_validity_period = 1_000;
+    msg.price_data_validity_period = 100;
+
+    instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
+
+    deps.querier.with_price_and_height(price, height);
+
+    let data = dummy_solana_data();
+    env.block.time = env.block.time.plus_seconds(101); // next round
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&messenger1, &[]),
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&messenger2, &[]),
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
+    )
+    .unwrap();
+    let res = execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&messenger3, &[]),
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
+    );
+
+    (deps, res)
 }
