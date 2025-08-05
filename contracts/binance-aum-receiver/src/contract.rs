@@ -3,7 +3,7 @@ use crate::msg::{
     ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, QueryMsg,
     RoundInfoResponse, UpdateConfig,
 };
-use crate::state::{BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
+use crate::state::{AumInWBTC, BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
@@ -84,8 +84,14 @@ fn execute_publish_data(
 
     // If we have newly published data for the current round, consensus was reached
     if let PublishResult::ConsensusReached(outcome) = result {
-        let aum_in_btc = calculate_aum(deps.as_ref(), outcome.data)?;
-        AUM_IN_WBTC.save(deps.storage, &aum_in_btc)?;
+        let aum_amount = calculate_aum(deps.as_ref(), outcome.data)?;
+        AUM_IN_WBTC.save(
+            deps.storage,
+            &AumInWBTC {
+                amount: aum_amount,
+                timestamp: outcome.timestamp,
+            },
+        )?;
         res = res.add_attribute("consensus_reached", outcome.round.to_string());
     }
 
@@ -182,17 +188,15 @@ fn query_get_data(deps: Deps, env: Env) -> ContractResult<GetDataResponse> {
 
 pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let published_data = CONSENSUS_STATE.get_last_published_data(&env, deps.storage)?;
-    if let Some(outcome) = published_data {
-        if env.block.time.seconds() > outcome.timestamp + config.consensus_data_valid_period {
-            return Err(ContractError::PublishedDataTooOld {});
-        }
-    } else {
-        return Err(ContractError::NoDataPublished {});
+    let aum_data: AumInWBTC = AUM_IN_WBTC
+        .may_load(deps.storage)?
+        .ok_or(ContractError::NoDataPublished {})?;
+    if env.block.time.seconds() > aum_data.timestamp + config.consensus_data_valid_period {
+        return Err(ContractError::PublishedDataTooOld {});
     }
 
     Ok(GetAumResponse {
-        aum_in_btc: AUM_IN_WBTC.load(deps.storage)?,
+        aum_in_btc: aum_data.amount,
         decimals: WBTC_DECIMALS,
     })
 }

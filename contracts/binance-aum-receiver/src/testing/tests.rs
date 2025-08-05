@@ -1,12 +1,12 @@
 use crate::contract::*;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
-use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS_STATE};
+use crate::state::{
+    AumInWBTC, BinanceData, Config, Position, SpotBalance, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE,
+};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
-use consensus::consensus::{
-    Config as ConsensusConfig, ConsensusData, ConsensusOutcome, Round, State,
-};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusData, Round, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
@@ -1628,24 +1628,15 @@ fn test_query_get_aum_with_expired_data() {
 
     // Set up consensus state data with an old timestamp
     let current_time = 1700000000;
-    let binance_data = BinanceData {
-        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
-        positions: vec![],
-        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
-        spot_balances: vec![],
-        pm_account_actual_equity: SignedDecimal256::from_str("80000.0").unwrap(),
-        withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
-    };
 
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: 0,
-        data: binance_data,
-    };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
+    AUM_IN_WBTC
+        .save(
+            deps.as_mut().storage,
+            &AumInWBTC {
+                amount: Int256::from(1000),
+                timestamp: 0,
+            },
+        )
         .unwrap();
 
     // Create an environment with a timestamp that's beyond the valid period
@@ -1738,7 +1729,6 @@ fn test_query_get_aum_with_negative_equity() {
 
     let current_time = 1700000000;
 
-    // Create an environment with a timestamp that's within the valid period
     // Create an environment with a timestamp that's within the valid period
     let mut env = mock_env();
     env.block.time = Timestamp::from_seconds(current_time);

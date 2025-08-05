@@ -7,7 +7,7 @@ use cosmwasm_std::Int256;
 pub struct InstantiateMsg {
     /// Owner of the contract
     pub owner: String,
-    /// A list of messengers allowed to publish data
+    /// A list of messengers allowed publishing data
     pub messengers: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,

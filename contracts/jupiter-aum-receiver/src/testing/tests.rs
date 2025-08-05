@@ -25,9 +25,9 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         threshold: 2,
         data_delta_ppm: 1000,
         round_length: 100,
-        consensus_data_validity_period: 1_000,
+        consensus_data_valid_period: 1_000,
         required_custody_assets: vec!["USDC".to_string()],
-        price_data_validity_period: 100,
+        price_data_valid_period: 100,
     }
 }
 
@@ -45,9 +45,9 @@ fn test_update_config() {
 
     let update = msg::UpdateConfig {
         owner: Some(deps.api.addr_make("owner2").to_string()),
-        consensus_data_validity_period: Some(50_000),
+        consensus_data_valid_period: Some(50_000),
         required_custody_assets: Some(vec!["BTC".to_string()]),
-        price_data_validity_period: Some(999),
+        price_data_valid_period: Some(999),
         messengers: Some(vec![deps.api.addr_make("messenger1").to_string()]),
         threshold: Some(1),
         data_delta_ppm: Some(1234),
@@ -75,9 +75,9 @@ fn test_update_config() {
     // Assert config updated
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(config.owner, deps.api.addr_make("owner2"));
-    assert_eq!(config.consensus_data_validity_period, 50_000);
+    assert_eq!(config.consensus_data_valid_period, 50_000);
     assert_eq!(config.required_custody_assets, vec!["BTC"]);
-    assert_eq!(config.price_data_validity_period, 999);
+    assert_eq!(config.price_data_valid_period, 999);
 
     // Pending config also updated
     let consensus = CONSENSUS_STATE.pending_config.load(&deps.storage).unwrap();
@@ -174,12 +174,16 @@ fn test_query_get_aum_behavior() {
     let owner_info = message_info(&api.addr_make("owner"), &[]);
     let messenger1 = api.addr_make("messenger1");
     let messenger2 = api.addr_make("messenger2");
+    let messenger3 = api.addr_make("messenger3");
 
     let mut msg = default_init_msg(&api);
-    msg.consensus_data_validity_period = 1_000;
-    msg.price_data_validity_period = 100;
+    msg.consensus_data_valid_period = 1_000;
+    msg.price_data_valid_period = 100;
 
     instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
+
+    deps.querier
+        .with_price_and_height("10000", env.block.height);
 
     // 1. error: no data published yet
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
@@ -200,6 +204,15 @@ fn test_query_get_aum_behavior() {
         deps.as_mut(),
         env.clone(),
         message_info(&messenger2, &[]),
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&messenger3, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },
@@ -327,9 +340,13 @@ fn test_query_get_aum_data_stale() {
     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let messenger1 = deps.api.addr_make("messenger1");
     let messenger2 = deps.api.addr_make("messenger2");
+    let messenger3 = deps.api.addr_make("messenger3");
     let init_msg = default_init_msg(&deps.api);
 
     instantiate(deps.as_mut(), env.clone(), owner_info, init_msg).unwrap();
+
+    deps.querier
+        .with_price_and_height("10000", env.block.height);
 
     let data = dummy_solana_data();
     execute(
@@ -345,6 +362,15 @@ fn test_query_get_aum_data_stale() {
         deps.as_mut(),
         env.clone(),
         message_info(&messenger2, &[]),
+        ExecuteMsg::PublishData {
+            new_data: data.clone(),
+        },
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info(&messenger3, &[]),
         ExecuteMsg::PublishData {
             new_data: data.clone(),
         },
@@ -392,8 +418,8 @@ fn publish_till_consensus(
     env.block.time = Timestamp::from_seconds(1000);
 
     let mut msg = default_init_msg(&api);
-    msg.consensus_data_validity_period = 1_000;
-    msg.price_data_validity_period = 100;
+    msg.consensus_data_valid_period = 1_000;
+    msg.price_data_valid_period = 100;
 
     instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
 
