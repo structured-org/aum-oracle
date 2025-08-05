@@ -1,17 +1,21 @@
 use crate::consensus::PublishResult::ConsensusReached;
 use crate::error::{ConsensusError, ConsensusResult};
-use cosmwasm_std::{Addr, Decimal, Decimal256, Env, SignedDecimal256, StdResult, Storage, Uint128};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{
+    Addr, Decimal, Decimal256, Env, Order, SignedDecimal256, StdResult, Storage, Uint128,
+};
 use cw_storage_plus::{Item, Map};
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use std::marker::PhantomData;
+use std::ops::{Add, Div, Sub};
 
 /// Describes the configuration of consensus
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct Config {
-    /// a list of oracles that can submit data for consensus
-    pub oracles: Vec<Addr>,
-    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    /// a list of messengers that can submit data for consensus
+    pub messengers: Vec<Addr>,
+    /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
@@ -20,7 +24,7 @@ pub struct Config {
 }
 
 /// Describes the round entity
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy)]
+#[cw_serde]
 pub struct Round {
     /// a number of the round
     pub round: u64,
@@ -34,23 +38,6 @@ impl Round {
         self.start + round_length <= env.block.time.seconds()
     }
 
-    /// how many rounds passed since the round started?
-    pub fn rounds_passed(&self, env: &Env, round_length: u64) -> u64 {
-        (env.block.time.seconds() - self.start) / round_length
-    }
-
-    /// Returns a new round after the current one based on two inputs:
-    /// `round_length` - length of one round in seconds
-    /// `rounds` - how many rounds to add to the current one
-    /// The new round has the `start_time` equals to `self.start + rounds * round_length`
-    /// and the `round` equals to `self.round + rounds`
-    pub fn add_rounds(&self, round_length: u64, rounds: u64) -> Round {
-        Round {
-            round: self.round + rounds,
-            start: self.start + rounds * round_length,
-        }
-    }
-
     /// Returns a new round after the current one based on one input:
     /// `round_length` - length of one round in seconds
     pub fn next_round(&self, round_length: u64) -> Round {
@@ -61,31 +48,38 @@ impl Round {
     }
 }
 
-/// Describes a data you want to get a consensus for.
+/// Describes the data you want to get a consensus for.
 /// The structure must be Clonable, Serialized and Deserialized to store it in the CosmWasm storage.
-pub trait ConsensusData: Serialize + DeserializeOwned + Clone {
+pub trait ConsensusData<O>: Serialize + DeserializeOwned + Clone {
+    /// The method sorts and cleans incoming data, and checks for all required fields present.
+    fn prepublish_cleanup(&mut self, options: O) -> Result<(), ConsensusError>;
     /// The method tries to form a single value from a slice of [ConsensusData] values based on `threshold` and `delta_ppm` from the Config.
     fn try_consensus(data: &[Self], threshold: usize, delta_ppm: u64) -> Option<Self>;
 }
 
 /// State of the consensus
-pub struct State<T: ConsensusData> {
+pub struct State<T: ConsensusData<O>, O> {
     /// the current pending round we are waiting data for
     pub pending_round: Item<Round>,
     /// the configuration of the consensus
     pub config: Item<Config>,
+    /// the pending configuration for the next round that will be applied on round switch
+    pub pending_config: Item<Config>,
     /// the pending data for the current round
-    pub pending_data: Map<Addr, OracleData<T>>,
-    /// the last published data oracles agreed on
-    pub last_published_data: Item<OracleData<T>>,
+    pub pending_data: Map<Addr, T>,
+    /// the last published data messengers agreed on
+    pub last_published_data: Item<ConsensusOutcome<T>>,
+    /// necessary to allow trait constraint
+    pub phantom_data: Option<PhantomData<O>>,
 }
 
 const PENDING_ROUND_KEY: &str = "consensus__pending_round";
 const CONFIG_KEY: &str = "consensus__config";
 const PENDING_DATA_KEY: &str = "consensus__pending_data";
 const LAST_PUBLISHED_DATA_KEY: &str = "consensus__last_published_data";
+const PENDING_CONFIG_KEY: &str = "consensus__pending_config";
 
-impl<T: ConsensusData> State<T> {
+impl<T: ConsensusData<O>, O> State<T, O> {
     /// State constructor
     pub const fn default() -> Self {
         State {
@@ -93,6 +87,8 @@ impl<T: ConsensusData> State<T> {
             pending_data: Map::new(PENDING_DATA_KEY),
             last_published_data: Item::new(LAST_PUBLISHED_DATA_KEY),
             config: Item::new(CONFIG_KEY),
+            pending_config: Item::new(PENDING_CONFIG_KEY),
+            phantom_data: None,
         }
     }
 
@@ -117,16 +113,16 @@ impl<T: ConsensusData> State<T> {
         Ok(())
     }
 
-    /// Returns all pending data
-    fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<OracleData<T>>> {
-        let oracles = self.config.load(storage)?.oracles;
-
-        let mut v = Vec::new();
-        for addr in oracles {
-            if let Some(d) = self.pending_data.may_load(storage, addr)? {
-                v.push(d);
-            }
+    /// Returns all pending data as a Vec<T>
+    fn get_all_pending_data(&self, storage: &dyn Storage) -> StdResult<Vec<T>> {
+        let mut v: Vec<T> = Vec::new();
+        for data in self
+            .pending_data
+            .range(storage, None, None, Order::Ascending)
+        {
+            v.push(data?.1);
         }
+
         Ok(v)
     }
 
@@ -135,19 +131,22 @@ impl<T: ConsensusData> State<T> {
         self.pending_round.load(storage)
     }
 
-    /// Updates the consensus configuration
-    pub fn update_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
-        self.config.save(storage, &new_config)
+    /// Saves the new consensus configuration
+    /// New configuration will be applied only on **the next round**
+    /// This mechanism guarantees all messengers use the same config and no consensus changes
+    /// can happen in the middle of a round unexpectedly
+    pub fn save_config(&self, storage: &mut dyn Storage, new_config: Config) -> StdResult<()> {
+        self.pending_config.save(storage, &new_config)
     }
 
-    /// Returns the last current data oracles agreed on
+    /// Returns the last consensus data messengers agreed on
     /// If the pending round is passed, returns the consensus data for the current pending round
     /// Otherwise, returns the last published data from the storage
     pub fn get_last_published_data(
         &self,
         env: &Env,
         storage: &dyn Storage,
-    ) -> StdResult<Option<OracleData<T>>> {
+    ) -> StdResult<Option<ConsensusOutcome<T>>> {
         let config = self.config.load(storage)?;
 
         let pending_round = self.pending_round.load(storage)?;
@@ -156,17 +155,12 @@ impl<T: ConsensusData> State<T> {
         if pending_round.is_passed(env, config.round_length) {
             let pending = self.get_all_pending_data(storage)?;
 
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
-
             if let Some(consensus) = ConsensusData::try_consensus(
-                &data,
+                &pending,
                 config.threshold as usize,
                 config.data_delta_ppm,
             ) {
-                return Ok(Some(OracleData {
+                return Ok(Some(ConsensusOutcome {
                     round: pending_round.round,
                     timestamp: pending_round.start + config.round_length,
                     data: consensus,
@@ -180,206 +174,189 @@ impl<T: ConsensusData> State<T> {
 
     /// Publishes data for consensus.
     /// * If the pending round is passed, try to form a consensus for the current pending data and move to the next round;
-    /// * If all oracles have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
+    /// * If all messengers have submitted but the current round is not passed yet, try to form the consensus but not increase the round.
     ///
     /// An error is returned in the following cases:
-    /// * an oracle tries to publish data for the same round more than ones;
-    /// * an oracle tries to publish data for the past or future round;
+    /// * a messenger tries to publish data for the same round more than once;
+    /// * a messenger tries to publish data for the past or future round;
     ///
-    /// The method returns `PublishResult::ConsensusReached(OracleData<T>)` if the call
+    /// The method returns `PublishResult::ConsensusReached(ConsensusOutcome<T>)` if the call
     /// and `PublishResult::ConsensusNotReached` in case it did not as the first argument
     /// and the current pending round as the second
     pub fn publish_data(
         &self,
         storage: &mut dyn Storage,
         env: &Env,
-        oracle: Addr,
-        new_data: T,
+        messenger: Addr,
+        mut new_data: T,
+        options: O,
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
         let config = self.config.load(storage)?;
 
-        let mut consensus_data = PublishResult::ConsensusNotReached;
+        ConsensusData::prepublish_cleanup(&mut new_data, options)?;
 
-        // if pending round is passed:
+        let mut pub_res = PublishResult::ConsensusNotReached;
+
+        // if the pending round is passed:
         // * process pending data for the passed round
-        // * if consensus for the pending data is reached, publish it
-        // * clear pending data
+        // * move to the next round
+        // * update config (optional)
         if pending_round.is_passed(env, config.round_length) {
-            let pending = self.get_all_pending_data(storage)?;
+            let pending_data = self.get_all_pending_data(storage)?;
+            pub_res = self.finalize_round_data(
+                pending_data,
+                pending_round.clone(),
+                config.clone(),
+                env,
+                storage,
+            )?;
 
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
-
-            if let Some(consensus) = ConsensusData::try_consensus(
-                &data,
-                config.threshold as usize,
-                config.data_delta_ppm,
-            ) {
-                let oracle_data = OracleData {
-                    round: pending_round.round,
-                    timestamp: env.block.time.seconds(),
-                    data: consensus,
-                };
-                self.last_published_data.save(storage, &oracle_data)?;
-                consensus_data = ConsensusReached(oracle_data);
-            }
-
-            pending_round = pending_round.add_rounds(
-                config.round_length,
-                pending_round.rounds_passed(env, config.round_length),
-            );
+            pending_round = Round {
+                round: pending_round.round + 1,
+                start: env.block.time.seconds(),
+            };
             self.pending_round.save(storage, &pending_round)?;
 
-            // Reset pending data
-            self.pending_data.clear(storage);
+            // if there is some pending config, we need to write to the main config storage on round switch
+            if let Some(pending_config) = self.pending_config.may_load(storage)? {
+                self.config.save(storage, &pending_config)?;
+                // clear pending config
+                self.pending_config.remove(storage);
+            }
         }
 
-        // Check if oracle has already submitted data for this round
+        // Check if messenger has already submitted data for this round
         if self
             .pending_data
-            .may_load(storage, oracle.clone())?
+            .may_load(storage, messenger.clone())?
             .is_some()
         {
             return Err(ConsensusError::DoubleSubmission {});
         }
 
-        self.pending_data.save(
-            storage,
-            oracle.clone(),
-            &OracleData {
-                round: pending_round.round,
-                timestamp: env.block.time.seconds(),
-                data: new_data,
-            },
-        )?;
+        self.pending_data
+            .save(storage, messenger.clone(), &new_data)?;
 
-        // Check if round is complete: either all oracles or round time expired
-        let pending = self.get_all_pending_data(storage)?;
+        let pending_data = self.get_all_pending_data(storage)?;
 
-        // Try forming consensus, because we have all oracles published their data for a round
-        if pending.len() == config.oracles.len() {
-            let data: Vec<T> = pending
-                .iter()
-                .map(|oracle_data| oracle_data.data.clone())
-                .collect();
-
-            if let Some(consensus) = ConsensusData::try_consensus(
-                &data,
-                config.threshold as usize,
-                config.data_delta_ppm,
-            ) {
-                let oracle_data = OracleData {
-                    round: pending_round.round,
-                    timestamp: env.block.time.seconds(),
-                    data: consensus,
-                };
-                self.last_published_data.save(storage, &oracle_data)?;
-                consensus_data = ConsensusReached(oracle_data);
-            }
-
-            self.pending_data.clear(storage);
+        // Try forming consensus if we have all messengers published their data for the round
+        if pending_data.len() == config.messengers.len() {
+            pub_res = self.finalize_round_data(
+                pending_data,
+                pending_round.clone(),
+                config,
+                env,
+                storage,
+            )?;
         }
 
-        Ok((consensus_data, pending_round))
+        Ok((pub_res, pending_round))
+    }
+
+    /// Tries to form a consensus for the pending data and publishes it if consensus is reached.
+    /// Regardless of whether consensus is reached or not, the pending data is cleared.
+    fn finalize_round_data(
+        &self,
+        pending_data: Vec<T>,
+        round: Round,
+        config: Config,
+        env: &Env,
+        storage: &mut dyn Storage,
+    ) -> ConsensusResult<PublishResult<T>> {
+        let mut res = PublishResult::ConsensusNotReached;
+
+        if let Some(consensus) = ConsensusData::try_consensus(
+            &pending_data,
+            config.threshold as usize,
+            config.data_delta_ppm,
+        ) {
+            let oracle_data = ConsensusOutcome {
+                round: round.round,
+                timestamp: env.block.time.seconds(),
+                data: consensus,
+            };
+            self.last_published_data.save(storage, &oracle_data)?;
+            res = ConsensusReached(oracle_data);
+        }
+
+        self.pending_data.clear(storage);
+
+        Ok(res)
     }
 }
 
 /// Result of the `publish_data` method
 pub enum PublishResult<T> {
-    /// The consensus was reached, the first element is the data
-    ConsensusReached(OracleData<T>),
+    /// The consensus was reached for the ConsensusOutcome<T> data
+    ConsensusReached(ConsensusOutcome<T>),
     /// The consensus was not reached
     ConsensusNotReached,
 }
 
-/// Data submitted by an oracle
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct OracleData<T> {
-    /// The round number an oracle tries to submit data for
+/// The outcome of the consensus algorithm for data with type T
+#[cw_serde]
+pub struct ConsensusOutcome<T> {
+    /// The round number when the consensus was reached
     pub round: u64,
-    /// The UNIX timestamp in seconds when the oracle submitted the data
+    /// The UNIX timestamp in seconds when the consensus was reached
     pub timestamp: u64,
-    /// The data submitted by the oracle
+    /// The data submitted by the messengers
     pub data: T,
 }
 
+// Single field consensus
+pub fn consensus_on_field<F, T, O>(
+    data: &[T],
+    extract: F,
+    threshold: usize,
+    delta_ppm: u64,
+) -> Option<SignedDecimal256>
+where
+    F: Fn(&T) -> SignedDecimal256,
+    T: ConsensusData<O>,
+{
+    let items: Vec<SignedDecimal256> = data.iter().map(&extract).collect();
+    consensus_on_items_dec256(&items, threshold, delta_ppm)
+}
+
 /// A helper function that calculates consensus for a given array of SignedDecimal256s
-// TODO: make it generic (not critical for now, but it would be nice to have)
-pub fn consensus_on_items(
+pub fn consensus_on_items_dec256(
     items: &[SignedDecimal256],
     threshold: usize,
     delta_ppm: u64,
 ) -> Option<SignedDecimal256> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
     let ppm = Decimal256::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            if high.abs_diff(low)
-                <= low
-                    .abs_diff(SignedDecimal256::zero())
-                    .max(high.abs_diff(SignedDecimal256::zero()))
-                    * ppm
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median(slice))
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            // |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000)
+            let diff = high.abs_diff(low);
+            let max_dispersion = low
+                .abs_diff(SignedDecimal256::zero())
+                .max(high.abs_diff(SignedDecimal256::zero()))
+                * ppm;
+            Some(diff <= max_dispersion)
+        },
+        SignedDecimal256::from_atomics(2, 0).ok()?,
+    )
 }
 
 pub fn consensus_on_items_u64(items: &[u64], threshold: usize, delta_ppm: u64) -> Option<u64> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
-    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            let low_high_abs_diff = low.abs_diff(0).max(high.abs_diff(0));
-            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-            if Uint128::new(high.abs_diff(low) as u128)
-                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median_u64(slice))
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = Uint128::new(high.abs_diff(low) as u128);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        2u64,
+    )
 }
 
 pub fn consensus_on_items_uint128(
@@ -387,43 +364,22 @@ pub fn consensus_on_items_uint128(
     threshold: usize,
     delta_ppm: u64,
 ) -> Option<Uint128> {
-    if items.len() < threshold {
-        return None;
-    }
-    let mut sorted = items.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Find largest sublice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
-    // let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-    let mut max_len = 0;
-    let mut best_slice = (0, 0);
-    for i in 0..sorted.len() {
-        for j in (i + threshold)..=sorted.len() {
-            let low = sorted[i];
-            let high = sorted[j - 1];
-
-            // if |high - low| <= (max(|low|, |high|) * data_delta_ppm / 1_000_000) && j - i > max_len
-            let low_high_abs_diff = low
-                .abs_diff(Uint128::zero())
-                .max(high.abs_diff(Uint128::zero()));
-            let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
-            if high.abs_diff(low)
-                <= (Decimal::from_atomics(low_high_abs_diff, 0).ok()? * ppm).to_uint_floor()
-                && j - i > max_len
-            {
-                max_len = j - i;
-                best_slice = (i, j);
-            }
-        }
-    }
-    if max_len < threshold {
-        return None;
-    }
-    let slice = &sorted[best_slice.0..best_slice.1];
-    Some(median_u128(slice))
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = high.abs_diff(low);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        Uint128::new(2),
+    )
 }
 
 // Utility function that returns item only if all items are the same
-pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
+pub fn all_items_equal<T: Eq + Clone>(items: &[T]) -> Option<T> {
     let item = items.first()?;
 
     for a in items.iter() {
@@ -435,39 +391,59 @@ pub fn exact_consensus_on_items<T: Eq + Clone>(items: &[T]) -> Option<T> {
     Some(item.clone())
 }
 
+pub fn consensus_on_items<T, F>(
+    items: &[T],
+    threshold: usize,
+    inside_ppm_bounds: F,
+    two: T, // 2 in T type
+) -> Option<T>
+where
+    T: Eq + PartialOrd + Copy + Clone + Add<Output = T> + Sub<Output = T> + Div<Output = T>,
+    F: Fn(T, T) -> Option<bool>,
+{
+    if items.len() < threshold {
+        return None;
+    }
+    let mut sorted = items.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // Find largest subslice [i..j] such that sorted[j-1] - sorted[i] <= sorted[j-1] * data_delta_ppm / 1_000_000
+    let mut max_len = 0;
+    let mut best_slice = (0, 0);
+    'outer: for i in 0..sorted.len() {
+        // iterate in reverse, so we could find the largest faster
+        for j in ((i + threshold)..=sorted.len()).rev() {
+            let low = sorted[i];
+            let high = sorted[j - 1];
+
+            if inside_ppm_bounds(high, low)? && j - i > max_len {
+                max_len = j - i;
+                best_slice = (i, j);
+                // we found the largest slice, we can exit
+                break 'outer;
+            }
+        }
+    }
+    if max_len < threshold {
+        return None;
+    }
+    let slice = &sorted[best_slice.0..best_slice.1];
+    median(slice, two)
+}
+
 /// Utility function that calculates the median value of a slice of SignedDecimals
-fn median(slice: &[SignedDecimal256]) -> SignedDecimal256 {
+pub fn median<T>(slice: &[T], two: T) -> Option<T>
+where
+    T: Copy + Clone + Add<Output = T> + Sub<Output = T> + Div<Output = T>,
+{
     let n = slice.len();
     if n == 0 {
-        return SignedDecimal256::zero();
+        return None;
     }
-    if n % 2 == 1 {
+    let res = if n % 2 == 1 {
         slice[n / 2]
     } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / SignedDecimal256::from_ratio(2, 1)
-    }
-}
+        (slice[n / 2 - 1] + slice[n / 2]) / two
+    };
 
-fn median_u64(slice: &[u64]) -> u64 {
-    let n = slice.len();
-    if n == 0 {
-        return 0;
-    }
-    if n % 2 == 1 {
-        slice[n / 2]
-    } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / 2
-    }
-}
-
-fn median_u128(slice: &[Uint128]) -> Uint128 {
-    let n = slice.len();
-    if n == 0 {
-        return Uint128::zero();
-    }
-    if n % 2 == 1 {
-        slice[n / 2]
-    } else {
-        (slice[n / 2 - 1] + slice[n / 2]) / Uint128::new(2)
-    }
+    Some(res)
 }

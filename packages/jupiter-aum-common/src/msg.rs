@@ -1,16 +1,15 @@
 use crate::types::SolanaData;
-use consensus::consensus::{OracleData, Round};
+use consensus::consensus::{ConsensusOutcome, Round};
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Int256};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 /// InstantiateMsg defines the message used to initialize the contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     /// The address that will be the contract's owner.
     pub owner: String,
-    /// Initial list of oracle addresses.
-    pub oracles: Vec<String>,
+    /// Initial list of messenger addresses.
+    pub messengers: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,
     /// Delta in percent per million (ppm), for which two values are considered equal
@@ -26,18 +25,17 @@ pub struct InstantiateMsg {
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
     /// Only callable by the owner. All fields are optional, allowing partial updates.
     UpdateConfig { new_config: UpdateConfig },
-    /// PublishData allows a registered oracle to submit new Solana data.
+    /// PublishData allows a registered messenger to submit new Solana data.
     /// This message triggers the consensus check and updates `last_published_data` if consensus is reached.
     PublishData { new_data: SolanaData },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct UpdateConfig {
     /// Contract config updates.
     ///
@@ -52,8 +50,8 @@ pub struct UpdateConfig {
 
     /// Consensus configuration updates
     ///
-    /// New list of oracles.
-    pub oracles: Option<Vec<String>>,
+    /// New list of messengers.
+    pub messengers: Option<Vec<String>>,
     /// New threshold needed for consensus.
     pub threshold: Option<u32>,
     /// New delta in percent per million (ppm), for which two values are considered equal.
@@ -63,25 +61,30 @@ pub struct UpdateConfig {
 }
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[allow(clippy::enum_variant_names)]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// Config returns the current contract configuration.
-    Config {},
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
+    #[returns(GetDataResponse)]
     GetData {},
     /// GetAum calculates and returns the current Jupiter AUM value represented in BTC.
-    /// Returned value is a decimal integer with precision of `DECIMAL_PRECISION`
+    /// Returned value is a decimal integer with precision of `WBTC_DECIMALS`
     /// Returns error if data is not valid.
+    #[returns(GetAumResponse)]
     GetAum {},
     /// GetRoundInfo returns round info that is needed for oracles to know when to publish data
+    #[returns(RoundInfoResponse)]
     GetRoundInfo {},
+    /// Config returns the current contract configuration.
+    #[returns(ConfigResponse)]
+    GetConfig {},
 }
 
 // --- Query Responses ---
 
 /// ConfigResponse contains the current contract configuration.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct ConfigResponse {
     /// The current owner address.
     pub owner: String,
@@ -91,9 +94,9 @@ pub struct ConfigResponse {
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
     pub price_data_validity_period: u64,
-    /// a list of oracles that can submit data for consensus
-    pub oracles: Vec<Addr>,
-    /// threshold of the consensus (how many oracles must submit data for consensus to be reached)
+    /// a list of messengers that can submit data for consensus
+    pub messengers: Vec<Addr>,
+    /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
     pub threshold: u32,
     /// delta in percent per million (ppm), for which two values are considered equal
     pub data_delta_ppm: u64,
@@ -102,21 +105,25 @@ pub struct ConfigResponse {
 }
 
 /// GetDataResponse contains the last successfully published Solana data.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct GetDataResponse {
     /// The finalized Solana data, if available.
-    pub last_published_data: Option<OracleData<SolanaData>>,
+    pub last_published_data: Option<ConsensusOutcome<SolanaData>>,
 }
 
-// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
+#[cw_serde]
 pub struct GetAumResponse {
-    /// The latest AUM in Binance reported by oracles
+    /// The latest AUM in Jupiter reported by oracles
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
     pub aum_in_btc: Int256,
+    /// Represents the number of decimals that the aum_in_btc is
+    /// represented in. It is used to scale the aum_in_btc to its base BTC value.
+    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
+    pub decimals: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct RoundInfoResponse {
     /// Current round.
     pub pending_round: Round,
@@ -125,5 +132,5 @@ pub struct RoundInfoResponse {
 }
 
 /// MigrateMsg is used for contract migration.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}

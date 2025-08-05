@@ -1,10 +1,5 @@
 [workspace]
-members = [
-    "contracts/binance-aum",
-    "contracts/jupiter-aum",
-    "contracts/twaer",
-    "packages/*",
-]
+members = ["contracts/*", "packages/*"]
 
 [profile.release]
 codegen-units = 1

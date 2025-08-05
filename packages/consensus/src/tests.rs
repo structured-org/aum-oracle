@@ -1,12 +1,12 @@
 use crate::consensus::{
-    consensus_on_items, exact_consensus_on_items, Config, ConsensusData, Round, State,
+    all_items_equal, consensus_on_items_dec256, Config, ConsensusData, Round, State,
 };
 use crate::error::ConsensusError;
 use cosmwasm_std::testing::mock_env;
 use cosmwasm_std::{Addr, SignedDecimal256, Timestamp};
 use serde::{Deserialize, Serialize};
 
-// Mock data structure for testing OracleData<T>
+// Mock data structure for testing data publishing and consensus calculations
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct MockData {
     pub value1: SignedDecimal256,
@@ -15,7 +15,12 @@ struct MockData {
     pub value4: SignedDecimal256,
 }
 
-impl ConsensusData for MockData {
+struct MockConfig {}
+
+impl ConsensusData<MockConfig> for MockData {
+    fn prepublish_cleanup(&mut self, _: MockConfig) -> Result<(), ConsensusError> {
+        Ok(())
+    }
     // Consensus function for MockData
     fn try_consensus(data: &[MockData], threshold: usize, delta_ppm: u64) -> Option<MockData> {
         if data.len() < threshold {
@@ -23,22 +28,22 @@ impl ConsensusData for MockData {
         }
 
         // Try to reach consensus on each field
-        let value1 = consensus_on_items(
+        let value1 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value1).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value2 = consensus_on_items(
+        let value2 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value2).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value3 = consensus_on_items(
+        let value3 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value3).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
         );
-        let value4 = consensus_on_items(
+        let value4 = consensus_on_items_dec256(
             &data.iter().map(|d| d.value4).collect::<Vec<_>>(),
             threshold,
             delta_ppm,
@@ -61,10 +66,10 @@ impl ConsensusData for MockData {
 // Helper function to create a test config
 fn create_test_config() -> Config {
     Config {
-        oracles: vec![
-            Addr::unchecked("oracle1"),
-            Addr::unchecked("oracle2"),
-            Addr::unchecked("oracle3"),
+        messengers: vec![
+            Addr::unchecked("messenger1"),
+            Addr::unchecked("messenger2"),
+            Addr::unchecked("messenger3"),
         ],
         threshold: 2,
         data_delta_ppm: 10000, // 1%
@@ -85,6 +90,10 @@ fn create_test_data(
         value3,
         value4,
     }
+}
+
+fn create_mock_config() -> MockConfig {
+    MockConfig {}
 }
 
 #[test]
@@ -174,7 +183,7 @@ fn test_try_consensus() {
         .is_none());
     }
 
-    // Test 5: Consensus with more than threshold oracles
+    // Test 5: Consensus with more than threshold messengers
     {
         let config = create_test_config();
         let data_multiple = vec![
@@ -283,44 +292,6 @@ fn test_round_operations() {
     assert!(
         round.is_passed(&env, round_length),
         "Round should be passed after end time"
-    );
-
-    // Test Round::rounds_passed
-    env.block.time = Timestamp::from_seconds(start_time);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed at start time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length - 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        0,
-        "No rounds should have passed just before end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + round_length);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        1,
-        "One round should have passed at end time"
-    );
-
-    env.block.time = Timestamp::from_seconds(start_time + 3 * round_length + 1);
-    assert_eq!(
-        round.rounds_passed(&env, round_length),
-        3,
-        "Three rounds should have passed"
-    );
-
-    // Test Round::add_rounds
-    let new_round = round.add_rounds(round_length, 2);
-    assert_eq!(new_round.round, 3, "Round number should be increased by 2");
-    assert_eq!(
-        new_round.start,
-        start_time + 2 * round_length,
-        "Start time should be increased by 2 round lengths"
     );
 
     // Test Round::next_round
@@ -457,7 +428,7 @@ fn test_consensus_on_items() {
     for tc in test_cases {
         println!("Running test case: {}", tc.name);
         assert_eq!(
-            consensus_on_items(&tc.items, tc.threshold, tc.delta),
+            consensus_on_items_dec256(&tc.items, tc.threshold, tc.delta),
             tc.expected,
         )
     }
@@ -469,7 +440,7 @@ fn setup_test_state(
     config: &Config,
     round: u64,
     start_time: u64,
-) -> State<MockData> {
+) -> State<MockData, MockConfig> {
     let state = State::default();
     state.config.save(deps, config).unwrap();
     state
@@ -509,45 +480,69 @@ fn test_state_publish_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
 
-    // Test 1: Oracle publishes data
-    let oracle1 = Addr::unchecked("oracle1");
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
-    assert!(result.is_ok(), "Oracle should be able to publish data");
+    // Test 1: Messenger publishes data
+    let messenger1 = Addr::unchecked("messenger1");
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
+    assert!(result.is_ok(), "Messenger should be able to publish data");
 
-    // Test 2: Oracle tries to publish data again for the same round (should fail)
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data.clone());
+    // Test 2: Messenger tries to publish data again for the same round (should fail)
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger1.clone(),
+        test_data.clone(),
+        create_mock_config(),
+    );
     assert!(
         result.is_err(),
-        "Oracle should not be able to publish data twice for the same round"
+        "Messenger should not be able to publish data twice for the same round"
     );
     assert_eq!(result.err().unwrap(), ConsensusError::DoubleSubmission {});
 
-    // Test 3: Another oracle publishes data
-    let oracle2 = Addr::unchecked("oracle2");
+    // Test 3: Another messenger publishes data
+    let messenger2 = Addr::unchecked("messenger2");
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
         SignedDecimal256::from_ratio(2010, 1),
         SignedDecimal256::from_ratio(505, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle2.clone(), test_data2);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger2.clone(),
+        test_data2,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
-        "Second oracle should be able to publish data"
+        "Second messenger should be able to publish data"
     );
 
-    // Test 4: Third oracle publishes data (all oracles have now published)
-    let oracle3 = Addr::unchecked("oracle3");
+    // Test 4: Third messenger publishes data (all messengers have now published)
+    let messenger3 = Addr::unchecked("messenger3");
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
         SignedDecimal256::from_ratio(2005, 1),
         SignedDecimal256::from_ratio(503, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle3.clone(), test_data3);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger3.clone(),
+        test_data3,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
-        "Third oracle should be able to publish data"
+        "Third messenger should be able to publish data"
     );
 
     // Test 5: Verify consensus was reached and data was published
@@ -599,18 +594,24 @@ fn test_state_round_advancement() {
     // Test 1: Advance time to trigger round change
     env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
 
-    // Oracle publishes data for the new round
-    let oracle1 = Addr::unchecked("oracle1");
+    // Messenger publishes data for the new round
+    let messenger1 = Addr::unchecked("messenger1");
     let test_data = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
         SignedDecimal256::from_ratio(2000, 1),
         SignedDecimal256::from_ratio(500, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger1.clone(),
+        test_data,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
-        "Oracle should be able to publish data for the new round"
+        "Messenger should be able to publish data for the new round"
     );
 
     // Verify round has advanced
@@ -618,35 +619,41 @@ fn test_state_round_advancement() {
     assert_eq!(pending_round.round, 2, "Round should have advanced");
     assert_eq!(
         pending_round.start,
-        start_time + config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 
     // Test 2: Advance time by multiple rounds
     env.block.time = Timestamp::from_seconds(start_time + 3 * config.round_length + 1);
 
-    // Oracle publishes data for the new round
+    // Messenger publishes data for the new round
     let test_data_multi = create_test_data(
         SignedDecimal256::from_ratio(51, 100),
         SignedDecimal256::from_ratio(1010, 1),
         SignedDecimal256::from_ratio(2020, 1),
         SignedDecimal256::from_ratio(510, 1),
     );
-    let result = state.publish_data(&mut deps, &env, oracle1.clone(), test_data_multi);
+    let result = state.publish_data(
+        &mut deps,
+        &env,
+        messenger1.clone(),
+        test_data_multi,
+        create_mock_config(),
+    );
     assert!(
         result.is_ok(),
-        "Oracle should be able to publish data after multiple round advances"
+        "Messenger should be able to publish data after multiple round advances"
     );
 
-    // Verify round has advanced by multiple steps
+    // Verify round has advanced by one step, but the start time of the round has advanced by multiple steps
     let pending_round = state.pending_round.load(&deps).unwrap();
     assert_eq!(
-        pending_round.round, 4,
+        pending_round.round, 3,
         "Round should have advanced by multiple steps"
     );
     assert_eq!(
         pending_round.start,
-        start_time + 3 * config.round_length,
+        env.block.time.seconds(),
         "Round start time should be updated"
     );
 }
@@ -671,8 +678,8 @@ fn test_state_get_last_published_data() {
     let result = state.get_last_published_data(&env, &deps).unwrap();
     assert!(result.is_none(), "No data should be published initially");
 
-    // Test 2: Publish data from all oracles
-    let oracle1 = Addr::unchecked("oracle1");
+    // Test 2: Publish data from all messengers
+    let messenger1 = Addr::unchecked("messenger1");
     let test_data1 = create_test_data(
         SignedDecimal256::from_ratio(5, 10),
         SignedDecimal256::from_ratio(1000, 1),
@@ -680,10 +687,16 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(500, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data1)
+        .publish_data(
+            &mut deps,
+            &env,
+            messenger1.clone(),
+            test_data1,
+            create_mock_config(),
+        )
         .unwrap();
 
-    let oracle2 = Addr::unchecked("oracle2");
+    let messenger2 = Addr::unchecked("messenger2");
     let test_data2 = create_test_data(
         SignedDecimal256::from_ratio(505, 1000),
         SignedDecimal256::from_ratio(1005, 1),
@@ -691,10 +704,16 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(505, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data2)
+        .publish_data(
+            &mut deps,
+            &env,
+            messenger2.clone(),
+            test_data2,
+            create_mock_config(),
+        )
         .unwrap();
 
-    let oracle3 = Addr::unchecked("oracle3");
+    let messenger3 = Addr::unchecked("messenger3");
     let test_data3 = create_test_data(
         SignedDecimal256::from_ratio(503, 1000),
         SignedDecimal256::from_ratio(1003, 1),
@@ -702,14 +721,20 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(503, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle3.clone(), test_data3)
+        .publish_data(
+            &mut deps,
+            &env,
+            messenger3.clone(),
+            test_data3,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify data is published
     let result = state.get_last_published_data(&env, &deps).unwrap();
     assert!(
         result.is_some(),
-        "Data should be published after all oracles submit"
+        "Data should be published after all messengers submit"
     );
     let data = result.unwrap();
     assert_eq!(data.round, 1, "Published data should be for round 1");
@@ -722,7 +747,7 @@ fn test_state_get_last_published_data() {
     // Test 3: Advance time to next round but don't publish enough data
     env.block.time = Timestamp::from_seconds(start_time + config.round_length + 1);
 
-    // Only one oracle publishes data (below threshold)
+    // Only one messenger publishes data (below the threshold)
     let test_data4 = create_test_data(
         SignedDecimal256::from_ratio(52, 100),
         SignedDecimal256::from_ratio(1020, 1),
@@ -730,7 +755,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(520, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle1.clone(), test_data4)
+        .publish_data(
+            &mut deps,
+            &env,
+            messenger1.clone(),
+            test_data4,
+            create_mock_config(),
+        )
         .unwrap();
 
     // Verify we still get the last published data from round 1
@@ -747,7 +778,13 @@ fn test_state_get_last_published_data() {
         SignedDecimal256::from_ratio(525, 1),
     );
     state
-        .publish_data(&mut deps, &env, oracle2.clone(), test_data5)
+        .publish_data(
+            &mut deps,
+            &env,
+            messenger2.clone(),
+            test_data5,
+            create_mock_config(),
+        )
         .unwrap();
 
     // But verify we still get the last published data from round 1 because round is not passed yet
@@ -778,7 +815,7 @@ fn test_state_init() {
     let env = mock_env();
 
     // Create a new state
-    let state = State::<MockData>::default();
+    let state = State::<MockData, MockConfig>::default();
 
     // Initialize the state
     let config = create_test_config();
@@ -807,37 +844,37 @@ fn test_exact_consensus_on_items_various_cases() {
     // empty input
     {
         let items: Vec<u64> = vec![];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // single item
     {
         let items = vec![42];
-        assert_eq!(exact_consensus_on_items(&items), Some(42));
+        assert_eq!(all_items_equal(&items), Some(42));
     }
 
     // all equal
     {
         let items = vec![7, 7, 7, 7];
-        assert_eq!(exact_consensus_on_items(&items), Some(7));
+        assert_eq!(all_items_equal(&items), Some(7));
     }
 
     // one different
     {
         let items = vec![1, 1, 2, 1];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // all equal strings
     {
         let items = vec!["a", "a", "a"];
-        assert_eq!(exact_consensus_on_items(&items), Some("a"));
+        assert_eq!(all_items_equal(&items), Some("a"));
     }
 
     // different strings
     {
         let items = vec!["a", "b", "a"];
-        assert_eq!(exact_consensus_on_items(&items), None);
+        assert_eq!(all_items_equal(&items), None);
     }
 
     // custom struct
@@ -845,6 +882,6 @@ fn test_exact_consensus_on_items_various_cases() {
         #[derive(Clone, Eq, PartialEq, Debug)]
         struct Foo(u8);
         let items = vec![Foo(1), Foo(1), Foo(1)];
-        assert_eq!(exact_consensus_on_items(&items), Some(Foo(1)));
+        assert_eq!(all_items_equal(&items), Some(Foo(1)));
     }
 }
