@@ -6,6 +6,7 @@
   "scripts": {
     "test": "vitest --run",
     "test:mock_controller": "vitest --run mock_controller.test.ts",
+    "test:consensus": "vitest --run consensus.test.ts --bail=1",
     "debug": "vitest --inspect-brk --bail 1 --threads false --run core.test.ts",
     "watch": "vitest",
     "build-neutron-image": "./dockerfiles/neutron/build.sh",

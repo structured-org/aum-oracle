@@ -67,7 +67,7 @@ fn execute_publish_data(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    mut new_data: BinanceData,
+    new_data: BinanceData,
 ) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
@@ -77,14 +77,8 @@ fn execute_publish_data(
         return Err(ContractError::Unauthorized {});
     }
 
-    // clean and validate published data
-    new_data.clean_and_validate(
-        contract_config.required_binance_positions,
-        contract_config.required_binance_spot_assets,
-    )?;
-
     let (result, pending_round) =
-        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data)?;
+        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
     let mut res = Response::new();
 
@@ -154,11 +148,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetData {} => Ok(to_json_binary(&query_get_data(deps, env)?)?),
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
-        QueryMsg::GetConfig {} => Ok(to_json_binary(&query_configs(deps, env)?)?),
+        QueryMsg::GetConfig {} => Ok(to_json_binary(&query_config(deps, env)?)?),
     }
 }
 
-fn query_configs(deps: Deps, _env: Env) -> StdResult<GetConfigResponse> {
+fn query_config(deps: Deps, _env: Env) -> StdResult<GetConfigResponse> {
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     let contract_config = CONFIG.load(deps.storage)?;
 

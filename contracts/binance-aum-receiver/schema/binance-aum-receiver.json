@@ -446,7 +446,7 @@
           ],
           "properties": {
             "data_delta_ppm": {
-              "description": "delta in percent per million (ppm) for which two values are considered equal",
+              "description": "delta in percent per million (ppm), for which two values are considered equal",
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0

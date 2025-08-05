@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
@@ -16,6 +17,7 @@ type MockBinanceClient struct {
 	pmAccountInfo    *binanceportfolio.Account
 	pmAccountBalance []*binanceportfolio.Balance
 	spotAccountInfo  *binance.Account
+	timeoutEnabled   bool
 }
 
 func NewMockBinanceClient() *MockBinanceClient {
@@ -65,14 +67,26 @@ func (m *MockBinanceClient) loadDefaultData() {
 	}
 }
 
-func (m *MockBinanceClient) GetUmPositions(_ context.Context) ([]*binanceportfolio.UMPosition, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	cp := make([]*binanceportfolio.UMPosition, len(m.umPositions))
-	for i, position := range m.umPositions {
-		positionCp := *position
-		cp[i] = &positionCp
+func (m *MockBinanceClient) GetUmPositions(ctx context.Context) ([]*binanceportfolio.UMPosition, error) {
+	var cp []*binanceportfolio.UMPosition
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+
+		cp = make([]*binanceportfolio.UMPosition, len(m.umPositions))
+		for i, position := range m.umPositions {
+			positionCp := *position
+			cp[i] = &positionCp
+		}
+	}()
+
+	if m.timeoutEnabled {
+		// Then simulate latency without holding the lock
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
+			return nil, err
+		}
 	}
+
 	return cp, nil
 }
 
@@ -82,10 +96,18 @@ func (m *MockBinanceClient) SetUmPositions(positions []*binanceportfolio.UMPosit
 	m.umPositions = positions
 }
 
-func (m *MockBinanceClient) GetPMAccountInfo(_ context.Context) (*binanceportfolio.Account, error) {
+func (m *MockBinanceClient) GetPMAccountInfo(ctx context.Context) (*binanceportfolio.Account, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 	cp := *m.pmAccountInfo
+	m.mu.RUnlock()
+
+	if m.timeoutEnabled {
+		// Then simulate latency without holding the lock
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
+			return nil, err
+		}
+	}
+
 	return &cp, nil
 }
 
@@ -95,14 +117,25 @@ func (m *MockBinanceClient) SetPMAccountInfo(account *binanceportfolio.Account) 
 	m.pmAccountInfo = account
 }
 
-func (m *MockBinanceClient) GetPMAccountBalance(_ context.Context) ([]*binanceportfolio.Balance, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	cp := make([]*binanceportfolio.Balance, len(m.pmAccountBalance))
-	for i, balance := range m.pmAccountBalance {
-		balanceCp := *balance
-		cp[i] = &balanceCp
+func (m *MockBinanceClient) GetPMAccountBalance(ctx context.Context) ([]*binanceportfolio.Balance, error) {
+	var cp []*binanceportfolio.Balance
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		cp = make([]*binanceportfolio.Balance, len(m.pmAccountBalance))
+		for i, balance := range m.pmAccountBalance {
+			balanceCp := *balance
+			cp[i] = &balanceCp
+		}
+	}()
+
+	if m.timeoutEnabled {
+		// Then simulate latency without holding the lock
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
+			return nil, err
+		}
 	}
+
 	return cp, nil
 }
 
@@ -112,15 +145,35 @@ func (m *MockBinanceClient) SetPMAccountBalance(balances []*binanceportfolio.Bal
 	m.pmAccountBalance = balances
 }
 
-func (m *MockBinanceClient) GetSpotAccountInfo(_ context.Context) (*binance.Account, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	cp := *m.spotAccountInfo
-	return &cp, nil
+func (m *MockBinanceClient) GetSpotAccountInfo(ctx context.Context) (*binance.Account, error) {
+	var cp *binance.Account
+	func() {
+		// Acquire and copy under lock immediately
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		cp = m.spotAccountInfo
+	}()
+
+	if m.timeoutEnabled {
+		// Then simulate latency without holding the lock
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
+			return nil, err
+		}
+	}
+
+	return cp, nil
 }
 
 func (m *MockBinanceClient) SetSpotAccountInfo(account *binance.Account) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.spotAccountInfo = account
+}
+
+func (m *MockBinanceClient) EnableTimeout() {
+	m.timeoutEnabled = true
+}
+
+func (m *MockBinanceClient) DisableTimeout() {
+	m.timeoutEnabled = false
 }

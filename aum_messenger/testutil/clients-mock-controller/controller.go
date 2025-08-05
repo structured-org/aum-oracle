@@ -1,11 +1,13 @@
 package clients_mock_controller
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
@@ -52,6 +54,11 @@ func (cm *ClientsMockController) Start(port int) error {
 	http.HandleFunc("/mock/binance/pmaccountinfo", cm.handleBinancePMAccountInfo)
 	http.HandleFunc("/mock/binance/pmaccountbalance", cm.handleBinancePMAccountBalance)
 	http.HandleFunc("/mock/binance/spotaccountinfo", cm.handleBinanceSpotAccountInfo)
+
+	http.HandleFunc("/mock/binance/enabletimeout", cm.handleBinanceEnableTimeout)
+	http.HandleFunc("/mock/binance/disabletimeout", cm.handleBinanceDisableTimeout)
+	http.HandleFunc("/mock/solana/enabletimeout", cm.handleSolanaEnableTimeout)
+	http.HandleFunc("/mock/solana/disabletimeout", cm.handleSolanaDisableTimeout)
 
 	http.HandleFunc("/mock/jupiter/custodyinfo", cm.handleJupiterCustodyInfo)
 	http.HandleFunc("/mock/jupiter/poolinfo", cm.handleJupiterPoolInfo)
@@ -274,5 +281,50 @@ func (cm *ClientsMockController) handleSolanaTokenAccountBalance(w http.Response
 		json.NewEncoder(w).Encode(tokenAccountBalance)
 	default:
 		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (cm *ClientsMockController) handleBinanceEnableTimeout(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		cm.binanceMockClient.EnableTimeout()
+	default:
+		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (cm *ClientsMockController) handleBinanceDisableTimeout(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		cm.binanceMockClient.DisableTimeout()
+	default:
+		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (cm *ClientsMockController) handleSolanaEnableTimeout(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		cm.solanaMockClient.EnableTimeout()
+	default:
+		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (cm *ClientsMockController) handleSolanaDisableTimeout(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		cm.solanaMockClient.DisableTimeout()
+	default:
+		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func withTimeout(ctx context.Context, delay time.Duration) error {
+	select {
+	case <-time.After(delay):
+		return ctx.Err() // may be nil if still valid
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }

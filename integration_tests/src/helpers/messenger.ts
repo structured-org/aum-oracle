@@ -5,14 +5,17 @@
 // =============================================================================
 
 export class MockController {
-  private baseUrl: string;
+  private readonly baseUrl: string;
 
   constructor(port: number) {
     this.baseUrl = `http://localhost:${port}`;
   }
 
   // Generic helper for making POST requests
-  private async postToMockController<T>(endpoint: string, data: T): Promise<void> {
+  private async postToMockController<T>(
+    endpoint: string,
+    data: T,
+  ): Promise<void> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -23,12 +26,17 @@ export class MockController {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to call ${endpoint}: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to call ${endpoint}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
   }
 
   // Generic helper for making GET requests
-  private async getFromMockController<T>(endpoint: string, queryParams?: Record<string, string>): Promise<T> {
+  private async getFromMockController<T>(
+    endpoint: string,
+    queryParams?: Record<string, string>,
+  ): Promise<T> {
     let url = `${this.baseUrl}${endpoint}`;
 
     if (queryParams) {
@@ -45,7 +53,9 @@ export class MockController {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to call ${endpoint}: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to call ${endpoint}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
 
     return response.json();
@@ -62,7 +72,9 @@ export class MockController {
    * Get current mock Binance USD-margined perpetual futures positions
    */
   async getBinanceUmPositions(): Promise<BinanceUMPosition[]> {
-    return this.getFromMockController<BinanceUMPosition[]>('/mock/binance/umpositions');
+    return this.getFromMockController<BinanceUMPosition[]>(
+      '/mock/binance/umpositions',
+    );
   }
 
   /**
@@ -76,13 +88,17 @@ export class MockController {
    * Get current mock Binance Portfolio Margin account info
    */
   async getBinancePMAccountInfo(): Promise<BinancePmAccountInfo> {
-    return this.getFromMockController<BinancePmAccountInfo>('/mock/binance/pmaccountinfo');
+    return this.getFromMockController<BinancePmAccountInfo>(
+      '/mock/binance/pmaccountinfo',
+    );
   }
 
   /**
    * Set mock Binance Portfolio Margin account balance
    */
-  async setBinancePMAccountBalance(balances: BinancePmAccountBalance[]): Promise<void> {
+  async setBinancePMAccountBalance(
+    balances: BinancePmAccountBalance[],
+  ): Promise<void> {
     await this.postToMockController('/mock/binance/pmaccountbalance', balances);
   }
 
@@ -90,13 +106,17 @@ export class MockController {
    * Get current mock Binance Portfolio Margin account balance
    */
   async getBinancePMAccountBalance(): Promise<BinancePmAccountBalance[]> {
-    return this.getFromMockController<BinancePmAccountBalance[]>('/mock/binance/pmaccountbalance');
+    return this.getFromMockController<BinancePmAccountBalance[]>(
+      '/mock/binance/pmaccountbalance',
+    );
   }
 
   /**
    * Set mock Binance spot account info
    */
-  async setBinanceSpotAccountInfo(account: BinanceSpotAccountInfo): Promise<void> {
+  async setBinanceSpotAccountInfo(
+    account: BinanceSpotAccountInfo,
+  ): Promise<void> {
     await this.postToMockController('/mock/binance/spotaccountinfo', account);
   }
 
@@ -104,13 +124,18 @@ export class MockController {
    * Get current mock Binance spot account info
    */
   async getBinanceSpotAccountInfo(): Promise<BinanceSpotAccountInfo> {
-    return this.getFromMockController<BinanceSpotAccountInfo>('/mock/binance/spotaccountinfo');
+    return this.getFromMockController<BinanceSpotAccountInfo>(
+      '/mock/binance/spotaccountinfo',
+    );
   }
 
   /**
    * Set mock Jupiter perps custody info
    */
-  async setJupiterPerpsCustodyInfo(publicKey: string, data: JupiterPerpsCustodyAccount): Promise<void> {
+  async setJupiterPerpsCustodyInfo(
+    publicKey: string,
+    data: JupiterPerpsCustodyAccount,
+  ): Promise<void> {
     const request: JupiterPerpsCustodyInfoRequest = {
       publicKey,
       data,
@@ -122,10 +147,15 @@ export class MockController {
    * Get current mock Jupiter perps custody info
    * @param custodyPublicKey - The custody account public key (base58 string)
    */
-  async getJupiterPerpsCustodyInfo(custodyPublicKey: string): Promise<JupiterPerpsCustodyAccount> {
-    return this.getFromMockController<JupiterPerpsCustodyAccount>('/mock/jupiter/custodyinfo', {
-      custody: custodyPublicKey,
-    });
+  async getJupiterPerpsCustodyInfo(
+    custodyPublicKey: string,
+  ): Promise<JupiterPerpsCustodyAccount> {
+    return this.getFromMockController<JupiterPerpsCustodyAccount>(
+      '/mock/jupiter/custodyinfo',
+      {
+        custody: custodyPublicKey,
+      },
+    );
   }
 
   /**
@@ -139,7 +169,9 @@ export class MockController {
    * Get current mock Jupiter pool info
    */
   async getJupiterPoolInfo(): Promise<JupiterPoolAccount> {
-    return this.getFromMockController<JupiterPoolAccount>('/mock/jupiter/poolinfo');
+    return this.getFromMockController<JupiterPoolAccount>(
+      '/mock/jupiter/poolinfo',
+    );
   }
 
   /**
@@ -153,28 +185,69 @@ export class MockController {
    * Get current mock Solana token supply
    */
   async getSolanaTokenSupply(): Promise<SolanaUiTokenAmount> {
-    return this.getFromMockController<SolanaUiTokenAmount>('/mock/solana/tokensupply');
+    return this.getFromMockController<SolanaUiTokenAmount>(
+      '/mock/solana/tokensupply',
+    );
   }
 
   /**
    * Set mock Solana token account balance
    */
-  async setSolanaTokenAccountBalance(publicKey: string, balance: SolanaUiTokenAmount): Promise<void> {
+  async setSolanaTokenAccountBalance(
+    publicKey: string,
+    balance: SolanaUiTokenAmount,
+  ): Promise<void> {
     const request: SolanaTokenAccountBalanceRequest = {
       publicKey,
       data: balance,
     };
-    await this.postToMockController('/mock/solana/tokenaccountbalance', request);
+    await this.postToMockController(
+      '/mock/solana/tokenaccountbalance',
+      request,
+    );
   }
 
   /**
    * Get current mock Solana token account balance
    * @param tokenPublicKey - The token account public key (base58 string)
    */
-  async getSolanaTokenAccountBalance(tokenPublicKey: string): Promise<SolanaUiTokenAmount> {
-    return this.getFromMockController<SolanaUiTokenAmount>('/mock/solana/tokenaccountbalance', {
-      token: tokenPublicKey,
-    });
+  async getSolanaTokenAccountBalance(
+    tokenPublicKey: string,
+  ): Promise<SolanaUiTokenAmount> {
+    return this.getFromMockController<SolanaUiTokenAmount>(
+      '/mock/solana/tokenaccountbalance',
+      {
+        token: tokenPublicKey,
+      },
+    );
+  }
+
+  /**
+   * Enable timeouts for binance queries
+   */
+  async enableBinanceTimeout(): Promise<void> {
+    await this.postToMockController('/mock/binance/enabletimeout', {});
+  }
+
+  /**
+   * Disable timeouts for binance queries
+   */
+  async disableBinanceTimeout(): Promise<void> {
+    await this.postToMockController('/mock/binance/disabletimeout', {});
+  }
+
+  /**
+   * Enable timeouts for solana queries
+   */
+  async enableSolanaTimeout(): Promise<void> {
+    await this.postToMockController('/mock/solana/enabletimeout', {});
+  }
+
+  /**
+   * Disable timeouts for solana queries
+   */
+  async disableSolanaTimeout(): Promise<void> {
+    await this.postToMockController('/mock/solana/disabletimeout', {});
   }
 }
 

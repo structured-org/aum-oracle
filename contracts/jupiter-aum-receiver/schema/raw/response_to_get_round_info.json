@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoundInfoResponse",
+  "type": "object",
+  "required": [
+    "next_round",
+    "pending_round"
+  ],
+  "properties": {
+    "next_round": {
+      "description": "Next round.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Round"
+        }
+      ]
+    },
+    "pending_round": {
+      "description": "Current round.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Round"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Round": {
+      "description": "Describes the round entity",
+      "type": "object",
+      "required": [
+        "round",
+        "start"
+      ],
+      "properties": {
+        "round": {
+          "description": "a number of the round",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "start": {
+          "description": "when the round started (UNIX timestamp in seconds)",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
