@@ -430,7 +430,7 @@ where
     median(slice, two)
 }
 
-/// Utility function that calculates the median value of a slice of SignedDecimals
+/// Utility function that calculates the generic median value of a SignedDecimals slice
 pub fn median<T>(slice: &[T], two: T) -> Option<T>
 where
     T: Copy + Clone + Add<Output = T> + Sub<Output = T> + Div<Output = T>,
