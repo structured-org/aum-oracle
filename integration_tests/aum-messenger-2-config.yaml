@@ -29,7 +29,7 @@ clients:
   neutron:
     mnemonic: "hair swallow tongue burst act bomb test useless board novel hint know monkey solve wet math proud shock become topple buzz festival tail slab"
     gas_prices: "0.5untrn"
-    gas: 500_000
+    gas_adjustment: 1.5
     chain_id: "ntrntest"
     node: "http://neutron_val1:26657"
     node_conn_retries: 50

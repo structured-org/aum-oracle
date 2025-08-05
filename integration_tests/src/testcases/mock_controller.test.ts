@@ -17,7 +17,7 @@ import {
   MockController,
 } from '../helpers/messenger';
 
-describe('Distribution', () => {
+describe('Mock controller', () => {
   const context: {
     park?: Cosmopark;
     wallet?: DirectSecp256k1HdWallet;

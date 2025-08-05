@@ -1,10 +1,10 @@
+.idea
+target
 aum_messenger/config.yaml
 aum_messenger/aum-messenger
-
-.idea
+config.yaml
 
 artifacts
-target
 
 .DS_Store
 target/
