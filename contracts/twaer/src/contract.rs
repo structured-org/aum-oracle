@@ -266,8 +266,8 @@ fn record_er_at(
             .weighted_sum
             .checked_div(Decimal::from_ratio(twa_aggr.total_duration, 1u64))?
     } else {
-       new_rate
-    }
+        new_rate
+    };
 
     let oldest_timestamp = ER_HISTORY
         .range(storage, None, None, Order::Ascending)
