@@ -8,8 +8,11 @@ pub enum ContractError {
     #[error(transparent)]
     Std(#[from] StdError),
 
-    #[error("Msg sender must be the contract owner")]
+    #[error("Unauthorized")]
     Unauthorized,
+
+    #[error("Next TWAER publication will be available at timestamp {next_pub_time}")]
+    PublicationToSoon { next_pub_time: u64 },
 
     #[error("TWA exchange rate not yet calculated")]
     TwaerNotCalculated,

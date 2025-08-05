@@ -4,7 +4,9 @@ use crate::error::{ContractError, ContractResult};
 use crate::msg::{
     ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
-use crate::state::{Config, TwaAggregator, CONFIG, ER_HISTORY, TWAER, TWA_AGGREGATOR};
+use crate::state::{
+    Config, TwaAggregator, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR,
+};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
@@ -26,11 +28,14 @@ pub fn instantiate(
 
     let contract_config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
+        publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
-        maxbtc_denom: msg.maxbtc_denom,
+        maxbtc_denom: None,
         twa_window_seconds: msg.twa_window_seconds,
+        twaer_immutability_seconds: msg.twaer_immutability_seconds,
     };
     CONFIG.save(deps.storage, &contract_config)?;
+    MOCKED_MAXBTC_SUPPLY.save(deps.storage, &msg.mocked_maxbtc_supply)?;
 
     Ok(Response::default())
 }
@@ -48,6 +53,10 @@ pub fn execute(
         }
         ExecuteMsg::RecordEr {} => Ok(execute_record_er(deps, env, info)?),
         ExecuteMsg::PublishTwaer {} => Ok(execute_publish_twaer(deps, env, info)?),
+        ExecuteMsg::UnmockMaxbtcSupply { maxbtc_denom } => {
+            Ok(execute_unmock_maxbtc_supply(deps, env, info, maxbtc_denom)?)
+        }
+        ExecuteMsg::ResetTwaerTo { value } => Ok(execute_reset_twaer_to(deps, env, info, value)?),
     }
 }
 
@@ -74,11 +83,18 @@ fn execute_update_config(
         let validated_new_owner = deps.api.addr_validate(&new_owner)?;
         config.owner = validated_new_owner;
     }
+    if let Some(new_publisher) = new_config.publisher {
+        let validated_new_publisher = deps.api.addr_validate(&new_publisher)?;
+        config.publisher = validated_new_publisher;
+    }
     if let Some(maxbtc_denom) = new_config.maxbtc_denom {
-        config.maxbtc_denom = maxbtc_denom;
+        config.maxbtc_denom = Some(maxbtc_denom);
     }
     if let Some(twa_window_seconds) = new_config.twa_window_seconds {
         config.twa_window_seconds = twa_window_seconds;
+    }
+    if let Some(twaer_immutability_seconds) = new_config.twaer_immutability_seconds {
+        config.twaer_immutability_seconds = twaer_immutability_seconds;
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -103,8 +119,14 @@ fn execute_record_er(deps: DepsMut, env: Env, _info: MessageInfo) -> ContractRes
 
 fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
+    if info.sender != config.owner && info.sender != config.publisher {
         return Err(ContractError::Unauthorized {});
+    }
+
+    let prev_pub_time = TWAER.load(deps.storage).unwrap_or_default().1;
+    let next_pub_time = prev_pub_time + config.twaer_immutability_seconds;
+    if env.block.time.seconds() < next_pub_time {
+        return Err(ContractError::PublicationToSoon { next_pub_time });
     }
 
     let twaer = calculate_twaer(deps.as_ref(), env.clone())?;
@@ -114,6 +136,47 @@ fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> Contract
         Response::new()
             .add_attributes([("action", "publish_twaer"), ("twaer", &twaer.to_string())]),
     )
+}
+
+fn execute_reset_twaer_to(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    value: Decimal,
+) -> ContractResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    TWAER.save(deps.storage, &(value, env.block.time.seconds()))?;
+    TWA_AGGREGATOR.save(
+        deps.storage,
+        &TwaAggregator::from_single_point(env.block.time.seconds(), value),
+    )?;
+    ER_HISTORY.clear(deps.storage);
+    ER_HISTORY.save(deps.storage, env.block.time.seconds(), &value)?;
+
+    Ok(Response::new()
+        .add_attributes([("action", "reset_twaer_to"), ("value", &value.to_string())]))
+}
+
+fn execute_unmock_maxbtc_supply(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    maxbtc_denom: String,
+) -> ContractResult<Response> {
+    let mut config = CONFIG.load(deps.storage)?;
+    if info.sender != config.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    MOCKED_MAXBTC_SUPPLY.save(deps.storage, &Uint128::zero())?;
+    config.maxbtc_denom = Some(maxbtc_denom);
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attribute("action", "unmock_maxbtc_supply"))
 }
 
 /// Determine which exchange rates are expired and return them in ascending timestamp order.
@@ -160,7 +223,7 @@ fn update_twa_aggregator(
 
     // the rate that was active from window_end until now
     let latest_rate_duration = new_timestamp - twa_aggr.window_end;
-    if latest_rate_duration <= 0 {
+    if latest_rate_duration == 0 {
         return Err(ContractError::DuplicateDataPoint {
             timestamp: new_timestamp,
         });
@@ -224,7 +287,11 @@ fn update_twa_aggregator(
 
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     let config = CONFIG.load(deps.storage)?;
-    let maxbtc_supply = deps.querier.query_supply(config.maxbtc_denom)?.amount;
+
+    let maxbtc_supply = match config.maxbtc_denom {
+        Some(maxbtc_denom) => deps.querier.query_supply(maxbtc_denom)?.amount,
+        None => MOCKED_MAXBTC_SUPPLY.load(deps.storage)?,
+    };
     let aum = get_aum(deps)?;
 
     Ok(Decimal::from_ratio(aum, maxbtc_supply))
@@ -325,5 +392,5 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
     // Calculate final TWA
     total_weighted_sum
         .checked_div(Decimal::from_ratio(total_duration, 1u64))
-        .map_err(|e| ContractError::CheckedDiv(e))
+        .map_err(ContractError::CheckedDiv)
 }

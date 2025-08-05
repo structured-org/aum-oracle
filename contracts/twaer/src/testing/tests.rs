@@ -3,7 +3,7 @@ use crate::error::ContractError;
 use crate::msg::{
     ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
-use crate::state::{Config, CONFIG, ER_HISTORY};
+use crate::state::{Config, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
@@ -18,9 +18,11 @@ fn proper_initialization() {
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
         owner: deps.api.addr_make("owner"),
+        publisher: deps.api.addr_make("owner"),
         aum_oracles: vec![deps.api.addr_make("oracle1")],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        maxbtc_denom: None,
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -33,9 +35,30 @@ fn test_instantiate_with_invalid_owner() {
 
     let msg = InstantiateMsg {
         owner: "invalid...address...".to_string(),
+        publisher: deps.api.addr_make("owner").to_string(),
         aum_oracles: vec![oracle1.to_string()],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
+    };
+    let info = message_info(&owner, &[]);
+    let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert!(matches!(err, StdError::GenericErr { .. }));
+}
+
+#[test]
+fn test_instantiate_with_invalid_publisher() {
+    let mut deps = mock_dependencies();
+    let owner = deps.api.addr_make("owner");
+    let oracle1 = deps.api.addr_make("oracle1");
+
+    let msg = InstantiateMsg {
+        owner: owner.to_string(),
+        publisher: "invalid...address...".to_string(),
+        aum_oracles: vec![oracle1.to_string()],
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -49,9 +72,11 @@ fn test_instantiate_with_invalid_oracle() {
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        publisher: owner.to_string(),
         aum_oracles: vec!["invalid...oracle...".to_string()],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -65,13 +90,15 @@ fn update_config_by_owner() {
     let oracle1 = deps.api.addr_make("oracle1");
     let oracle2 = deps.api.addr_make("oracle2");
     let new_owner = deps.api.addr_make("new_owner");
-
+    let new_publisher = deps.api.addr_make("new_publisher");
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
             owner: Some(new_owner.to_string()),
+            publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
             maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
-            twa_window_seconds: Some(172800), // 48 hours
+            twa_window_seconds: Some(172800),         // 48 hours
+            twaer_immutability_seconds: Some(172800), // 48 hours
         },
     };
 
@@ -81,9 +108,11 @@ fn update_config_by_owner() {
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
         owner: new_owner,
+        publisher: new_publisher,
         aum_oracles: vec![oracle1, oracle2],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
         twa_window_seconds: 172800,
+        twaer_immutability_seconds: 172800,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -98,9 +127,11 @@ fn update_config_by_unauthorized() {
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
             owner: Some(new_owner.to_string()),
+            publisher: None,
             aum_oracles: None,
             maxbtc_denom: None,
             twa_window_seconds: None,
+            twaer_immutability_seconds: None,
         },
     };
 
@@ -109,10 +140,12 @@ fn update_config_by_unauthorized() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        owner,
+        owner: owner.clone(),
+        publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        maxbtc_denom: None,
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -127,9 +160,11 @@ fn update_config_partial() {
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
             owner: Some(new_owner.to_string()),
+            publisher: None,
             aum_oracles: None,
             maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
             twa_window_seconds: None,
+            twaer_immutability_seconds: None,
         },
     };
 
@@ -138,9 +173,11 @@ fn update_config_partial() {
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
         owner: new_owner,
+        publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: "factory/neutron1/minbtc".to_string(),
+        maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -155,10 +192,12 @@ fn query_config() {
     let config: Config = from_json(bin).unwrap();
 
     let expected_config = Config {
-        owner,
+        owner: owner.clone(),
+        publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        maxbtc_denom: None,
         twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -265,6 +304,308 @@ fn test_record_er_cleanup() {
     // Should only have 1 data point now (the old one was cleaned up)
     let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
+}
+
+#[test]
+fn test_publish_twaer_by_publisher() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+    let publisher = deps.api.addr_make("publisher");
+
+    // Update config to set a different publisher
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            owner: None,
+            publisher: Some(publisher.to_string()),
+            aum_oracles: None,
+            maxbtc_denom: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+
+    // Record some ER data first
+    let env = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env.clone(), &owner).unwrap();
+
+    // No TWAER calculated yet
+    assert_eq!(
+        query_twaer(&deps, env.clone()).unwrap_err(),
+        ContractError::TwaerNotCalculated
+    );
+
+    // Test that publisher can publish TWAER
+    let env2 = test_env_with_time(1000001, 101);
+    let res = execute_msg(
+        &mut deps,
+        env2.clone(),
+        &publisher,
+        ExecuteMsg::PublishTwaer {},
+    );
+    assert!(res.is_ok());
+    assert!(query_twaer(&deps, env2.clone()).is_ok());
+
+    // Test that unauthorized user cannot publish TWAER
+    let stranger = deps.api.addr_make("stranger");
+    let env3 = test_env_with_time(1000002, 102);
+    let err = execute_msg(&mut deps, env3, &stranger, ExecuteMsg::PublishTwaer {}).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+}
+
+#[test]
+fn test_twaer_immutability() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+
+    // Set immutability period to 3600 seconds (1 hour)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            owner: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_denom: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: Some(3600),
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+
+    // Record some ER data first
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &owner).unwrap();
+
+    // First publication should succeed
+    let res = execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok());
+
+    // Second publication immediately after should fail due to immutability
+    let env2 = test_env_with_time(1000001, 101);
+    let err = execute_msg(&mut deps, env2, &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
+    assert!(matches!(err, ContractError::PublicationToSoon { .. }));
+
+    // Publication before immutability period ends should fail
+    let env3 = test_env_with_time(1000000 + 3599, 102); // 1 second before immutability ends
+    let err = execute_msg(&mut deps, env3, &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
+    assert!(matches!(err, ContractError::PublicationToSoon { .. }));
+
+    // Publication after immutability period should succeed
+    let env4 = test_env_with_time(1000000 + 3600, 103); // Exactly when immutability ends
+    let res = execute_msg(&mut deps, env4, &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_unmock_maxbtc_supply() {
+    // Set up contract with mocked supply of 500,000
+    let mocked_supply = Uint128::from(500000u128);
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let owner = deps.api.addr_make("owner");
+    let oracle1 = deps.api.addr_make("oracle1");
+
+    // Initialize contract with mocked supply
+    let msg = InstantiateMsg {
+        owner: owner.to_string(),
+        publisher: owner.to_string(),
+        aum_oracles: vec![oracle1.to_string()],
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: mocked_supply,
+    };
+    let info = message_info(&owner, &[]);
+    instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // Set up oracle to return AUM of 1,000,000 uwBTC
+    let aum_amount = 1000000u128;
+    deps.querier.update_wasm(mock_oracle_response(aum_amount));
+
+    // Record ER using mocked supply
+    let env1 = test_env_with_time(1000000, 100);
+    execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
+
+    // Verify ER is calculated using mocked supply by checking the recorded ER in history
+    let history_rates: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates.len(), 1);
+    let recorded_er_mocked = history_rates[0];
+    let expected_er_mocked = Decimal::from_ratio(aum_amount, mocked_supply.u128());
+    assert_eq!(recorded_er_mocked, expected_er_mocked);
+    assert_eq!(recorded_er_mocked, Decimal::from_ratio(2u128, 1u128)); // 2.0
+
+    // Set up mock querier with different real supply (750,000) for bank queries
+    let real_supply = 750000u128;
+    deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
+        "",
+        &[cosmwasm_std::Coin {
+            denom: "factory/neutron1/maxbtc".to_string(),
+            amount: Uint128::from(real_supply),
+        }],
+    )]);
+    deps.querier.update_wasm(mock_oracle_response(aum_amount));
+
+    // Execute UnmockMaxbtcSupply to switch to real supply
+    let res = execute_msg(
+        &mut deps,
+        mock_env(),
+        &owner,
+        ExecuteMsg::UnmockMaxbtcSupply {
+            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        },
+    );
+    assert!(res.is_ok());
+
+    // Verify config is updated
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(
+        config.maxbtc_denom,
+        Some("factory/neutron1/maxbtc".to_string())
+    );
+
+    // Verify mocked supply is zeroed out
+    let mocked_supply_after = MOCKED_MAXBTC_SUPPLY.load(&deps.storage).unwrap();
+    assert_eq!(mocked_supply_after, Uint128::zero());
+
+    // Record ER using real supply
+    let env2 = test_env_with_time(1000001, 101);
+    execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
+
+    // Verify ER is now calculated using real supply by checking the recorded ER in history
+    let history_rates_after: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates_after.len(), 2);
+    let recorded_er_real = history_rates_after[1]; // Second entry
+    let expected_er_real = Decimal::from_ratio(aum_amount, real_supply);
+    assert_eq!(recorded_er_real, expected_er_real);
+    assert_eq!(recorded_er_real, Decimal::from_ratio(4u128, 3u128)); // ≈ 1.333...
+
+    // Verify the ERs are different (proving the switch worked)
+    assert_ne!(recorded_er_mocked, recorded_er_real);
+
+    // Test that unauthorized user cannot unmock supply
+    let stranger = deps.api.addr_make("stranger");
+    let err = execute_msg(
+        &mut deps,
+        mock_env(),
+        &stranger,
+        ExecuteMsg::UnmockMaxbtcSupply {
+            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+}
+
+#[test]
+fn test_reset_twaer() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+
+    // Set immutability period to 3600 seconds (1 hour)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            owner: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_denom: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: Some(3600),
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+
+    // Record multiple ER data points to populate history
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &owner).unwrap();
+
+    let env2 = test_env_with_time(1000300, 101);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+
+    let env3 = test_env_with_time(1000600, 102);
+    record_er(&mut deps, env3.clone(), &owner).unwrap();
+
+    // Verify we have multiple data points
+    let count_before = query_data_point_count(&deps).unwrap();
+    assert_eq!(count_before, 3);
+
+    // Publish a TWAER first
+    execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
+
+    // Reset TWAER to a specific value
+    let reset_value = Decimal::from_ratio(5u128, 2u128); // 2.5
+    let reset_env = test_env_with_time(1001000, 103);
+    let res = execute_msg(
+        &mut deps,
+        reset_env.clone(),
+        &owner,
+        ExecuteMsg::ResetTwaerTo { value: reset_value },
+    );
+    assert!(res.is_ok());
+
+    // Verify the history record has the reset value
+    let history_rates: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates.len(), 1);
+    assert_eq!(history_rates[0], reset_value);
+
+    // Verify TWA aggregator has only one value
+    let aggregator = TWA_AGGREGATOR.load(&deps.storage).unwrap();
+    assert_eq!(aggregator.current_twa, reset_value);
+    assert_eq!(aggregator.weighted_sum, Decimal::zero());
+    assert_eq!(aggregator.total_duration, 0);
+    assert_eq!(aggregator.window_start, reset_env.block.time.seconds());
+    assert_eq!(aggregator.window_end, reset_env.block.time.seconds());
+
+    // Verify TWAER query returns the reset value
+    let twaer_response = query_twaer(&deps, reset_env.clone()).unwrap();
+    assert_eq!(twaer_response.twaer, reset_value);
+    assert_eq!(twaer_response.published_at, reset_env.block.time.seconds());
+
+    // Verify that immutability period is renewed after reset
+    // Try to publish immediately after reset - should fail due to immutability
+    let immediate_env = test_env_with_time(1001001, 104); // 1 second after reset
+    let err = execute_msg(
+        &mut deps,
+        immediate_env,
+        &owner,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap_err();
+    assert!(matches!(err, ContractError::PublicationToSoon { .. }));
+
+    // Try to publish before immutability period ends - should fail
+    let early_env = test_env_with_time(1001000 + 3599, 105); // 1 second before immutability ends
+    let err = execute_msg(&mut deps, early_env, &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
+    assert!(matches!(err, ContractError::PublicationToSoon { .. }));
+
+    // Try to publish exactly when immutability period ends - should succeed
+    let valid_env = test_env_with_time(1001000 + 3600, 106); // Exactly when immutability ends
+    let res = execute_msg(&mut deps, valid_env, &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok());
+
+    // Test that unauthorized user cannot reset TWAER
+    let stranger = deps.api.addr_make("stranger");
+    let err = execute_msg(
+        &mut deps,
+        reset_env,
+        &stranger,
+        ExecuteMsg::ResetTwaerTo {
+            value: Decimal::one(),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
 }
 
 #[test]
@@ -609,7 +950,6 @@ fn test_twaer_complex_intertwining_expiration() {
 struct ContractSetup {
     owner: String,
     oracles: Vec<String>,
-    maxbtc_denom: String,
     twa_window_seconds: u64,
 }
 
@@ -618,7 +958,6 @@ impl Default for ContractSetup {
         Self {
             owner: "owner".to_string(),
             oracles: vec!["oracle1".to_string()],
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
             twa_window_seconds: 86400, // 24 hours
         }
     }
@@ -644,9 +983,11 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
         } else {
             config.owner
         },
+        publisher: owner.to_string(),
         aum_oracles: oracle_addresses,
-        maxbtc_denom: config.maxbtc_denom,
         twa_window_seconds: config.twa_window_seconds,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -679,9 +1020,11 @@ fn setup_contract_with_standard_querier_and_config(
         } else {
             config.owner
         },
+        publisher: owner.to_string(),
         aum_oracles: oracle_addresses,
-        maxbtc_denom: config.maxbtc_denom,
         twa_window_seconds: config.twa_window_seconds,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -711,12 +1054,24 @@ fn setup_contract_with_supply(
     let oracle1 = deps.api.addr_make("oracle1");
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        publisher: owner.to_string(),
         aum_oracles: vec![oracle1.to_string()],
-        maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
         twa_window_seconds: twa_window_seconds.unwrap_or(86400),
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+    assert_eq!(0, res.messages.len());
+    let res = execute_msg(
+        &mut deps,
+        mock_env(),
+        &owner,
+        ExecuteMsg::UnmockMaxbtcSupply {
+            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        },
+    )
+    .unwrap();
     assert_eq!(0, res.messages.len());
     deps
 }
