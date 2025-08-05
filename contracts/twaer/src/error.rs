@@ -28,6 +28,12 @@ pub enum ContractError {
 
     #[error("No next timestamp found for expired rate at timestamp {timestamp}")]
     NoNextTimestamp { timestamp: u64 },
+
+    #[error("No latest exchange rate found")]
+    NoLatestRate,
+
+    #[error("No earliest exchange rate found")]
+    NoEarliestRate,
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {

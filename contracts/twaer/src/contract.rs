@@ -26,7 +26,7 @@ pub fn instantiate(
         .map(|addr| deps.api.addr_validate(addr))
         .collect::<StdResult<_>>()?;
 
-    let contract_config = Config {
+    let config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
         publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
@@ -34,7 +34,7 @@ pub fn instantiate(
         twa_window_seconds: msg.twa_window_seconds,
         twaer_immutability_seconds: msg.twaer_immutability_seconds,
     };
-    CONFIG.save(deps.storage, &contract_config)?;
+    CONFIG.save(deps.storage, &config)?;
     MOCKED_MAXBTC_SUPPLY.save(deps.storage, &msg.mocked_maxbtc_supply)?;
 
     Ok(Response::default())
@@ -104,12 +104,7 @@ fn execute_update_config(
 fn execute_record_er(deps: DepsMut, env: Env, _info: MessageInfo) -> ContractResult<Response> {
     let exchange_rate = calc_exchange_rate(deps.as_ref())?;
     let timestamp = env.block.time.seconds();
-    ER_HISTORY.save(deps.storage, timestamp, &exchange_rate)?;
-
-    let config = CONFIG.load(deps.storage)?;
-    let window_start = timestamp.sub(config.twa_window_seconds);
-    let expired_rates = determine_expired_rates(deps.storage, window_start)?;
-    update_twa_aggregator(deps.storage, exchange_rate, timestamp, &expired_rates)?;
+    record_er_at(deps.storage, exchange_rate, timestamp)?;
 
     Ok(Response::new().add_attributes([
         ("action", "record_er"),
@@ -196,19 +191,19 @@ fn determine_expired_rates(
     Ok(expired_data)
 }
 
-/// Updates the TWA aggregator with a new exchange rate data point and manages the time window
-/// by removing expired entries. This function performs incremental TWA calculation by:
+/// Stores an exchange rate in the history and updates the TWA aggregator with the exchange
+/// rate data point and manages the time window by removing expired entries. This function
+/// performs incremental TWA calculation by:
 /// 1. Adding the weighted contribution of the most recent rate for the time period since
 ///    the last update;
 /// 2. Removing weighted contributions from exchange rates that have expired outside the
 ///    configured TWA window;
 /// 3. Recalculating the current TWA based on the updated weighted sum and total duration;
 /// 4. Updating aggregator metadata (window boundaries, current TWA).
-fn update_twa_aggregator(
+fn record_er_at(
     storage: &mut dyn cosmwasm_std::Storage,
     new_rate: Decimal,
     new_timestamp: u64,
-    expired_rates: &[(u64, Decimal)],
 ) -> ContractResult<()> {
     let mut twa_aggr = match TWA_AGGREGATOR.may_load(storage)? {
         None => {
@@ -216,9 +211,10 @@ fn update_twa_aggregator(
                 storage,
                 &TwaAggregator::from_single_point(new_timestamp, new_rate),
             )?;
+            ER_HISTORY.save(storage, new_timestamp, &new_rate)?;
             return Ok(());
         }
-        Some(buffer) => buffer,
+        Some(aggr) => aggr,
     };
 
     // the rate that was active from window_end until now
@@ -229,27 +225,27 @@ fn update_twa_aggregator(
         });
     }
     let latest_rate = ER_HISTORY
-        .range(
-            storage,
-            None,
-            Some(Bound::inclusive(twa_aggr.window_end)),
-            Order::Descending,
-        )
+        .range(storage, None, None, Order::Descending)
         .next()
         .transpose()?
-        .map(|(_, rate)| rate)
-        .unwrap_or(twa_aggr.current_twa);
+        .map_or_else(|| Err(ContractError::NoLatestRate {}), |(_, rate)| Ok(rate))?;
 
     let weighted_contribution =
         latest_rate.checked_mul(Decimal::from_ratio(latest_rate_duration, 1u64))?;
     twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_add(weighted_contribution)?;
     twa_aggr.total_duration += latest_rate_duration;
 
+    ER_HISTORY.save(storage, new_timestamp, &new_rate)?;
+
+    let config = CONFIG.load(storage)?;
+    let window_start = new_timestamp.sub(config.twa_window_seconds);
+    let expired_rates = determine_expired_rates(storage, window_start)?;
+
     // Remove contributions from rates that are no longer in the window
     for (expired_timestamp, expired_rate) in expired_rates {
-        let next_timestamp = find_next_timestamp_after(storage, *expired_timestamp)?.ok_or(
+        let next_timestamp = find_next_timestamp_after(storage, expired_timestamp)?.ok_or(
             ContractError::NoNextTimestamp {
-                timestamp: *expired_timestamp,
+                timestamp: expired_timestamp,
             },
         )?;
         // how long the rate was active
@@ -261,7 +257,7 @@ fn update_twa_aggregator(
         twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
         twa_aggr.total_duration -= expired_duration;
 
-        ER_HISTORY.remove(storage, *expired_timestamp);
+        ER_HISTORY.remove(storage, expired_timestamp);
     }
 
     twa_aggr.window_end = new_timestamp;
@@ -277,8 +273,7 @@ fn update_twa_aggregator(
         .range(storage, None, None, Order::Ascending)
         .next()
         .transpose()?
-        .map(|(timestamp, _)| timestamp)
-        .unwrap_or(new_timestamp);
+        .map_or_else(|| Err(ContractError::NoEarliestRate {}), |(ts, _)| Ok(ts))?;
     twa_aggr.window_start = oldest_timestamp;
 
     TWA_AGGREGATOR.save(storage, &twa_aggr)?;
@@ -371,8 +366,7 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
         .range(deps.storage, None, None, Order::Descending)
         .next()
         .transpose()?
-        .map(|(_, rate)| rate)
-        .unwrap_or(twa_buffer.current_twa);
+        .map_or_else(|| Err(ContractError::NoLatestRate {}), |(_, rate)| Ok(rate))?;
 
     // Calculate the additional contribution from the last rate
     let additional_duration = env.block.time.seconds() - twa_buffer.window_end;
