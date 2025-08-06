@@ -7,7 +7,7 @@ use cosmwasm_std::Int256;
 pub struct InstantiateMsg {
     /// Owner of the contract
     pub owner: String,
-    /// A list of messengers allowed to publish data
+    /// A list of messengers allowed publishing data
     pub messengers: Vec<String>,
     /// Initial threshold for consensus.
     pub threshold: u32,
@@ -103,7 +103,7 @@ pub struct GetDataResponse {
 #[cw_serde]
 pub struct GetAumResponse {
     /// The latest AUM in Binance reported by messengers
-    pub aum_in_btc: Int256,
+    pub aum_in_wbtc: Int256,
     /// Represents the number of decimals that the aum_in_btc is
     /// represented in. It is used to scale the aum_in_btc to its base BTC value.
     /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`

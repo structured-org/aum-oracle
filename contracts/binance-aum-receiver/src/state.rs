@@ -2,8 +2,14 @@ use crate::error::ContractResult;
 use consensus::consensus::{consensus_on_field, consensus_on_items_dec256, ConsensusData, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Deps, SignedDecimal256};
+use cosmwasm_std::{Addr, Deps, Int256, SignedDecimal256};
 use cw_storage_plus::Item;
+
+pub const CONFIG: Item<Config> = Item::new("config");
+
+pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();
+
+pub const AUM_IN_WBTC: Item<AumInWBTC> = Item::new("aum_in_wbtc");
 
 #[cw_serde]
 pub struct Config {
@@ -13,11 +19,11 @@ pub struct Config {
     pub price_oracle_contract: Addr,
     /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
     /// Binance AUM contract cannot rely on it in AUM calculations,
-    /// and in that case the contract just doesn't calculate AUM and returns an error in the corresponding query.
+    /// and in that case, the contract just doesn't calculate AUM and returns an error in the corresponding query.
     pub consensus_data_valid_period: u64,
     /// Validity period for prices from the oracle contract in blocks. If the prices are too old,
     /// Binance AUM contract cannot rely on them in AUM calculations,
-    /// and in that case the contract just doesn't calculate AUM and returns an error in the corresponding query.
+    /// and in that case, the contract just doesn't calculate AUM and returns an error in the corresponding query.
     pub price_data_valid_period: u64,
     /// required binance positions that messengers must provide
     pub required_binance_positions: Vec<String>,
@@ -185,6 +191,10 @@ impl Config {
     }
 }
 
-pub const CONFIG: Item<Config> = Item::new("config");
-
-pub const CONSENSUS_STATE: State<BinanceData, Config> = State::default();
+#[cw_serde]
+pub struct AumInWBTC {
+    /// Amount of aum in uWBTC
+    pub amount: Int256,
+    /// Timestamp when aum was calculated
+    pub timestamp: u64,
+}

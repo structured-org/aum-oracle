@@ -1,4 +1,4 @@
-use crate::state::{CONFIG, CONSENSUS_STATE};
+use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
@@ -12,7 +12,7 @@ use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
     QueryMsg, RoundInfoResponse, UpdateConfig,
 };
-use jupiter_aum_common::types::{Config, SolanaData};
+use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::str::FromStr;
@@ -35,9 +35,9 @@ pub fn instantiate(
 
     let config = Config {
         owner: deps.api.addr_validate(&msg.owner)?,
-        consensus_data_validity_period: msg.consensus_data_validity_period,
+        consensus_data_valid_period: msg.consensus_data_valid_period,
         required_custody_assets: msg.required_custody_assets,
-        price_data_validity_period: msg.price_data_validity_period,
+        price_data_valid_period: msg.price_data_valid_period,
     };
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
@@ -90,16 +90,16 @@ fn update_config(
         contract_config.owner = deps.api.addr_validate(&new_owner)?;
     }
 
-    if let Some(new_consensus_data_validity_period) = new_config.consensus_data_validity_period {
-        contract_config.consensus_data_validity_period = new_consensus_data_validity_period;
+    if let Some(new_consensus_data_valid_period) = new_config.consensus_data_valid_period {
+        contract_config.consensus_data_valid_period = new_consensus_data_valid_period;
     }
 
     if let Some(new_required_custody_assets) = new_config.required_custody_assets {
         contract_config.required_custody_assets = new_required_custody_assets;
     }
 
-    if let Some(new_price_data_validity_period) = new_config.price_data_validity_period {
-        contract_config.price_data_validity_period = new_price_data_validity_period;
+    if let Some(new_price_data_valid_period) = new_config.price_data_valid_period {
+        contract_config.price_data_valid_period = new_price_data_valid_period;
     }
 
     contract_config.validate()?;
@@ -149,13 +149,18 @@ fn execute_publish_data(
 
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
-    match result {
-        PublishResult::ConsensusReached(_) => {
-            res = res.add_attribute("consensus_reached", "true");
-        }
-        PublishResult::ConsensusNotReached => {
-            res = res.add_attribute("consensus_reached", "false");
-        }
+    if let PublishResult::ConsensusReached(outcome) = result {
+        let aum_amount = calculate_aum(deps.as_ref(), env, outcome.data)?;
+        AUM_IN_WBTC.save(
+            deps.storage,
+            &AumInWBTC {
+                amount: aum_amount,
+                timestamp: outcome.timestamp,
+            },
+        )?;
+        res = res
+            .add_attribute("consensus_reached", outcome.round.to_string())
+            .add_attribute("aum_in_wbtc", aum_amount);
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
@@ -185,9 +190,9 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     Ok(ConfigResponse {
         owner: config.owner.to_string(),
-        consensus_data_validity_period: config.consensus_data_validity_period,
+        consensus_data_valid_period: config.consensus_data_valid_period,
         required_custody_assets: config.required_custody_assets,
-        price_data_validity_period: config.price_data_validity_period,
+        price_data_valid_period: config.price_data_valid_period,
         messengers: consensus_config.messengers,
         threshold: consensus_config.threshold,
         data_delta_ppm: consensus_config.data_delta_ppm,
@@ -205,20 +210,15 @@ fn query_get_data(deps: Deps, env: Env) -> Result<GetDataResponse, ContractError
 /// Calculates and returns the current AUM value in wBTC.
 fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let published_state = CONSENSUS_STATE
-        .get_last_published_data(&env, deps.storage)?
+    let aum_data: AumInWBTC = AUM_IN_WBTC
+        .may_load(deps.storage)?
         .ok_or(ContractError::NoDataPublished {})?;
-
-    if env.block.time.seconds() > published_state.timestamp + config.consensus_data_validity_period
-    {
+    if env.block.time.seconds() > aum_data.timestamp + config.consensus_data_valid_period {
         return Err(ContractError::PublishedDataTooOld {});
     }
 
-    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
-    let aum_in_btc = calculate_aum_in_btc(published_state.data, btc_price_in_usd)?;
-
     Ok(GetAumResponse {
-        aum_in_btc,
+        aum_in_wbtc: aum_data.amount,
         decimals: WBTC_DECIMALS,
     })
 }
@@ -250,7 +250,7 @@ fn query_btc_price_in_usd(
         .price
         .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
 
-    if quote.block_height + config.price_data_validity_period < env.block.height {
+    if quote.block_height + config.price_data_valid_period < env.block.height {
         return Err(ContractError::SlinkyBTCPriceTooOld {
             price_height: quote.block_height,
         });
@@ -273,7 +273,7 @@ fn query_btc_price_in_usd(
 }
 
 /// Computes the AUM in wBTC units using Solana data and BTC/USD price.
-pub fn calculate_aum_in_btc(
+pub fn calculate_aum_in_wbtc(
     data: SolanaData,
     btc_price_in_usd: SignedDecimal256,
 ) -> Result<Int256, ContractError> {
@@ -300,4 +300,12 @@ pub fn calculate_aum_in_btc(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
+}
+
+/// Calculates and returns the current AUM value in wBTC.
+fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
+    let aum_in_btc = calculate_aum_in_wbtc(data, btc_price_in_usd)?;
+    Ok(aum_in_btc)
 }

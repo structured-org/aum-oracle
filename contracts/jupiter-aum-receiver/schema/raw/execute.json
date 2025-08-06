@@ -155,7 +155,7 @@
     "UpdateConfig": {
       "type": "object",
       "properties": {
-        "consensus_data_validity_period": {
+        "consensus_data_valid_period": {
           "description": "New validity period for data in seconds.",
           "type": [
             "integer",
@@ -190,7 +190,7 @@
             "null"
           ]
         },
-        "price_data_validity_period": {
+        "price_data_valid_period": {
           "description": "New value for how many blocks we consider BTC/USD price from oracle as valid.",
           "type": [
             "integer",

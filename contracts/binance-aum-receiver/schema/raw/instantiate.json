@@ -28,7 +28,7 @@
       "minimum": 0.0
     },
     "messengers": {
-      "description": "A list of messengers allowed to publish data",
+      "description": "A list of messengers allowed publishing data",
       "type": "array",
       "items": {
         "type": "string"

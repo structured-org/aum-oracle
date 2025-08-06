@@ -8,17 +8,17 @@
     "description": "InstantiateMsg defines the message used to initialize the contract.",
     "type": "object",
     "required": [
-      "consensus_data_validity_period",
+      "consensus_data_valid_period",
       "data_delta_ppm",
       "messengers",
       "owner",
-      "price_data_validity_period",
+      "price_data_valid_period",
       "required_custody_assets",
       "round_length",
       "threshold"
     ],
     "properties": {
-      "consensus_data_validity_period": {
+      "consensus_data_valid_period": {
         "description": "Initial valid period for data in seconds.",
         "type": "integer",
         "format": "uint64",
@@ -41,7 +41,7 @@
         "description": "The address that will be the contract's owner.",
         "type": "string"
       },
-      "price_data_validity_period": {
+      "price_data_valid_period": {
         "description": "How many blocks we consider BTC/USD price from oracle as valid.",
         "type": "integer",
         "format": "uint64",
@@ -226,7 +226,7 @@
       "UpdateConfig": {
         "type": "object",
         "properties": {
-          "consensus_data_validity_period": {
+          "consensus_data_valid_period": {
             "description": "New validity period for data in seconds.",
             "type": [
               "integer",
@@ -261,7 +261,7 @@
               "null"
             ]
           },
-          "price_data_validity_period": {
+          "price_data_valid_period": {
             "description": "New value for how many blocks we consider BTC/USD price from oracle as valid.",
             "type": [
               "integer",
@@ -375,11 +375,11 @@
       "description": "AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)",
       "type": "object",
       "required": [
-        "aum_in_btc",
+        "aum_in_wbtc",
         "decimals"
       ],
       "properties": {
-        "aum_in_btc": {
+        "aum_in_wbtc": {
           "description": "The latest AUM in Jupiter reported by messengers The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
           "allOf": [
             {
@@ -388,7 +388,7 @@
           ]
         },
         "decimals": {
-          "description": "Represents the number of decimals that the aum_in_btc is represented in. It is used to scale the aum_in_btc to its base BTC value. E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`",
+          "description": "Represents the number of decimals that the aum_in_wbtc is represented in. It is used to scale the aum_in_btc to its base BTC value. E.g. `base_aum_in_wbtc = aum_in_wbtc / 10^decimals`",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -408,17 +408,17 @@
       "description": "ConfigResponse contains the current contract configuration.",
       "type": "object",
       "required": [
-        "consensus_data_validity_period",
+        "consensus_data_valid_period",
         "data_delta_ppm",
         "messengers",
         "owner",
-        "price_data_validity_period",
+        "price_data_valid_period",
         "required_custody_assets",
         "round_length",
         "threshold"
       ],
       "properties": {
-        "consensus_data_validity_period": {
+        "consensus_data_valid_period": {
           "description": "The current valid period in seconds.",
           "type": "integer",
           "format": "uint64",
@@ -441,7 +441,7 @@
           "description": "The current owner address.",
           "type": "string"
         },
-        "price_data_validity_period": {
+        "price_data_valid_period": {
           "description": "How many blocks we consider the last price from oracle as valid",
           "type": "integer",
           "format": "uint64",

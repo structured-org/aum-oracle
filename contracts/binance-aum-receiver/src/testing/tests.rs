@@ -1,12 +1,12 @@
 use crate::contract::*;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
-use crate::state::{BinanceData, Config, Position, SpotBalance, CONFIG, CONSENSUS_STATE};
+use crate::state::{
+    AumInWBTC, BinanceData, Config, Position, SpotBalance, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE,
+};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
-use consensus::consensus::{
-    Config as ConsensusConfig, ConsensusData, ConsensusOutcome, Round, State,
-};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusData, Round, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
@@ -49,7 +49,7 @@ fn create_test_contract_config() -> Config {
         price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
-        price_oracle_contract: Addr::unchecked("price_oracle_contract"),
+        price_oracle_contract: Addr::unchecked("price_oracle"),
         consensus_data_valid_period: 100,
     }
 }
@@ -115,7 +115,7 @@ fn query_last_published_data(deps: Deps, env: Env) -> GetDataResponse {
 #[test]
 fn test_execute_publish_data() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     env.block.time = Timestamp::from_seconds(1000);
 
@@ -318,7 +318,7 @@ fn test_execute_publish_data() {
 #[test]
 fn test_execute_publish_data_time_based_consensus() {
     // Set up a test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -631,7 +631,7 @@ fn test_try_consensus() {
 #[test]
 fn test_all_messengers_consensus_round_not_increased() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -727,7 +727,7 @@ fn test_all_messengers_consensus_round_not_increased() {
 #[test]
 fn test_partial_messengers_consensus_round_not_increased() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -845,7 +845,7 @@ fn test_partial_messengers_consensus_round_not_increased() {
 #[test]
 fn test_no_consensus_when_threshold_not_met_and_round_passed() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -936,7 +936,7 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
 #[test]
 fn test_multiple_rounds_passing() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -1010,7 +1010,7 @@ fn test_multiple_rounds_passing() {
 #[test]
 fn test_messengers_submitting_across_multiple_rounds() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -1274,7 +1274,7 @@ fn test_messengers_submitting_across_multiple_rounds() {
 #[test]
 fn test_messenger_cannot_publish_twice_for_same_round() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -1354,7 +1354,7 @@ fn test_messenger_cannot_publish_twice_for_same_round() {
 #[test]
 fn test_delayed_messenger_submissions_within_round() {
     // Set up test environment
-    let mut deps = mock_dependencies();
+    let mut deps = custom_mock_dependencies(mock_price_responses());
     let mut env = mock_env();
     let start_time = 1000;
     env.block.time = Timestamp::from_seconds(start_time);
@@ -1482,63 +1482,12 @@ fn test_delayed_messenger_submissions_within_round() {
 #[test]
 fn test_query_get_aum_basic() {
     // Set up mock dependencies with price oracle responses
-    let price_oracle_addr = "price_oracle";
-    let price_oracle_responses = vec![
-        // BTC/BTC price
-        (
-            price_oracle_addr.to_string(),
-            "BTC".to_string(),
-            "BTC".to_string(),
-            to_json_binary(&CombinedPriceResponse {
-                token_0_price: PrecDec::from_str("100000.0").unwrap(),
-                token_1_price: PrecDec::from_str("100000.0").unwrap(),
-                price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
-            })
-            .unwrap(),
-        ), // BTC/USD price
-        (
-            price_oracle_addr.to_string(),
-            "BTC".to_string(),
-            "USD".to_string(),
-            to_json_binary(&CombinedPriceResponse {
-                token_0_price: PrecDec::from_str("100000.0").unwrap(),
-                token_1_price: PrecDec::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
-            })
-            .unwrap(),
-        ),
-        // BTC/ETH price
-        (
-            price_oracle_addr.to_string(),
-            "BTC".to_string(),
-            "ETH".to_string(),
-            to_json_binary(&CombinedPriceResponse {
-                token_0_price: PrecDec::from_str("100000.0").unwrap(),
-                token_1_price: PrecDec::from_str("2000.0").unwrap(),
-                price_0_to_1: SignedDecimal256::from_str("50").unwrap(),
-            })
-            .unwrap(),
-        ),
-        // BTC/USDT price
-        (
-            price_oracle_addr.to_string(),
-            "BTC".to_string(),
-            "USDT".to_string(),
-            to_json_binary(&CombinedPriceResponse {
-                token_0_price: PrecDec::from_str("100000").unwrap(),
-                token_1_price: PrecDec::from_str("1.0").unwrap(),
-                price_0_to_1: SignedDecimal256::from_str("100000").unwrap(),
-            })
-            .unwrap(),
-        ),
-    ];
-
-    let mut deps = custom_mock_dependencies(price_oracle_responses);
+    let mut deps = custom_mock_dependencies(mock_price_responses());
 
     // Set up configuration
     let config = Config {
         owner: Addr::unchecked("admin"),
-        price_oracle_contract: Addr::unchecked(price_oracle_addr),
+        price_oracle_contract: Addr::unchecked("price_oracle"),
         consensus_data_valid_period: 3600, // 1 hour
         price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
@@ -1595,19 +1544,35 @@ fn test_query_get_aum_basic() {
     };
 
     let current_time = 1700000000;
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: current_time,
-        data: binance_data,
-    };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
-        .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
     let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time);
+    let msg = ExecuteMsg::PublishData {
+        new_data: binance_data.clone(),
+    };
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger1", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger2", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger3", &[]),
+        msg,
+    )
+    .unwrap();
+
     env.block.time = Timestamp::from_seconds(current_time + 1800); // 30 minutes after the data timestamp
 
     // Calculate expected AUM manually
@@ -1623,7 +1588,7 @@ fn test_query_get_aum_basic() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[test]
@@ -1663,24 +1628,15 @@ fn test_query_get_aum_with_expired_data() {
 
     // Set up consensus state data with an old timestamp
     let current_time = 1700000000;
-    let binance_data = BinanceData {
-        unimmr: SignedDecimal256::from_str("0.1").unwrap(),
-        positions: vec![],
-        um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
-        spot_balances: vec![],
-        pm_account_actual_equity: SignedDecimal256::from_str("80000.0").unwrap(),
-        withdrawable_usdt: SignedDecimal256::from_str("3000.0").unwrap(),
-    };
 
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: 0,
-        data: binance_data,
-    };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
+    AUM_IN_WBTC
+        .save(
+            deps.as_mut().storage,
+            &AumInWBTC {
+                amount: Int256::from(1000),
+                timestamp: 0,
+            },
+        )
         .unwrap();
 
     // Create an environment with a timestamp that's beyond the valid period
@@ -1772,19 +1728,35 @@ fn test_query_get_aum_with_negative_equity() {
     };
 
     let current_time = 1700000000;
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: current_time,
-        data: binance_data,
-    };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
-        .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
     let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time);
+    let msg = ExecuteMsg::PublishData {
+        new_data: binance_data.clone(),
+    };
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger1", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger2", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger3", &[]),
+        msg,
+    )
+    .unwrap();
+
     env.block.time = Timestamp::from_seconds(current_time + 1800);
 
     // Calculate expected AUM manually
@@ -1798,7 +1770,7 @@ fn test_query_get_aum_with_negative_equity() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[test]
@@ -1864,9 +1836,6 @@ fn test_execute_update_config_admin_only() {
         new_config: update_config,
     };
     let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
-    if result.is_err() {
-        println!("Error: {:?}", result.as_ref().unwrap_err());
-    }
     assert!(result.is_ok());
 
     // Verify contract config was updated
@@ -2293,7 +2262,11 @@ fn test_query_get_aum_with_large_values() {
     // Set up consensus state data with large values
     let binance_data = BinanceData {
         unimmr: SignedDecimal256::from_str("0.1").unwrap(),
-        positions: vec![],
+        positions: vec![Position {
+            symbol: "BTCUSDT".to_string(),
+            amount: SignedDecimal256::from_str("1.5").unwrap(),
+            pnl: SignedDecimal256::from_str("10000.0").unwrap(),
+        }],
         um_balance_usdt: SignedDecimal256::from_str("5000.0").unwrap(),
         spot_balances: vec![
             SpotBalance {
@@ -2310,16 +2283,33 @@ fn test_query_get_aum_with_large_values() {
     };
 
     let current_time = 1700000000;
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: current_time,
-        data: binance_data,
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time);
+    let msg = ExecuteMsg::PublishData {
+        new_data: binance_data.clone(),
     };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
-        .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger1", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger2", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger3", &[]),
+        msg,
+    )
+    .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
     let mut env = mock_env();
@@ -2337,7 +2327,7 @@ fn test_query_get_aum_with_large_values() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -2464,16 +2454,33 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     };
 
     let current_time = 1700000000;
-    let outcome = ConsensusOutcome {
-        round: 1,
-        timestamp: current_time,
-        data: binance_data,
+    // Create an environment with a timestamp that's within the valid period
+    let mut env = mock_env();
+    env.block.time = Timestamp::from_seconds(current_time);
+    let msg = ExecuteMsg::PublishData {
+        new_data: binance_data.clone(),
     };
-
-    CONSENSUS_STATE
-        .last_published_data
-        .save(deps.as_mut().storage, &outcome)
-        .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger1", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger2", &[]),
+        msg.clone(),
+    )
+    .unwrap();
+    execute(
+        deps.as_mut(),
+        env.clone(),
+        message_info("messenger3", &[]),
+        msg,
+    )
+    .unwrap();
 
     // Create an environment with a timestamp that's within the valid period
     let mut env = mock_env();
@@ -2492,5 +2499,61 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
     let response: GetAumResponse = query_get_aum(deps.as_ref(), env).unwrap();
 
     // Verify results
-    assert_eq!(response.aum_in_btc, expected_aum);
+    assert_eq!(response.aum_in_wbtc, expected_aum);
+}
+
+fn mock_price_responses() -> Vec<(String, String, String, cosmwasm_std::Binary)> {
+    // Set up mock dependencies with price oracle responses
+    let price_oracle_addr = "price_oracle";
+    let price_oracle_responses = vec![
+        // BTC/BTC price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "BTC".to_string(),
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("100000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("1.0").unwrap(),
+            })
+            .unwrap(),
+        ),
+        // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USD".to_string(),
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
+            })
+            .unwrap(),
+        ),
+        // BTC/USD price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "USDT".to_string(),
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000.0").unwrap(),
+                token_1_price: PrecDec::from_str("1.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("100000.0").unwrap(),
+            })
+            .unwrap(),
+        ),
+        // BTC/ETH price
+        (
+            price_oracle_addr.to_string(),
+            "BTC".to_string(),
+            "ETH".to_string(),
+            to_json_binary(&CombinedPriceResponse {
+                token_0_price: PrecDec::from_str("100000").unwrap(),
+                token_1_price: PrecDec::from_str("2000.0").unwrap(),
+                price_0_to_1: SignedDecimal256::from_str("50").unwrap(),
+            })
+            .unwrap(),
+        ),
+    ];
+    price_oracle_responses
 }

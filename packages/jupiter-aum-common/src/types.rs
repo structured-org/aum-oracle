@@ -5,33 +5,31 @@ use consensus::consensus::{
 };
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, SignedDecimal256, Uint128};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_std::{Addr, Decimal, Int256, SignedDecimal256, Uint128};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 /// Config defines the contract's configuration parameters.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct Config {
     /// The address that is allowed to perform management actions in the contract.
     pub owner: Addr,
     /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
-    pub consensus_data_validity_period: u64,
+    pub consensus_data_valid_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
-    pub price_data_validity_period: u64,
+    pub price_data_valid_period: u64,
 }
 
 impl Config {
     /// Validates the configuration parameters.
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self.consensus_data_validity_period == 0 {
+        if self.consensus_data_valid_period == 0 {
             return Err(ContractError::InvalidConsensusPeriod {});
         }
 
-        if self.price_data_validity_period == 0 {
+        if self.price_data_valid_period == 0 {
             return Err(ContractError::InvalidPriceDataPeriod {});
         }
 
@@ -271,7 +269,7 @@ where
 }
 
 // Represents Jupiter asset under custody in JLP pool
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct CustodyAsset {
     /// Amount of tokens in u<DENOM>. 1<DENOM> = 10^<decimals>u<denom>
     pub owned: u64,
@@ -283,4 +281,12 @@ pub struct CustodyAsset {
     pub decimals: u8,
     /// Custody denom.
     pub denom: String,
+}
+
+#[cw_serde]
+pub struct AumInWBTC {
+    /// Amount of aum in uWBTC
+    pub amount: Int256,
+    /// Timestamp when aum was calculated
+    pub timestamp: u64,
 }

@@ -323,7 +323,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
 
 fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
     let aum = get_aum(deps)?;
-    Ok(GetAumResponse { aum_in_btc: aum })
+    Ok(GetAumResponse { aum_in_wbtc: aum })
 }
 
 fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
@@ -347,7 +347,7 @@ fn get_aum(deps: Deps) -> ContractResult<Uint128> {
               "get_aum": {}
             }),
         )?;
-        total_aum += aum.aum_in_btc;
+        total_aum += aum.aum_in_wbtc;
     }
 
     Ok(total_aum)

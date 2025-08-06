@@ -17,11 +17,11 @@ pub struct InstantiateMsg {
     /// Consensus round length in seconds
     pub round_length: u64,
     /// Initial valid period for data in seconds.
-    pub consensus_data_validity_period: u64,
+    pub consensus_data_valid_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider BTC/USD price from oracle as valid.
-    pub price_data_validity_period: u64,
+    pub price_data_valid_period: u64,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -42,11 +42,11 @@ pub struct UpdateConfig {
     /// New owner address.
     pub owner: Option<String>,
     /// New validity period for data in seconds.
-    pub consensus_data_validity_period: Option<u64>,
+    pub consensus_data_valid_period: Option<u64>,
     /// New required custody asset denoms.
     pub required_custody_assets: Option<Vec<String>>,
     /// New value for how many blocks we consider BTC/USD price from oracle as valid.
-    pub price_data_validity_period: Option<u64>,
+    pub price_data_valid_period: Option<u64>,
 
     /// Consensus configuration updates
     ///
@@ -89,11 +89,11 @@ pub struct ConfigResponse {
     /// The current owner address.
     pub owner: String,
     /// The current valid period in seconds.
-    pub consensus_data_validity_period: u64,
+    pub consensus_data_valid_period: u64,
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
-    pub price_data_validity_period: u64,
+    pub price_data_valid_period: u64,
     /// a list of messengers that can submit data for consensus
     pub messengers: Vec<Addr>,
     /// threshold of the consensus (how many messengers must submit data for consensus to be reached)
@@ -116,10 +116,10 @@ pub struct GetDataResponse {
 pub struct GetAumResponse {
     /// The latest AUM in Jupiter reported by messengers
     /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
-    pub aum_in_btc: Int256,
-    /// Represents the number of decimals that the aum_in_btc is
+    pub aum_in_wbtc: Int256,
+    /// Represents the number of decimals that the aum_in_wbtc is
     /// represented in. It is used to scale the aum_in_btc to its base BTC value.
-    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
+    /// E.g. `base_aum_in_wbtc = aum_in_wbtc / 10^decimals`
     pub decimals: u32,
 }
 
