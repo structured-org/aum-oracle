@@ -92,7 +92,9 @@ fn execute_publish_data(
                 timestamp: outcome.timestamp,
             },
         )?;
-        res = res.add_attribute("consensus_reached", outcome.round.to_string());
+        res = res
+            .add_attribute("consensus_reached", outcome.round.to_string())
+            .add_attribute("aum_in_wbtc", aum_amount);
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);

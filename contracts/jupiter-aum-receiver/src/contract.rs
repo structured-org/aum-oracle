@@ -149,21 +149,18 @@ fn execute_publish_data(
 
     let mut res = Response::new().add_attribute("action", "publish_consensus");
 
-    match result {
-        PublishResult::ConsensusReached(outcome) => {
-            let aum_amount = calculate_aum(deps.as_ref(), env, outcome.data)?;
-            AUM_IN_WBTC.save(
-                deps.storage,
-                &AumInWBTC {
-                    amount: aum_amount,
-                    timestamp: outcome.timestamp,
-                },
-            )?;
-            res = res.add_attribute("consensus_reached", "true");
-        }
-        PublishResult::ConsensusNotReached => {
-            res = res.add_attribute("consensus_reached", "false");
-        }
+    if let PublishResult::ConsensusReached(outcome) = result {
+        let aum_amount = calculate_aum(deps.as_ref(), env, outcome.data)?;
+        AUM_IN_WBTC.save(
+            deps.storage,
+            &AumInWBTC {
+                amount: aum_amount,
+                timestamp: outcome.timestamp,
+            },
+        )?;
+        res = res
+            .add_attribute("consensus_reached", outcome.round.to_string())
+            .add_attribute("aum_in_wbtc", aum_amount);
     }
 
     let next_round = pending_round.next_round(consensus_config.round_length);
