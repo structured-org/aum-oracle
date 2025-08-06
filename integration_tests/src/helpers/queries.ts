@@ -16,14 +16,15 @@ export async function queryAum(
 export async function queryLastPublishedData<T>(
   contract: string,
   client: CosmWasmClient,
-): Promise<LastPublishedData<T>> {
+): Promise<ConsensusOutcome<T>> {
   const res = await client.queryContractSmart(contract, {
     get_data: {},
   });
+  console.log('queryLastPublishedData: ' + JSON.stringify(res));
   return res.last_published_data;
 }
 
-export class LastPublishedData<T> {
+export class ConsensusOutcome<T> {
   round: number;
   timestamp: number;
   data: T;

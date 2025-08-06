@@ -11,6 +11,7 @@
     "watch": "vitest",
     "build-neutron-image": "./dockerfiles/neutron/build.sh",
     "build-aum-messenger-image": "./dockerfiles/aum_messenger/build.sh",
+    "build-slinky": "./dockerfiles/slinky/build.sh",
     "build-images": "./dockerfiles/build-all.sh && docker images",
     "lint": "eslint ./src -f compact",
     "lint:fix": "eslint ./src -f compact --fix"

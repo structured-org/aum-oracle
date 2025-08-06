@@ -236,6 +236,14 @@ export const setupPark = async (
         depends_on: ['neutron_val1'],
         volumes: ['./aum-messenger-3-config.yaml:/aum_messenger/config.yaml'],
       },
+      {
+        name: 'oracle',
+        image: `skip-mev/slinky-e2e-oracle`,
+        entrypoint: 'slinky --market-map-endpoint neutron_val1:9090',
+        ports: ['8080:8080', '8002:8002'],
+        depends_on: ['neutron_val1'],
+        volumes: [],
+      },
     ],
   };
   for (const network of networks) {

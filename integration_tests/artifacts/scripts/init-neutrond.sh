@@ -737,9 +737,9 @@ JUPITER_AUM_RECEIVER_INIT_MSG='{
   "threshold": 2,
   "data_delta_ppm": 10000,
   "round_length": 15,
-  "consensus_data_validity_period": 60,
+  "consensus_data_valid_period": 60,
   "required_custody_assets": ["SOL", "USDC", "USDT", "WBTC", "WETH"],
-  "price_data_validity_period": 100
+  "price_data_valid_period": 100
 }'
 
 echo "Instantiate contracts"
