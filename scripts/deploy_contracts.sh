@@ -33,9 +33,9 @@ JUPITER_INIT_MSG=$(jq -nc --arg owner "$OWNER" '{
   threshold: 1,
   data_delta_ppm: 10000,
   round_length: 5,
-  consensus_data_validity_period: 60,
+  consensus_data_valid_period: 60,
   required_custody_assets: ["SOL", "USDC", "USDT", "WBTC", "WETH"],
-  price_data_validity_period: 100
+  price_data_valid_period: 100
 }')
 echo ">>> instantiating jupiter aum with msg:"
 echo "$JUPITER_INIT_MSG"

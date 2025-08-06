@@ -129,6 +129,9 @@ describe('Consensus', () => {
               JUPITER_CONTRACT,
               context.client,
             );
+            if (!result) {
+              return false;
+            }
             // wait until we have same changed aum usd gotten from contract
             return (
               result.data.aum_usd ===
