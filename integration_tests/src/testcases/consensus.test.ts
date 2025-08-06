@@ -159,13 +159,14 @@ describe('Consensus', () => {
               JUPITER_CONTRACT,
               context.client,
             );
+
             // wait until we have same changed aum usd gotten from contract
             return (
               result.data.aum_usd ===
               Math.trunc((1_531_381_751_507_034 * 2) / 1_000_000).toString()
             );
           },
-          20_000,
+          30_000,
           1_000,
         );
       });

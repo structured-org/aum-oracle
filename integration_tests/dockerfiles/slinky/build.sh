@@ -1,0 +1,1 @@
+docker buildx build --load --build-context app=https://github.com/skip-mev/slinky.git#v1.2.0 -t skip-mev/slinky-e2e-oracle -f slinky/Dockerfile.slinky .
