@@ -74,7 +74,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go msgr.RunMessenger(ctx, o)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
 	cancel()
 }
 
@@ -137,6 +137,6 @@ func TestMessengerForSolanaRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go msgr.RunMessenger(ctx, o)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
 	cancel()
 }

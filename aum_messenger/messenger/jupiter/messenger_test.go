@@ -61,7 +61,7 @@ func TestMessengerForNeutronRun(t *testing.T) {
 		Amount: "10000000", Decimals: 6,
 	}, nil)
 	solanaClient.EXPECT().GetTokenAccountBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
-		Amount: "2000000",
+		Amount: "2000000", Decimals: 6,
 	}, nil)
 	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
 		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
@@ -108,6 +108,6 @@ func TestMessengerForNeutronRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go msgr.RunMessenger(ctx, o)
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
 	cancel()
 }
