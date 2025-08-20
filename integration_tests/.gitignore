@@ -1,5 +1,3 @@
 node_modules
 /docker-compose-*.yml
 .idea/
-artifacts/contracts/
-artifacts/contracts_thirdparty/
