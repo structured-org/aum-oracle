@@ -1,4 +1,4 @@
-package utils
+package cosmos
 
 import (
 	"context"
@@ -45,8 +45,8 @@ var (
 	hdPath = hd.CreateHDPath(types.GetConfig().GetCoinType(), 0, 0).String()
 )
 
-// CosmosClientConfig represents configuration for CosmosClient.
-type CosmosClientConfig struct {
+// Config represents configuration for CosmosClient.
+type Config struct {
 	Mnemonic           string        `yaml:"mnemonic"`
 	GasPrices          string        `yaml:"gas_prices"`
 	GasAdjustment      float64       `yaml:"gas_adjustment"`
@@ -56,8 +56,8 @@ type CosmosClientConfig struct {
 	NodeConnRetryDelay time.Duration `yaml:"node_conn_retry_delay"`
 }
 
-// New creates a new instance of CosmosClient.
-func New(cfg *CosmosClientConfig, logger *zap.Logger) (*CosmosClient, error) {
+// NewClient creates a new instance of CosmosClient.
+func NewClient(cfg *Config, logger *zap.Logger) (*CosmosClient, error) {
 	rpcClient, err := createRpcClient(cfg.Node, cfg.NodeConnRetries, cfg.NodeConnRetryDelay, logger)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ type CosmosClient struct {
 	// because tendermint RPC client doesn't allow multiple subscriptions from a single instance.
 	subClients map[string]client.Client
 	logger     *zap.Logger
-	cfg        *CosmosClientConfig
+	cfg        *Config
 }
 
 // GetAddress returns the client's network address.

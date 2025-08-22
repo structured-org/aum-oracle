@@ -71,7 +71,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
-	solanaClient := solanaclient.NewClient(conf.SolanaRpcEndpoint)
+	solanaClient := solanaclient.NewClient(conf.Clients.Solana.RpcEndpoint)
 
 	switch conf.MockClients {
 	case true: // test run. populate deps with mock clients and run mock controller server
@@ -98,8 +98,8 @@ func main() {
 		}()
 
 	case false: // prod run. populate deps with real clients
-		jupiterClient := jupiterclient.NewClient(conf.SolanaRpcEndpoint)
-		binanceClient := binanceclient.NewClient(conf.BinanceApiKey, conf.BinanceApiSecret)
+		jupiterClient := jupiterclient.NewClient(conf.Clients.Solana.RpcEndpoint)
+		binanceClient := binanceclient.NewClient(conf.Clients.Binance.ApiKey, conf.Clients.Binance.ApiSecret)
 
 		binanceMsgrForNeutronDeps.binanceClient = binanceClient
 		binanceMsgrForNeutronDeps.neutronClient = neutronClient
