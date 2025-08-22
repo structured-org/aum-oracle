@@ -2187,6 +2187,85 @@ fn test_execute_update_config_admin_change() {
 }
 
 #[test]
+fn test_execute_update_config_validation() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let consensus_config = create_test_consensus_config();
+    let contract_config = create_test_contract_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    // Test zero value for consensus_data_valid_period
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: Some(0),
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidConsensusPeriod {}
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    // Test zero value for price_data_valid_period
+    let admin_info = message_info("admin", &[]);
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: Some(0),
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+}
+
+#[test]
 fn test_query_get_aum_with_large_values() {
     // Set up mock dependencies with price oracle responses
     let price_oracle_addr = "price_oracle";
