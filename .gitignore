@@ -4,7 +4,7 @@ aum_messenger/config.yaml
 aum_messenger/aum-messenger
 config.yaml
 
-./artifacts
+./artifacts/
 
 .DS_Store
 target/
