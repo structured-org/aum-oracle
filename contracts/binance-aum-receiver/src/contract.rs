@@ -19,7 +19,7 @@ pub fn instantiate(
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> ContractResult<Response> {
     let messengers: Vec<Addr> = msg
         .messengers
         .iter()
@@ -41,6 +41,7 @@ pub fn instantiate(
         price_data_valid_period: msg.price_data_valid_period,
         price_oracle_contract: deps.api.addr_validate(&msg.price_oracle_contract)?,
     };
+    contract_config.validate()?;
     CONFIG.save(deps.storage, &contract_config)?;
 
     Ok(Response::default())
@@ -124,6 +125,7 @@ fn execute_update_config(
 
     // Update contract configuration
     contract_config.update_config(deps.as_ref(), &new_config)?;
+    contract_config.validate()?;
     CONFIG.save(deps.storage, &contract_config)?;
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;

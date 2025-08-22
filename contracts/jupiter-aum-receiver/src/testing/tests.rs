@@ -4,7 +4,7 @@ use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
 use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_json, Env, Int256, OwnedDeps, Response, SignedDecimal256, Timestamp, Uint128,
+    from_json, Env, Int256, OwnedDeps, Response, SignedDecimal256, StdError, Timestamp, Uint128,
 };
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
@@ -29,6 +29,63 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         required_custody_assets: vec!["USDC".to_string()],
         price_data_valid_period: 100,
     }
+}
+
+#[test]
+fn test_instantiate_validation() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
+
+    // Test zero value for consensus_data_valid_period
+    let mut msg = default_init_msg(&deps.api);
+    msg.consensus_data_valid_period = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidConsensusPeriod {}
+    );
+
+    // Verify nothing was created
+    let contract_config = CONFIG.load(&deps.storage);
+    assert!(contract_config.is_err());
+    assert!(matches!(
+        contract_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
+    assert!(consensus_config.is_err());
+    assert!(matches!(
+        consensus_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    // Test zero value for price_data_valid_period
+    let mut msg = default_init_msg(&deps.api);
+    msg.price_data_valid_period = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Verify nothing was created
+    let contract_config = CONFIG.load(&deps.storage);
+    assert!(contract_config.is_err());
+    assert!(matches!(
+        contract_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
+    assert!(consensus_config.is_err());
+    assert!(matches!(
+        consensus_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
 }
 
 #[test]
@@ -84,6 +141,74 @@ fn test_update_config() {
     assert_eq!(consensus.data_delta_ppm, 1234);
     assert_eq!(consensus.round_length, 99);
     assert_eq!(consensus.messengers, vec![deps.api.addr_make("messenger1")]);
+}
+
+#[test]
+fn test_update_config_validation() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
+    let msg = default_init_msg(&deps.api);
+    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg).unwrap();
+
+    let contract_config = CONFIG.load(&deps.storage).unwrap();
+    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+
+    // Test zero value for consensus_data_valid_period
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: Some(0),
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+    let result = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidConsensusPeriod {}
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    // Test zero value for price_data_valid_period
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: Some(0),
+        messengers: None,
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+    let result = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
 }
 
 #[test]

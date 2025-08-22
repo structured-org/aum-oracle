@@ -1,6 +1,6 @@
 use crate::contract::*;
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, QueryMsg};
+use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg};
 use crate::state::{
     AumInWBTC, BinanceData, Config, Position, SpotBalance, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE,
 };
@@ -12,9 +12,9 @@ use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{
     from_json,
-    testing::{mock_dependencies, mock_env},
+    testing::{mock_dependencies, mock_env, MockApi},
     to_json_binary, Addr, Coin, Deps, DepsMut, Env, Int256, MessageInfo, SignedDecimal256,
-    Timestamp,
+    StdError, Timestamp,
 };
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
@@ -110,6 +110,73 @@ fn setup_test_state(
 
 fn query_last_published_data(deps: Deps, env: Env) -> GetDataResponse {
     from_json(query(deps, env, QueryMsg::GetData {}).unwrap()).unwrap()
+}
+
+// Helper to create a default instantiate message
+fn default_init_msg(api: &MockApi) -> InstantiateMsg {
+    InstantiateMsg {
+        owner: api.addr_make("admin").to_string(),
+        messengers: vec![
+            api.addr_make("messenger1").to_string(),
+            api.addr_make("messenger2").to_string(),
+            api.addr_make("messenger3").to_string(),
+        ],
+        threshold: 3,
+        data_delta_ppm: 1000,
+        round_length: 100,
+        consensus_data_valid_period: 1000,
+        price_data_valid_period: 100,
+        required_binance_positions: vec!["BTCUSDT".to_string()],
+        required_binance_spot_assets: vec![
+            "BTC".to_string(),
+            "ETH".to_string(),
+            "USDT".to_string(),
+        ],
+        price_oracle_contract: api.addr_make("price_oracle").to_string(),
+    }
+}
+
+#[test]
+fn test_instantiate_validation() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let admin_info = message_info("admin", &[]);
+
+    // Test zero value for consensus_data_valid_period
+    let mut msg = default_init_msg(&deps.api);
+    msg.consensus_data_valid_period = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidConsensusPeriod {}
+    );
+
+    // Verify nothing was created
+    let contract_config = CONFIG.load(deps.as_ref().storage);
+    assert!(contract_config.is_err());
+    assert!(matches!(
+        contract_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    // Test zero value for price_data_valid_period
+    let mut msg = default_init_msg(&deps.api);
+    msg.price_data_valid_period = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Verify nothing was created
+    let contract_config = CONFIG.load(deps.as_ref().storage);
+    assert!(contract_config.is_err());
+    assert!(matches!(
+        contract_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
 }
 
 #[test]
@@ -2192,8 +2259,8 @@ fn test_execute_update_config_validation() {
     let env = mock_env();
 
     // Set up initial state
-    let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
+    let consensus_config = create_test_consensus_config();
     setup_test_state(
         &mut deps.as_mut(),
         &contract_config,
@@ -2219,7 +2286,7 @@ fn test_execute_update_config_validation() {
     let msg = ExecuteMsg::UpdateConfig {
         new_config: update_config,
     };
-    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
@@ -2234,7 +2301,6 @@ fn test_execute_update_config_validation() {
     assert_eq!(consensus_config_after, consensus_config);
 
     // Test zero value for price_data_valid_period
-    let admin_info = message_info("admin", &[]);
     let update_config = crate::msg::UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,

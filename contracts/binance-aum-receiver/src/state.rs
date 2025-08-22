@@ -31,21 +31,6 @@ pub struct Config {
     pub required_binance_spot_assets: Vec<String>,
 }
 
-impl Config {
-    /// Validates the configuration parameters.
-    pub fn validate(&self) -> Result<(), ContractError> {
-        if self.consensus_data_valid_period == 0 {
-            return Err(ContractError::InvalidConsensusPeriod {});
-        }
-
-        if self.price_data_valid_period == 0 {
-            return Err(ContractError::InvalidPriceDataPeriod {});
-        }
-
-        Ok(())
-    }
-}
-
 #[cw_serde]
 pub struct Position {
     pub symbol: String,
@@ -203,7 +188,18 @@ impl Config {
             self.price_oracle_contract = deps.api.addr_validate(price_oracle_contract)?;
         }
 
-        self.validate()?;
+        Ok(())
+    }
+
+    /// Validates the configuration parameters.
+    pub fn validate(&self) -> Result<(), ContractError> {
+        if self.consensus_data_valid_period == 0 {
+            return Err(ContractError::InvalidConsensusPeriod {});
+        }
+
+        if self.price_data_valid_period == 0 {
+            return Err(ContractError::InvalidPriceDataPeriod {});
+        }
 
         Ok(())
     }
