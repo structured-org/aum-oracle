@@ -156,21 +156,21 @@ func main() {
 	go func() {
 		defer wg.Done()
 		logger.Info("running binance messenger for neutron")
-		msgr.RunMessenger(ctx, binanceMsgrForNeutron)
+		msgr.RunMessenger(ctx, binanceMsgrForNeutron, conf.OperationalConfig)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		logger.Info("running binance messenger for solana")
-		msgr.RunMessenger(ctx, binanceMsgrForSolana)
+		msgr.RunMessenger(ctx, binanceMsgrForSolana, conf.OperationalConfig)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		logger.Info("running jupiter messenger for neutron")
-		msgr.RunMessenger(ctx, jupiterMsgrForNeutron)
+		msgr.RunMessenger(ctx, jupiterMsgrForNeutron, conf.OperationalConfig)
 	}()
 
 	go func() {

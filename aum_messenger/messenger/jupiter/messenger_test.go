@@ -23,6 +23,12 @@ var (
 	testPubKey3 = solana.MustPublicKeyFromBase58("F6ZjiBm1WgVXzez5vxHeBDgaVPQRfLyFb7GFwXvyZVxD")
 	testPubKey4 = solana.MustPublicKeyFromBase58("E1bQJ8eMMn3zmeSewW3HQ8zmJr7KR75JonbwAtWx2bux")
 	testPubKey5 = solana.MustPublicKeyFromBase58("92q4Y2xGE39Bm2JgNZLZWuafoBiBR4gCj4igfpwvpgcD")
+
+	msgrOpConfig = msgr.OperationalConfig{
+		FailureDelay:     0 * time.Second,
+		PreSubmitDelay:   0 * time.Second,
+		FetchDataTimeout: 3 * time.Second,
+	}
 )
 
 func TestMessengerForNeutronRun(t *testing.T) {
@@ -106,8 +112,8 @@ func TestMessengerForNeutronRun(t *testing.T) {
 		zap.NewExample(),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	go msgr.RunMessenger(ctx, o)
+	go msgr.RunMessenger(ctx, o, msgrOpConfig)
 
-	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
+	time.Sleep(4 * time.Second)
 	cancel()
 }

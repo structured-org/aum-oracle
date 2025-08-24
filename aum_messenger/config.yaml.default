@@ -21,6 +21,11 @@ jupiter_strategy_address: ""
 jupiter_aum_contract: ""
 binance_aum_contract: ""
 
+operational_config:
+  failure_delay: 1s
+  pre_submit_delay: 3s
+  fetch_data_timeout: 3s
+
 clients:
   neutron:
     mnemonic: ""

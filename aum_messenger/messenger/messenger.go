@@ -32,24 +32,10 @@ type Messenger[T any] interface {
 	Logger() *zap.Logger
 }
 
-// failureDelay is the delay taken when a messenger fails to fetch or submit data to prevent
-// the messenger from spamming.
-// TODO: make this configurable.
-var failureDelay = 10 * time.Second
-
-// preSubmitDelay is an additional delay taken before submitting data to prevent the messenger
-// from submitting data too soon because of possible time desync.
-// TODO: make this configurable.
-var preSubmitDelay = 5 * time.Second
-
-// fetchDataTimeout is a timeout for fetch data operation
-// TODO: make this configurable
-var fetchDataTimeout = 3 * time.Second
-
 // RunMessenger is a utility function that runs a messenger in a loop, fetching and submitting
 // data at specified intervals. It handles the necessary context management for the messenger's
 // operation.
-func RunMessenger[T any](ctx context.Context, msgr Messenger[T]) {
+func RunMessenger[T any](ctx context.Context, msgr Messenger[T], cfg OperationalConfig) {
 	var nextRound *NextRound
 	var err error
 	for {
@@ -58,19 +44,19 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T]) {
 			if err != nil {
 				msgr.Logger().Error("failed to query next round, having a delay",
 					zap.Error(err),
-					zap.String("delay", failureDelay.String()),
+					zap.String("delay", cfg.FailureDelay.String()),
 				)
-				time.Sleep(failureDelay)
+				time.Sleep(cfg.FailureDelay)
 				continue
 			}
 		}
 
 		timeTillNextRound := time.Duration(int64(nextRound.Timestamp)-time.Now().Unix()) * time.Second
-		timeTillNextRound = timeTillNextRound + preSubmitDelay
+		timeTillNextRound = timeTillNextRound + cfg.PreSubmitDelay
 		msgr.Logger().Info("waiting for next round",
 			zap.Uint64("round", nextRound.Round),
 			zap.Uint64("round_timestamp", nextRound.Timestamp),
-			zap.Duration("pre_submit_delay", preSubmitDelay),
+			zap.Duration("pre_submit_delay", cfg.PreSubmitDelay),
 			zap.Duration("time_till_next_round", timeTillNextRound),
 		)
 
@@ -81,12 +67,12 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T]) {
 				zap.Uint64("round_timestamp", nextRound.Timestamp),
 			)
 
-			nextRound = processRound(ctx, msgr, nextRound)
+			nextRound = processRound(ctx, msgr, nextRound, cfg.FetchDataTimeout)
 			if nextRound == nil {
 				msgr.Logger().Info("having a delay after round processing failure",
-					zap.String("delay", failureDelay.String()),
+					zap.String("delay", cfg.FailureDelay.String()),
 				)
-				time.Sleep(failureDelay)
+				time.Sleep(cfg.FailureDelay)
 				continue
 			}
 
@@ -100,8 +86,13 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T]) {
 // processRound fetches and submits data for a given round. Returns the next round on successful
 // processing as a response from the receiver. If either fetching or submitting data fails, it will
 // return nil, meaning that the next round is unknown.
-func processRound[T any](ctx context.Context, msgr Messenger[T], round *NextRound) *NextRound {
-	fetchCtx, fetchCancel := context.WithTimeout(ctx, fetchDataTimeout)
+func processRound[T any](
+	ctx context.Context,
+	msgr Messenger[T],
+	round *NextRound,
+	fetchTimeout time.Duration,
+) *NextRound {
+	fetchCtx, fetchCancel := context.WithTimeout(ctx, fetchTimeout)
 	defer fetchCancel()
 
 	data, err := msgr.FetchData(fetchCtx)

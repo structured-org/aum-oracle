@@ -6,6 +6,7 @@ import (
 	"os"
 
 	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
+	"github.com/structured-org/aum-messenger/messenger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,6 +49,9 @@ type config struct {
 	JupiterAumContract string `yaml:"jupiter_aum_contract"`
 	// Binance AUM Oracle Receiver contract address.
 	BinanceAumContract string `yaml:"binance_aum_contract"`
+
+	// OperationalConfig is the configuration for the messenger's operational parameters.
+	OperationalConfig messenger.OperationalConfig `yaml:"operational_config"`
 
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`

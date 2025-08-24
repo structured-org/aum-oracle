@@ -21,6 +21,11 @@ jupiter_strategy_address: "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf"
 binance_aum_contract: "neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm"
 jupiter_aum_contract: "neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj"
 
+operational_config:
+  failure_delay: 10s
+  pre_submit_delay: 5s
+  fetch_data_timeout: 3s
+
 clients:
   neutron:
     mnemonic: "limb desk rib destroy valid unusual core useful hotel toward brisk hope prefer angry visa faint nature split team tent ask type obscure outdoor"
