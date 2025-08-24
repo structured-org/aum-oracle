@@ -15,6 +15,7 @@ use jupiter_aum_common::msg::{
 use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
+use std::collections::HashSet;
 use std::str::FromStr;
 
 const CONTRACT_NAME: &str = "crates.io:jupiter-aum-receiver";
@@ -43,12 +44,13 @@ pub fn instantiate(
 
     CONFIG.save(deps.storage, &config)?;
 
+    let messengers: Vec<Addr> = msg
+        .messengers
+        .iter()
+        .map(|addr| deps.api.addr_validate(addr))
+        .collect::<StdResult<_>>()?;
     let consensus_config = ConsensusConfig {
-        messengers: msg
-            .messengers
-            .into_iter()
-            .map(|addr| deps.api.addr_validate(&addr))
-            .collect::<Result<Vec<Addr>, _>>()?,
+        messengers: deduplicate_messengers(messengers),
         threshold: msg.threshold,
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
@@ -115,7 +117,7 @@ fn update_config(
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = validated_messengers;
+        consensus_config.messengers = deduplicate_messengers(validated_messengers);
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -304,6 +306,19 @@ pub fn calculate_aum_in_wbtc(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
+}
+
+fn deduplicate_messengers(messengers: Vec<Addr>) -> Vec<Addr> {
+    let mut seen = HashSet::new();
+    let mut unique = Vec::new();
+
+    for addr in messengers {
+        if seen.insert(addr.clone()) {
+            unique.push(addr);
+        }
+    }
+
+    unique
 }
 
 /// Calculates and returns the current AUM value in wBTC.

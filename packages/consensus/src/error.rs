@@ -17,6 +17,9 @@ pub enum ConsensusError {
     #[error("Threshold should be less than or equal to the number of messengers")]
     LargeThreshold {},
 
+    #[error("Messengers should have at least 1 address")]
+    InvalidMessengers {},
+
     #[error("You already submitted data for this round")]
     DoubleSubmission {},
 

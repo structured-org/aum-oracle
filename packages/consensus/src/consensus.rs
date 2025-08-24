@@ -26,6 +26,10 @@ pub struct Config {
 impl Config {
     /// Validates the configuration parameters.
     pub fn validate(&self) -> Result<(), ConsensusError> {
+        if self.messengers.is_empty() {
+            return Err(ConsensusError::InvalidMessengers {});
+        }
+
         if self.threshold == 0 {
             return Err(ConsensusError::ZeroThreshold {});
         }
