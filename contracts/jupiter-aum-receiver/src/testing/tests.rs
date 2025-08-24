@@ -55,13 +55,6 @@ fn test_instantiate_validation() {
         StdError::NotFound { .. }
     ));
 
-    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
-    assert!(consensus_config.is_err());
-    assert!(matches!(
-        consensus_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
-
     // Test zero value for price_data_valid_period
     let mut msg = default_init_msg(&deps.api);
     msg.price_data_valid_period = 0;
@@ -80,6 +73,35 @@ fn test_instantiate_validation() {
         StdError::NotFound { .. }
     ));
 
+    // Test zero value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Verify nothing was created
+    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
+    assert!(consensus_config.is_err());
+    assert!(matches!(
+        consensus_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    // Test large value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = 4;
+    let result = instantiate(deps.as_mut(), env, owner_info, msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::LargeThreshold {})
+    );
+
+    // Verify nothing was created
     let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
     assert!(consensus_config.is_err());
     assert!(matches!(
@@ -201,6 +223,60 @@ fn test_update_config_validation() {
     assert_eq!(
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    // Test zero value for threshold
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: None,
+        threshold: Some(0),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+    let result = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    // Test large value for threshold
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: None,
+        threshold: Some(4),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig { new_config: update };
+    let result = execute(deps.as_mut(), env, owner_info, update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::LargeThreshold {})
     );
 
     // Verify nothing was changed

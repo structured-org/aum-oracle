@@ -31,6 +31,8 @@ pub fn instantiate(
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
     };
+    consensus_config.validate()?;
+
     CONSENSUS_STATE.initialize(deps.storage, &env, consensus_config)?;
 
     let contract_config = Config {
@@ -42,6 +44,7 @@ pub fn instantiate(
         price_oracle_contract: deps.api.addr_validate(&msg.price_oracle_contract)?,
     };
     contract_config.validate()?;
+
     CONFIG.save(deps.storage, &contract_config)?;
 
     Ok(Response::default())
@@ -147,6 +150,7 @@ fn execute_update_config(
     if let Some(round_length) = new_config.round_length {
         consensus_config.round_length = round_length;
     }
+    consensus_config.validate()?;
 
     // Save updated consensus config
     CONSENSUS_STATE.save_config(deps.storage, consensus_config)?;
