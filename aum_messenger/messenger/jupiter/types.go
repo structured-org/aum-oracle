@@ -2,12 +2,14 @@ package jupiter
 
 import (
 	"context"
-	"cosmossdk.io/math"
 	"errors"
 	"fmt"
+	stdmath "math"
+	"sync"
+
+	"cosmossdk.io/math"
 	"github.com/gagliardetto/solana-go"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
-	"sync"
 )
 
 // JupiterConfig is the configuration for the Jupiter Oracle Messenger.
@@ -72,9 +74,15 @@ func fetchJupiterAumData(
 			return
 		}
 
+		aumUsd, err := math.ParseUint(poolInfo.AumUsd.String())
+		if err != nil {
+			errsMu.Lock()
+			errs = append(errs, fmt.Errorf("failed to parse Jupiter pool aumUsd %s: %w", poolInfo.AumUsd.String(), err))
+			errsMu.Unlock()
+			return
+		}
 		// Jupiter pool returns aumUsd with 6 decimals.
-		// TODO: remove hardcoded value and find out how to get the correct value
-		data.AumUsd = math.NewUintFromString(poolInfo.AumUsd.String()).Quo(math.NewUint(1000000))
+		data.AumUsd = aumUsd.Quo(math.NewUint(uint64(jupiterUsdDecimalsDivisor)))
 	}()
 
 	wg.Add(1)
@@ -115,3 +123,8 @@ func fetchJupiterAumData(
 	data.SortCustodyAssets()
 	return data, nil
 }
+
+// jupiterUsdDecimalsDivisor is the divisor for the Jupiter USD values. According to Jupiter
+// team, all USD values in Jupiter are scaled to 6 decimal places (presumably to comply with
+// USDC/USDT as they also have 6 decimals).
+var jupiterUsdDecimalsDivisor = stdmath.Pow10(6)
