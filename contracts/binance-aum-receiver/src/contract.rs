@@ -71,14 +71,19 @@ fn execute_publish_data(
 ) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
+    let (result, pending_round) = CONSENSUS_STATE.publish_data(
+        deps.storage,
+        &env,
+        info.sender.clone(),
+        new_data,
+        contract_config,
+    )?;
+
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     // Only messengers can submit
     if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
-
-    let (result, pending_round) =
-        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
     let mut res = Response::new();
 
