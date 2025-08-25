@@ -287,11 +287,12 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
         Some(maxbtc_denom) => deps.querier.query_supply(maxbtc_denom)?.amount,
         None => MOCKED_MAXBTC_SUPPLY.load(deps.storage)?,
     };
-    let aum = get_aum(deps)?;
 
     if maxbtc_supply.is_zero() {
         return Ok(Decimal::one());
     }
+
+    let aum = get_aum(deps)?;
 
     Ok(Decimal::from_ratio(aum, maxbtc_supply))
 }
