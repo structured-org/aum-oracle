@@ -289,6 +289,10 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     };
     let aum = get_aum(deps)?;
 
+    if maxbtc_supply.is_zero() {
+        return Ok(Decimal::one());
+    }
+
     Ok(Decimal::from_ratio(aum, maxbtc_supply))
 }
 
