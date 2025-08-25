@@ -31,7 +31,7 @@ impl Config {
         }
 
         if (self.threshold as usize) > self.messengers.len() {
-            return Err(ConsensusError::LargeThreshold {});
+            return Err(ConsensusError::UnreachableThreshold {});
         }
 
         Ok(())

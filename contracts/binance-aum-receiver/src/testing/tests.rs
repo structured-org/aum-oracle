@@ -160,14 +160,14 @@ fn test_instantiate_validation() {
         StdError::NotFound { .. }
     ));
 
-    // Test large value for threshold
+    // Test unreachable value for threshold
     let mut msg = default_init_msg(&deps.api);
-    msg.threshold = 4;
+    msg.threshold = msg.messengers.len() as u32 + 1;
     let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::LargeThreshold {})
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
 
     // Verify nothing was created
@@ -2396,7 +2396,7 @@ fn test_execute_update_config_validation() {
     let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
     assert_eq!(consensus_config_after, consensus_config);
 
-    // Test large value for threshold
+    // Test unreachable value for threshold
     let update_config = crate::msg::UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
@@ -2405,7 +2405,7 @@ fn test_execute_update_config_validation() {
         required_binance_spot_assets: None,
         price_oracle_contract: None,
         messengers: None,
-        threshold: Some(4),
+        threshold: Some(consensus_config.messengers.len() as u32 + 1),
         data_delta_ppm: None,
         round_length: None,
     };
@@ -2416,7 +2416,7 @@ fn test_execute_update_config_validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::LargeThreshold {})
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
 
     // Verify nothing was changed
