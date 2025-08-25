@@ -137,34 +137,6 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
 }
 
 #[test]
-fn test_instantiate_messengers_with_duplicates() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let admin_info = message_info("admin", &[]);
-
-    let messenger_a = deps.api.addr_make("messenger_a");
-    let messenger_b = deps.api.addr_make("messenger_b");
-    let messenger_c = deps.api.addr_make("messenger_c");
-
-    let mut msg = default_init_msg(&deps.api);
-    msg.messengers = vec![
-        messenger_a.to_string(),
-        messenger_b.to_string(),
-        messenger_a.to_string(),
-        messenger_b.to_string(),
-        messenger_c.to_string(),
-    ];
-    let result = instantiate(deps.as_mut(), env, admin_info, msg);
-    assert!(result.is_ok());
-
-    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(
-        consensus_config.messengers,
-        vec![messenger_a, messenger_b, messenger_c]
-    );
-}
-
-#[test]
 fn test_instantiate_validation() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -177,7 +149,41 @@ fn test_instantiate_validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::InvalidMessengers {})
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    // Verify nothing was created
+    let consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage);
+    assert!(consensus_config.is_err());
+    assert!(matches!(
+        consensus_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    let contract_config = CONFIG.load(deps.as_ref().storage);
+    assert!(contract_config.is_err());
+    assert!(matches!(
+        contract_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let mut msg = default_init_msg(&deps.api);
+    msg.messengers = vec![
+        messenger_a.to_string(),
+        messenger_b.to_string(),
+        messenger_a.to_string(),
+        messenger_c.to_string(),
+    ];
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
     );
 
     // Verify nothing was created
@@ -2357,74 +2363,6 @@ fn test_execute_update_config_admin_change() {
 }
 
 #[test]
-fn test_execute_update_config_messengers_with_duplicates() {
-    let mut deps = mock_dependencies();
-    let mut env = mock_env();
-
-    // Set up initial state
-    let contract_config = create_test_contract_config();
-    let consensus_config = create_test_consensus_config();
-    setup_test_state(
-        &mut deps.as_mut(),
-        &contract_config,
-        &consensus_config,
-        1,
-        1000,
-    );
-
-    let messenger_a = deps.api.addr_make("messenger_a");
-    let messenger_b = deps.api.addr_make("messenger_b");
-    let messenger_c = deps.api.addr_make("messenger_c");
-
-    let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
-        owner: None,
-        consensus_data_valid_period: None,
-        price_data_valid_period: None,
-        required_binance_positions: None,
-        required_binance_spot_assets: None,
-        price_oracle_contract: None,
-        messengers: Some(vec![
-            messenger_a.to_string(),
-            messenger_b.to_string(),
-            messenger_a.to_string(),
-            messenger_b.to_string(),
-            messenger_c.to_string(),
-        ]),
-        threshold: None,
-        data_delta_ppm: None,
-        round_length: None,
-    };
-    let msg = ExecuteMsg::UpdateConfig {
-        new_config: update_config,
-    };
-    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
-    assert!(result.is_ok());
-
-    // Submit some to switch round
-    let messenger1_info = message_info("messenger1", &[]);
-    let test_data1 = create_test_data(
-        SignedDecimal256::from_ratio(5, 10),
-        SignedDecimal256::from_ratio(1000, 1),
-        SignedDecimal256::from_ratio(2000, 1),
-        SignedDecimal256::from_ratio(500, 1),
-    );
-    let msg = ExecuteMsg::PublishData {
-        new_data: test_data1,
-    };
-    env.block.time = env.block.time.plus_days(1);
-    let result = execute(deps.as_mut(), env, messenger1_info, msg);
-    assert!(result.is_ok());
-
-    // Verify only specified consensus fields were updated after the round switch
-    let updated_consensus_config = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(
-        updated_consensus_config.messengers,
-        vec![messenger_a, messenger_b, messenger_c]
-    );
-}
-
-#[test]
 fn test_execute_update_config_validation() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -2521,7 +2459,46 @@ fn test_execute_update_config_validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::InvalidMessengers {})
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: Some(vec![
+            messenger_a.to_string(),
+            messenger_b.to_string(),
+            messenger_a.to_string(),
+            messenger_c.to_string(),
+        ]),
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
     );
 
     // Verify nothing was changed

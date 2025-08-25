@@ -32,34 +32,6 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
 }
 
 #[test]
-fn test_instantiate_messengers_with_duplicates() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
-
-    let messenger_a = deps.api.addr_make("messenger_a");
-    let messenger_b = deps.api.addr_make("messenger_b");
-    let messenger_c = deps.api.addr_make("messenger_c");
-
-    let mut msg = default_init_msg(&deps.api);
-    msg.messengers = vec![
-        messenger_a.to_string(),
-        messenger_b.to_string(),
-        messenger_a.to_string(),
-        messenger_b.to_string(),
-        messenger_c.to_string(),
-    ];
-    let result = instantiate(deps.as_mut(), env, owner_info, msg);
-    assert!(result.is_ok());
-
-    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
-    assert_eq!(
-        consensus_config.messengers,
-        vec![messenger_a, messenger_b, messenger_c]
-    );
-}
-
-#[test]
 fn test_instantiate_validation() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -122,7 +94,34 @@ fn test_instantiate_validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::InvalidMessengers {})
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    // Verify consensus config was not created
+    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
+    assert!(consensus_config.is_err());
+    assert!(matches!(
+        consensus_config.unwrap_err(),
+        StdError::NotFound { .. }
+    ));
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let mut msg = default_init_msg(&deps.api);
+    msg.messengers = vec![
+        messenger_a.to_string(),
+        messenger_b.to_string(),
+        messenger_a.to_string(),
+        messenger_c.to_string(),
+    ];
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
     );
 
     // Verify consensus config was not created
@@ -226,54 +225,6 @@ fn test_update_config() {
 }
 
 #[test]
-fn test_update_config_messengers_with_duplicates() {
-    let mut deps = mock_dependencies();
-    let mut env = mock_env();
-    let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
-    let msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg).unwrap();
-
-    let messenger_a = deps.api.addr_make("messenger_a");
-    let messenger_b = deps.api.addr_make("messenger_b");
-    let messenger_c = deps.api.addr_make("messenger_c");
-
-    let update = msg::UpdateConfig {
-        owner: None,
-        consensus_data_valid_period: None,
-        required_custody_assets: None,
-        price_data_valid_period: None,
-        messengers: Some(vec![
-            messenger_a.to_string(),
-            messenger_b.to_string(),
-            messenger_a.to_string(),
-            messenger_b.to_string(),
-            messenger_c.to_string(),
-        ]),
-        threshold: None,
-        data_delta_ppm: None,
-        round_length: None,
-    };
-    let update_msg = UpdateConfig { new_config: update };
-    let result = execute(deps.as_mut(), env.clone(), owner_info, update_msg);
-    assert!(result.is_ok());
-
-    // Submit some to switch round
-    let messenger1_info = message_info(&deps.api.addr_make("messenger1"), &[]);
-    let data = dummy_solana_data();
-    let msg = ExecuteMsg::PublishData { new_data: data };
-    env.block.time = env.block.time.plus_days(1);
-    let result = execute(deps.as_mut(), env, messenger1_info, msg);
-    assert!(result.is_ok());
-
-    // Verify only specified consensus fields were updated after the round switch
-    let updated_consensus_config = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
-    assert_eq!(
-        updated_consensus_config.messengers,
-        vec![messenger_a, messenger_b, messenger_c]
-    );
-}
-
-#[test]
 fn test_update_config_validation() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -358,7 +309,44 @@ fn test_update_config_validation() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        ContractError::ConsensusError(ConsensusError::InvalidMessengers {})
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    // Verify nothing was changed
+    let contract_config_after = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(contract_config_after, contract_config);
+
+    let consensus_config_after = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+    assert_eq!(consensus_config_after, consensus_config);
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: Some(vec![
+            messenger_a.to_string(),
+            messenger_b.to_string(),
+            messenger_a.to_string(),
+            messenger_c.to_string(),
+        ]),
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+    let result = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
     );
 
     // Verify nothing was changed

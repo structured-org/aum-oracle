@@ -2,8 +2,8 @@ use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
-    Response, SignedDecimal256, StdResult, Uint128,
+    attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
+    SignedDecimal256, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::constants::WBTC_DECIMALS;
@@ -15,7 +15,6 @@ use jupiter_aum_common::msg::{
 use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
-use std::collections::HashSet;
 use std::str::FromStr;
 
 const CONTRACT_NAME: &str = "crates.io:jupiter-aum-receiver";
@@ -44,13 +43,12 @@ pub fn instantiate(
 
     CONFIG.save(deps.storage, &config)?;
 
-    let messengers: Vec<Addr> = msg
-        .messengers
-        .iter()
-        .map(|addr| deps.api.addr_validate(addr))
-        .collect::<StdResult<_>>()?;
     let consensus_config = ConsensusConfig {
-        messengers: deduplicate_messengers(messengers),
+        messengers: msg
+            .messengers
+            .iter()
+            .map(|addr| deps.api.addr_validate(addr))
+            .collect::<StdResult<_>>()?,
         threshold: msg.threshold,
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
@@ -113,11 +111,10 @@ fn update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     if let Some(ref messengers) = new_config.messengers {
-        let validated_messengers: Vec<Addr> = messengers
+        consensus_config.messengers = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = deduplicate_messengers(validated_messengers);
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -306,19 +303,6 @@ pub fn calculate_aum_in_wbtc(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
-}
-
-fn deduplicate_messengers(messengers: Vec<Addr>) -> Vec<Addr> {
-    let mut seen = HashSet::new();
-    let mut unique = Vec::new();
-
-    for addr in messengers {
-        if seen.insert(addr.clone()) {
-            unique.push(addr);
-        }
-    }
-
-    unique
 }
 
 /// Calculates and returns the current AUM value in wBTC.

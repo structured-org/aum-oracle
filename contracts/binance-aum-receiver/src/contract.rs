@@ -7,10 +7,9 @@ use crate::state::{AumInWBTC, BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSU
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
-    Response, SignedDecimal256, StdResult,
+    attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
+    SignedDecimal256, StdResult,
 };
-use std::collections::HashSet;
 
 const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
@@ -21,13 +20,12 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
-    let messengers: Vec<Addr> = msg
-        .messengers
-        .iter()
-        .map(|addr| deps.api.addr_validate(addr))
-        .collect::<StdResult<_>>()?;
     let consensus_config = ConsensusConfig {
-        messengers: deduplicate_messengers(messengers),
+        messengers: msg
+            .messengers
+            .iter()
+            .map(|addr| deps.api.addr_validate(addr))
+            .collect::<StdResult<_>>()?,
         threshold: msg.threshold,
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
@@ -136,11 +134,10 @@ fn execute_update_config(
 
     // Update consensus config fields
     if let Some(ref messengers) = new_config.messengers {
-        let validated_messengers: Vec<Addr> = messengers
+        consensus_config.messengers = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = deduplicate_messengers(validated_messengers);
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;
@@ -208,19 +205,6 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         aum_in_wbtc: aum_data.amount,
         decimals: WBTC_DECIMALS,
     })
-}
-
-fn deduplicate_messengers(messengers: Vec<Addr>) -> Vec<Addr> {
-    let mut seen = HashSet::new();
-    let mut unique = Vec::new();
-
-    for addr in messengers {
-        if seen.insert(addr.clone()) {
-            unique.push(addr);
-        }
-    }
-
-    unique
 }
 
 pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {
