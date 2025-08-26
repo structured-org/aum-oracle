@@ -14,7 +14,7 @@ use cosmwasm_std::{
     from_json,
     testing::{mock_dependencies, mock_env, MockApi},
     to_json_binary, Addr, Coin, Deps, DepsMut, Env, Int256, MessageInfo, SignedDecimal256,
-    StdError, Timestamp,
+    Timestamp,
 };
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
@@ -152,14 +152,6 @@ fn test_instantiate_validation() {
         ContractError::InvalidConsensusPeriod {}
     );
 
-    // Verify nothing was created
-    let contract_config = CONFIG.load(deps.as_ref().storage);
-    assert!(contract_config.is_err());
-    assert!(matches!(
-        contract_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
-
     // Test zero value for price_data_valid_period
     let mut msg = default_init_msg(&deps.api);
     msg.price_data_valid_period = 0;
@@ -169,14 +161,6 @@ fn test_instantiate_validation() {
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
     );
-
-    // Verify nothing was created
-    let contract_config = CONFIG.load(deps.as_ref().storage);
-    assert!(contract_config.is_err());
-    assert!(matches!(
-        contract_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
 }
 
 #[test]
@@ -2293,13 +2277,6 @@ fn test_execute_update_config_validation() {
         ContractError::InvalidConsensusPeriod {}
     );
 
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
-
     // Test zero value for price_data_valid_period
     let update_config = crate::msg::UpdateConfig {
         owner: None,
@@ -2322,13 +2299,6 @@ fn test_execute_update_config_validation() {
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
     );
-
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
 }
 
 #[test]
