@@ -1,4 +1,4 @@
-use crate::error::ContractResult;
+use crate::error::{ContractError, ContractResult};
 use consensus::consensus::{consensus_on_field, consensus_on_items_dec256, ConsensusData, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
@@ -187,6 +187,20 @@ impl Config {
         if let Some(ref price_oracle_contract) = new_config.price_oracle_contract {
             self.price_oracle_contract = deps.api.addr_validate(price_oracle_contract)?;
         }
+
+        Ok(())
+    }
+
+    /// Validates the configuration parameters.
+    pub fn validate(&self) -> Result<(), ContractError> {
+        if self.consensus_data_valid_period == 0 {
+            return Err(ContractError::InvalidConsensusPeriod {});
+        }
+
+        if self.price_data_valid_period == 0 {
+            return Err(ContractError::InvalidPriceDataPeriod {});
+        }
+
         Ok(())
     }
 }

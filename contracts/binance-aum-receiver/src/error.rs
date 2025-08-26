@@ -12,6 +12,12 @@ pub enum ContractError {
     #[error(transparent)]
     ConsensusError(#[from] ConsensusError),
 
+    #[error("Consensus period should be greater than 0")]
+    InvalidConsensusPeriod {},
+
+    #[error("Price data period should be greater than 0")]
+    InvalidPriceDataPeriod {},
+
     #[error("Failed to convert value to SignedDecimal256: {msg:?}")]
     SignedDecimal256RangeExceeded { msg: String },
 
