@@ -279,6 +279,41 @@ fn test_record_er_by_stranger() {
 }
 
 #[test]
+fn test_record_er_with_zero_maxbtc_supply() {
+    let mocked_supply = Uint128::zero();
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let owner = deps.api.addr_make("owner");
+    let oracle1 = deps.api.addr_make("oracle1");
+
+    // Initialize contract with mocked supply
+    let msg = InstantiateMsg {
+        owner: owner.to_string(),
+        publisher: owner.to_string(),
+        aum_oracles: vec![oracle1.to_string()],
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: mocked_supply,
+    };
+    let info = message_info(&owner, &[]);
+    instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    // Set up oracle to return AUM of 1,000,000 uwBTC
+    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+
+    // Record ER using mocked supply
+    let env1 = test_env_with_time(1000000, 100);
+    execute_msg(&mut deps, env1, &owner, ExecuteMsg::RecordEr {}).unwrap();
+
+    // Verify ER is calculated using mocked supply by checking the recorded ER in history
+    let history_rates: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates.len(), 1);
+    assert_eq!(history_rates[0], Decimal::one());
+}
+
+#[test]
 fn test_query_twaer_no_data() {
     let deps = setup_contract();
 
