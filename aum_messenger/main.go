@@ -43,7 +43,6 @@ func main() {
 	conf := readConfig()
 	logRegistry := initLogRegistry(conf.LoggerLevel)
 	logger := logRegistry.Get(mainContext)
-	logger.Info("app config", zap.Any("config", conf))
 
 	// auxiliary structs holding client definitions for DI into messengers
 	// are populated with either real or mock clients depending on config
