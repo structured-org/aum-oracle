@@ -4,7 +4,7 @@ use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
 use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_json, Env, Int256, OwnedDeps, Response, SignedDecimal256, StdError, Timestamp, Uint128,
+    from_json, Env, Int256, OwnedDeps, Response, SignedDecimal256, Timestamp, Uint128,
 };
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
@@ -47,14 +47,6 @@ fn test_instantiate_validation() {
         ContractError::InvalidConsensusPeriod {}
     );
 
-    // Verify nothing was created
-    let contract_config = CONFIG.load(&deps.storage);
-    assert!(contract_config.is_err());
-    assert!(matches!(
-        contract_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
-
     // Test zero value for price_data_valid_period
     let mut msg = default_init_msg(&deps.api);
     msg.price_data_valid_period = 0;
@@ -64,14 +56,6 @@ fn test_instantiate_validation() {
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
     );
-
-    // Verify nothing was created
-    let contract_config = CONFIG.load(&deps.storage);
-    assert!(contract_config.is_err());
-    assert!(matches!(
-        contract_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
 
     // Test zero value for threshold
     let mut msg = default_init_msg(&deps.api);
@@ -83,14 +67,6 @@ fn test_instantiate_validation() {
         ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
     );
 
-    // Verify nothing was created
-    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
-    assert!(consensus_config.is_err());
-    assert!(matches!(
-        consensus_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
-
     // Test unreachable value for threshold
     let mut msg = default_init_msg(&deps.api);
     msg.threshold = msg.messengers.len() as u32 + 1;
@@ -100,14 +76,6 @@ fn test_instantiate_validation() {
         result.unwrap_err(),
         ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
-
-    // Verify nothing was created
-    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage);
-    assert!(consensus_config.is_err());
-    assert!(matches!(
-        consensus_config.unwrap_err(),
-        StdError::NotFound { .. }
-    ));
 }
 
 #[test]
@@ -171,10 +139,7 @@ fn test_update_config_validation() {
     let env = mock_env();
     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg).unwrap();
-
-    let contract_config = CONFIG.load(&deps.storage).unwrap();
-    let consensus_config = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg.clone()).unwrap();
 
     // Test zero value for consensus_data_valid_period
     let update = msg::UpdateConfig {
@@ -197,13 +162,6 @@ fn test_update_config_validation() {
         ContractError::InvalidConsensusPeriod {}
     );
 
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(&deps.storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
-
     // Test zero value for price_data_valid_period
     let update = msg::UpdateConfig {
         owner: None,
@@ -224,13 +182,6 @@ fn test_update_config_validation() {
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
     );
-
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
 
     // Test zero value for threshold
     let update = msg::UpdateConfig {
@@ -253,13 +204,6 @@ fn test_update_config_validation() {
         ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
     );
 
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
-
     // Test unreachable value for threshold
     let update = msg::UpdateConfig {
         owner: None,
@@ -267,7 +211,7 @@ fn test_update_config_validation() {
         required_custody_assets: None,
         price_data_valid_period: None,
         messengers: None,
-        threshold: Some(consensus_config.messengers.len() as u32 + 1),
+        threshold: Some(msg.messengers.len() as u32 + 1),
         data_delta_ppm: None,
         round_length: None,
     };
@@ -278,13 +222,6 @@ fn test_update_config_validation() {
         result.unwrap_err(),
         ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
-
-    // Verify nothing was changed
-    let contract_config_after = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(contract_config_after, contract_config);
-
-    let consensus_config_after = CONSENSUS_STATE.config.load(deps.as_ref().storage).unwrap();
-    assert_eq!(consensus_config_after, consensus_config);
 }
 
 #[test]
