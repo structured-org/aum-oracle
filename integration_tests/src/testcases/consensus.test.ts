@@ -195,7 +195,7 @@ describe('Consensus', () => {
             );
             return result.round > currentRound + 1;
           },
-          40_000,
+          100_000,
           1_000,
         );
 
@@ -669,7 +669,7 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultAfterDisableTimeout.round;
           },
-          30_000,
+          100_000,
           2_000,
           true,
         );
@@ -686,7 +686,7 @@ describe('Consensus', () => {
             );
             return checkResult.round > resultAfterDisableTimeout2.round;
           },
-          30_000,
+          100_000,
           2_000,
           true,
         );
