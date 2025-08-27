@@ -185,6 +185,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
+ "cw2",
  "neutron-std",
  "serde",
  "serde_json",

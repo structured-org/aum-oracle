@@ -117,3 +117,7 @@ pub struct GetConfigResponse {
     /// The current config of the contract itself
     pub contract_config: Config,
 }
+
+/// MigrateMsg is used for contract migration.
+#[cw_serde]
+pub struct MigrateMsg {}

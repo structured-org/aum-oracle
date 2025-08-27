@@ -1,7 +1,7 @@
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, QueryMsg,
-    RoundInfoResponse, UpdateConfig,
+    ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
+    QueryMsg, RoundInfoResponse, UpdateConfig,
 };
 use crate::state::{AumInWBTC, BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
@@ -10,6 +10,10 @@ use cosmwasm_std::{
     attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
     SignedDecimal256, StdResult,
 };
+use cw2::set_contract_version;
+
+const CONTRACT_NAME: &str = "crates.io:binance-aum-receiver";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
@@ -20,6 +24,8 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let consensus_config = ConsensusConfig {
         messengers: msg
             .messengers
@@ -245,4 +251,11 @@ pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {
         / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
 
     Ok(aum_in_wbtc)
+}
+
+/// Migrates the contract
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::default())
 }

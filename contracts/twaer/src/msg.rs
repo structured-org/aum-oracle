@@ -102,3 +102,7 @@ pub struct GetTwaerResponse {
     /// The timestamp when the TWAER was published.
     pub published_at: u64,
 }
+
+/// MigrateMsg is used for contract migration.
+#[cw_serde]
+pub struct MigrateMsg {}

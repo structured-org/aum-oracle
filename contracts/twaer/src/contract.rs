@@ -2,7 +2,8 @@ use std::ops::Sub;
 
 use crate::error::{ContractError, ContractResult};
 use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
 };
 use crate::state::{
     Config, TwaAggregator, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR,
@@ -11,7 +12,11 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
 };
+use cw2::set_contract_version;
 use cw_storage_plus::Bound;
+
+const CONTRACT_NAME: &str = "crates.io:twaer";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
 pub fn instantiate(
@@ -20,6 +25,8 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let oracles: Vec<Addr> = msg
         .aum_oracles
         .iter()
@@ -392,4 +399,11 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
     total_weighted_sum
         .checked_div(Decimal::from_ratio(total_duration, 1u64))
         .map_err(ContractError::CheckedDiv)
+}
+
+/// Migrates the contract
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::default())
 }
