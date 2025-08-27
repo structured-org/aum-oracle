@@ -1,11 +1,12 @@
 use crate::contract::*;
-use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg};
-use crate::state::{
-    AumInWBTC, BinanceData, Config, Position, SpotBalance, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE,
-};
+use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
+use binance_aum_common::error::ContractError;
+use binance_aum_common::msg::{
+    ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+};
+use binance_aum_common::types::{AumInWBTC, BinanceData, Config, Position, SpotBalance};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, Round, State};
 use consensus::error::ConsensusError;
 use cosmwasm_schema::schemars;
@@ -1891,7 +1892,7 @@ fn test_execute_update_config_admin_only() {
 
     // Test 1: Non-admin tries to update config (should fail)
     let non_admin_info = message_info("non_admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: Some("new_admin_attempt".to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -1920,7 +1921,7 @@ fn test_execute_update_config_admin_only() {
 
     // Test 2: Admin successfully updates config
     let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: Some(new_admin.to_string()),
         consensus_data_valid_period: Some(7200),
         price_data_valid_period: Some(200),
@@ -2023,7 +2024,7 @@ fn test_execute_update_config_partial_updates() {
 
     // Test partial update - only contract config fields
     let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: Some(3600),
         price_data_valid_period: Some(150),
@@ -2075,7 +2076,7 @@ fn test_execute_update_config_partial_updates() {
     let messenger_b = deps.api.addr_make("messenger_b");
 
     // Test partial update - only consensus config fields
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2170,7 +2171,7 @@ fn test_execute_update_config_empty_update() {
 
     // Test empty update (all fields None)
     let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2215,7 +2216,7 @@ fn test_execute_update_config_admin_change() {
     let new_admin = deps.api.addr_make("new_admin");
     // Test admin change
     let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: Some(new_admin.to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2239,7 +2240,7 @@ fn test_execute_update_config_admin_change() {
 
     // Test that old admin can no longer update config
     let old_admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: Some("another_admin".to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2263,7 +2264,7 @@ fn test_execute_update_config_admin_change() {
 
     // Test that new admin can update config
     let new_admin_info = message_info(new_admin.as_ref(), &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: Some(5000),
         price_data_valid_period: None,
@@ -2304,7 +2305,7 @@ fn test_execute_update_config_validation() {
 
     // Test zero value for consensus_data_valid_period
     let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: Some(0),
         price_data_valid_period: None,
@@ -2327,7 +2328,7 @@ fn test_execute_update_config_validation() {
     );
 
     // Test zero value for price_data_valid_period
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: Some(0),
@@ -2350,7 +2351,7 @@ fn test_execute_update_config_validation() {
     );
 
     // Test empty vector for messengers
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2377,7 +2378,7 @@ fn test_execute_update_config_validation() {
     let messenger_c = deps.api.addr_make("messenger_c");
 
     // Test vector with duplicates for messengers
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2405,7 +2406,7 @@ fn test_execute_update_config_validation() {
     );
 
     // Test zero value for threshold
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
@@ -2428,7 +2429,7 @@ fn test_execute_update_config_validation() {
     );
 
     // Test unreachable value for threshold
-    let update_config = crate::msg::UpdateConfig {
+    let update_config = UpdateConfig {
         owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,

@@ -1,4 +1,4 @@
-use crate::state::{BinanceData, Config};
+use crate::types::{BinanceData, Config};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome, Round};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Int256;

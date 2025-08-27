@@ -1,10 +1,12 @@
-use crate::error::{ContractError, ContractResult};
-use crate::msg::{
+use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
+use crate::utils::{get_prices, spot_balance_asset_in_btc};
+use binance_aum_common::constants::WBTC_DECIMALS;
+use binance_aum_common::error::{ContractError, ContractResult};
+use binance_aum_common::msg::{
     ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
     QueryMsg, RoundInfoResponse, UpdateConfig,
 };
-use crate::state::{AumInWBTC, BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
-use crate::utils::{get_prices, spot_balance_asset_in_btc};
+use binance_aum_common::types::{AumInWBTC, BinanceData, Config};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
@@ -14,8 +16,6 @@ use cw2::set_contract_version;
 
 const CONTRACT_NAME: &str = "crates.io:binance-aum-receiver";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
 #[entry_point]
 pub fn instantiate(
