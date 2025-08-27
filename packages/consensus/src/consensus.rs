@@ -23,6 +23,21 @@ pub struct Config {
     pub round_length: u64,
 }
 
+impl Config {
+    /// Validates the configuration parameters.
+    pub fn validate(&self) -> Result<(), ConsensusError> {
+        if self.threshold == 0 {
+            return Err(ConsensusError::ZeroThreshold {});
+        }
+
+        if (self.threshold as usize) > self.messengers.len() {
+            return Err(ConsensusError::UnreachableThreshold {});
+        }
+
+        Ok(())
+    }
+}
+
 /// Describes the round entity
 #[cw_serde]
 pub struct Round {

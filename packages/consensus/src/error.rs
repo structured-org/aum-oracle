@@ -11,6 +11,12 @@ pub enum ConsensusError {
     #[error("Prepublish error: {msg}")]
     PrepublishError { msg: String },
 
+    #[error("Consensus threshold should be greater than 0")]
+    ZeroThreshold {},
+
+    #[error("Consensus threshold should be less than or equal to the number of messengers")]
+    UnreachableThreshold {},
+
     #[error("You already submitted data for this round")]
     DoubleSubmission {},
 

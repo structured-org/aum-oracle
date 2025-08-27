@@ -40,6 +40,7 @@ pub fn instantiate(
         price_data_valid_period: msg.price_data_valid_period,
     };
     config.validate()?;
+
     CONFIG.save(deps.storage, &config)?;
 
     let consensus_config = ConsensusConfig {
@@ -52,6 +53,8 @@ pub fn instantiate(
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
     };
+    consensus_config.validate()?;
+
     CONSENSUS_STATE.initialize(deps.storage, &env, consensus_config)?;
 
     Ok(Response::new()
@@ -101,8 +104,8 @@ fn update_config(
     if let Some(new_price_data_valid_period) = new_config.price_data_valid_period {
         contract_config.price_data_valid_period = new_price_data_valid_period;
     }
-
     contract_config.validate()?;
+
     CONFIG.save(deps.storage, &contract_config)?;
 
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
@@ -123,6 +126,7 @@ fn update_config(
     if let Some(round_length) = new_config.round_length {
         consensus_config.round_length = round_length;
     }
+    consensus_config.validate()?;
 
     CONSENSUS_STATE.save_config(deps.storage, consensus_config)?;
 

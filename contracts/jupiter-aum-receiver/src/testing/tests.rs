@@ -56,6 +56,26 @@ fn test_instantiate_validation() {
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
     );
+
+    // Test zero value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Test unreachable value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = msg.messengers.len() as u32 + 1;
+    let result = instantiate(deps.as_mut(), env, owner_info, msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
+    );
 }
 
 #[test]
@@ -119,7 +139,7 @@ fn test_update_config_validation() {
     let env = mock_env();
     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
     let msg = default_init_msg(&deps.api);
-    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg).unwrap();
+    instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg.clone()).unwrap();
 
     // Test zero value for consensus_data_valid_period
     let update = msg::UpdateConfig {
@@ -161,6 +181,46 @@ fn test_update_config_validation() {
     assert_eq!(
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Test zero value for threshold
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: None,
+        threshold: Some(0),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig {
+        new_config: update.clone(),
+    };
+    let result = execute(deps.as_mut(), env.clone(), owner_info.clone(), update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Test unreachable value for threshold
+    let update = msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        required_custody_assets: None,
+        price_data_valid_period: None,
+        messengers: None,
+        threshold: Some(msg.messengers.len() as u32 + 1),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let update_msg = UpdateConfig { new_config: update };
+    let result = execute(deps.as_mut(), env, owner_info, update_msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
 }
 

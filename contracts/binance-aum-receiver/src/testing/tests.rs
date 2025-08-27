@@ -142,6 +142,26 @@ fn test_instantiate_validation() {
     let env = mock_env();
     let admin_info = message_info("admin", &[]);
 
+    // Test zero value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = 0;
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Test unreachable value for threshold
+    let mut msg = default_init_msg(&deps.api);
+    msg.threshold = msg.messengers.len() as u32 + 1;
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
+    );
+
     // Test zero value for consensus_data_valid_period
     let mut msg = default_init_msg(&deps.api);
     msg.consensus_data_valid_period = 0;
@@ -155,7 +175,7 @@ fn test_instantiate_validation() {
     // Test zero value for price_data_valid_period
     let mut msg = default_init_msg(&deps.api);
     msg.price_data_valid_period = 0;
-    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    let result = instantiate(deps.as_mut(), env, admin_info, msg);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
@@ -2293,11 +2313,57 @@ fn test_execute_update_config_validation() {
     let msg = ExecuteMsg::UpdateConfig {
         new_config: update_config,
     };
-    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Test zero value for threshold
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: None,
+        threshold: Some(0),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::ZeroThreshold {})
+    );
+
+    // Test unreachable value for threshold
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: None,
+        threshold: Some(consensus_config.messengers.len() as u32 + 1),
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env, admin_info, msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::UnreachableThreshold {})
     );
 }
 
