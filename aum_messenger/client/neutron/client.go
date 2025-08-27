@@ -10,7 +10,7 @@ import (
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/structured-org/aum-messenger/utils"
+	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
 	"go.uber.org/zap"
 )
 
@@ -23,14 +23,14 @@ const (
 // Client is the Neutron client.
 type Client struct {
 	logger             *zap.Logger
-	client             *utils.CosmosClient
+	client             *cosmosclient.CosmosClient
 	jupiterAumContract string
 	binanceAumContract string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(conf utils.CosmosClientConfig, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
-	client, err := utils.New(&conf, logger)
+func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
+	client, err := cosmosclient.NewClient(&conf, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate cosmos client: %w", err)
 	}

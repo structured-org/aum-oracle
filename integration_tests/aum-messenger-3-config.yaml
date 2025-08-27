@@ -1,7 +1,3 @@
-solana_rpc_endpoint: ""
-
-binance_api_key: ""
-binance_api_secret: ""
 binance_um_positions_list:
   - BTCUSDT
   - ETHUSDT
@@ -25,6 +21,11 @@ jupiter_strategy_address: "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf"
 binance_aum_contract: "neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm"
 jupiter_aum_contract: "neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj"
 
+operational_config:
+  failure_delay: 10s
+  pre_submit_delay: 5s
+  fetch_data_timeout: 3s
+
 clients:
   neutron:
     mnemonic: "limb desk rib destroy valid unusual core useful hotel toward brisk hope prefer angry visa faint nature split team tent ask type obscure outdoor"
@@ -34,6 +35,11 @@ clients:
     node: "http://neutron_val1:26657"
     node_conn_retries: 50
     node_conn_retry_delay: "3s"
+  solana:
+    rpc_endpoint: ""
+  binance:
+    api_key: ""
+    api_secret: ""
 
 mock_clients: true
 mock_controller_port: 3000

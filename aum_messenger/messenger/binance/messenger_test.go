@@ -16,6 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
+var msgrOpConfig = msgr.OperationalConfig{
+	FailureDelay:     0 * time.Second,
+	PreSubmitDelay:   0 * time.Second,
+	FetchDataTimeout: 3 * time.Second,
+}
+
 func TestMessengerForNeutronRun(t *testing.T) {
 	start := uint64(time.Now().UTC().Unix())
 	ctrl := gomock.NewController(t)
@@ -72,9 +78,9 @@ func TestMessengerForNeutronRun(t *testing.T) {
 
 	o := NewBinanceAumMessengerForNeutron(binanceClient, neutronAumRecv, config, zap.NewExample())
 	ctx, cancel := context.WithCancel(context.Background())
-	go msgr.RunMessenger(ctx, o)
+	go msgr.RunMessenger(ctx, o, msgrOpConfig)
 
-	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
+	time.Sleep(4 * time.Second)
 	cancel()
 }
 
@@ -135,8 +141,8 @@ func TestMessengerForSolanaRun(t *testing.T) {
 
 	o := NewBinanceAumMessengerForSolana(binanceClient, solanaAumRecv, config, zap.NewExample())
 	ctx, cancel := context.WithCancel(context.Background())
-	go msgr.RunMessenger(ctx, o)
+	go msgr.RunMessenger(ctx, o, msgrOpConfig)
 
-	time.Sleep(9 * time.Second) // TODO: refine and shorten after preSubmitDelay is configurable
+	time.Sleep(4 * time.Second)
 	cancel()
 }

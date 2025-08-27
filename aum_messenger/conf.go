@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/structured-org/aum-messenger/utils"
-
+	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
+	"github.com/structured-org/aum-messenger/messenger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,13 +28,6 @@ func readConfig() *config {
 }
 
 type config struct {
-	// SolanaRpcEndpoint is the endpoint of the Solana RPC.
-	SolanaRpcEndpoint string `yaml:"solana_rpc_endpoint"`
-
-	// BinanceApiKey is the API key for the Binance API.
-	BinanceApiKey string `yaml:"binance_api_key"`
-	// BinanceApiSecret is the API secret for the Binance API.
-	BinanceApiSecret string `yaml:"binance_api_secret"`
 	// BinanceUmPositionsList is the list of UM-positions to fetch from Binance.
 	BinanceUmPositionsList []string `yaml:"binance_um_positions_list"`
 	// BinanceSpotAssetsList is the list of spot assets to fetch from Binance.
@@ -49,22 +42,40 @@ type config struct {
 	// JupiterStrategyAddress is the Jupiter strategy address pubkey.
 	JupiterStrategyAddress string `yaml:"jupiter_strategy_address"`
 
-	Clients ClientsConfig `yaml:"clients"`
+	// Clients is the configuration for different clients.
+	Clients clientsConfig `yaml:"clients"`
 
 	// Jupiter AUM Oracle Receiver contract address.
 	JupiterAumContract string `yaml:"jupiter_aum_contract"`
 	// Binance AUM Oracle Receiver contract address.
 	BinanceAumContract string `yaml:"binance_aum_contract"`
 
+	// OperationalConfig is the configuration for the messenger's operational parameters.
+	OperationalConfig messenger.OperationalConfig `yaml:"operational_config"`
+
 	// LoggerLevel is the level of the logger.
 	LoggerLevel string `yaml:"logger_level"`
 
 	// MockClients tells do the Oracle Messengers use mocked Solana, Jupiter and Binance client or
 	// real ones.
-	MockClients        bool `yaml:"mock_clients"`
-	MockControllerPort int  `yaml:"mock_controller_port"`
+	MockClients bool `yaml:"mock_clients"`
+	// MockControllerPort is the port of the mock controller server.
+	MockControllerPort int `yaml:"mock_controller_port"`
 }
 
-type ClientsConfig struct {
-	Neutron utils.CosmosClientConfig `yaml:"neutron"`
+type clientsConfig struct {
+	Neutron cosmosclient.Config `yaml:"neutron"`
+	Solana  solanaConfig        `yaml:"solana"`
+	Binance binanceConfig       `yaml:"binance"`
+}
+
+type solanaConfig struct {
+	RpcEndpoint string `yaml:"rpc_endpoint"`
+}
+
+type binanceConfig struct {
+	// BinanceApiKey is the API key for the Binance API.
+	ApiKey string `yaml:"api_key"`
+	// BinanceApiSecret is the API secret for the Binance API.
+	ApiSecret string `yaml:"api_secret"`
 }
