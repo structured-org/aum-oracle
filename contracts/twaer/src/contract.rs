@@ -1,19 +1,17 @@
-use std::ops::Sub;
-
-use crate::error::{ContractError, ContractResult};
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
-    UpdateConfig,
-};
-use crate::state::{
-    Config, TwaAggregator, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR,
-};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::Bound;
+use std::ops::Sub;
+use twaer_common::error::{ContractError, ContractResult};
+use twaer_common::msg::{
+    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
+};
+use twaer_common::types::{Config, TwaAggregator};
 
 const CONTRACT_NAME: &str = "crates.io:twaer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");

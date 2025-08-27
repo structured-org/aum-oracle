@@ -1,4 +1,4 @@
-use crate::state::Config;
+use crate::types::Config;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 

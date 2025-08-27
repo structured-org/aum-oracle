@@ -1,15 +1,16 @@
 use crate::contract::{execute, instantiate, query};
-use crate::error::ContractError;
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
-};
-use crate::state::{Config, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
+use twaer_common::error::ContractError;
+use twaer_common::msg::{
+    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+};
+use twaer_common::types::Config;
 
 #[test]
 fn proper_initialization() {

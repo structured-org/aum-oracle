@@ -1,0 +1,13 @@
+[package]
+name = "twaer-common"
+description = "Shared TWAER contract interface"
+version = "0.1.0"
+authors = []
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/structured-org/aum-oracle/"
+
+[dependencies]
+cosmwasm-std = { version = "2.2.0" }
+thiserror = "1"
+cosmwasm-schema = { version = "2.2.0" }

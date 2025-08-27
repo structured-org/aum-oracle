@@ -1382,6 +1382,16 @@ dependencies = [
  "serde-json-wasm 0.5.2",
  "serde_json",
  "thiserror",
+ "twaer-common",
+]
+
+[[package]]
+name = "twaer-common"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "thiserror",
 ]
 
 [[package]]
