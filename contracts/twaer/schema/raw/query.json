@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "oneOf": [
+    {
+      "description": "Returns contract's configuration.",
+      "type": "object",
+      "required": [
+        "get_config"
+      ],
+      "properties": {
+        "get_config": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Returns the latest total AUM (in Bitcoin) reported by oracles.",
+      "type": "object",
+      "required": [
+        "get_aum"
+      ],
+      "properties": {
+        "get_aum": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Returns the Time-Weighted Average Exchange Rate published by the contract. The rate is only updated when PublishTwaer is explicitly called, providing predictable and authorized rate changes.",
+      "type": "object",
+      "required": [
+        "get_twaer"
+      ],
+      "properties": {
+        "get_twaer": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "PredictTwaer calculates and returns the current Time-Weighted Average Exchange Rate based on all recorded exchange rate history from RecordEr calls. This provides a real-time view of what the TWA ER would be if PublishTwaer were called at this moment.",
+      "type": "object",
+      "required": [
+        "predict_twaer"
+      ],
+      "properties": {
+        "predict_twaer": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
