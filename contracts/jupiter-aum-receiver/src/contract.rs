@@ -2,8 +2,8 @@ use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
-    Response, SignedDecimal256, StdResult, Uint128,
+    attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
+    SignedDecimal256, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use jupiter_aum_common::constants::WBTC_DECIMALS;
@@ -46,9 +46,9 @@ pub fn instantiate(
     let consensus_config = ConsensusConfig {
         messengers: msg
             .messengers
-            .into_iter()
-            .map(|addr| deps.api.addr_validate(&addr))
-            .collect::<Result<Vec<Addr>, _>>()?,
+            .iter()
+            .map(|addr| deps.api.addr_validate(addr))
+            .collect::<StdResult<_>>()?,
         threshold: msg.threshold,
         data_delta_ppm: msg.data_delta_ppm,
         round_length: msg.round_length,
@@ -111,11 +111,10 @@ fn update_config(
     let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     if let Some(ref messengers) = new_config.messengers {
-        let validated_messengers: Vec<Addr> = messengers
+        consensus_config.messengers = messengers
             .iter()
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
-        consensus_config.messengers = validated_messengers;
     }
     if let Some(threshold) = new_config.threshold {
         consensus_config.threshold = threshold;

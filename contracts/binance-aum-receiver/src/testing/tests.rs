@@ -142,6 +142,35 @@ fn test_instantiate_validation() {
     let env = mock_env();
     let admin_info = message_info("admin", &[]);
 
+    // Test empty vector for messengers
+    let mut msg = default_init_msg(&deps.api);
+    msg.messengers = vec![];
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let mut msg = default_init_msg(&deps.api);
+    msg.messengers = vec![
+        messenger_a.to_string(),
+        messenger_b.to_string(),
+        messenger_a.to_string(),
+        messenger_c.to_string(),
+    ];
+    let result = instantiate(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
+    );
+
     // Test zero value for threshold
     let mut msg = default_init_msg(&deps.api);
     msg.threshold = 0;
@@ -2318,6 +2347,61 @@ fn test_execute_update_config_validation() {
     assert_eq!(
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod {}
+    );
+
+    // Test empty vector for messengers
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: Some(vec![]),
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::EmptyMessengers {})
+    );
+
+    let messenger_a = deps.api.addr_make("messenger_a");
+    let messenger_b = deps.api.addr_make("messenger_b");
+    let messenger_c = deps.api.addr_make("messenger_c");
+
+    // Test vector with duplicates for messengers
+    let update_config = crate::msg::UpdateConfig {
+        owner: None,
+        consensus_data_valid_period: None,
+        price_data_valid_period: None,
+        required_binance_positions: None,
+        required_binance_spot_assets: None,
+        price_oracle_contract: None,
+        messengers: Some(vec![
+            messenger_a.to_string(),
+            messenger_b.to_string(),
+            messenger_a.to_string(),
+            messenger_c.to_string(),
+        ]),
+        threshold: None,
+        data_delta_ppm: None,
+        round_length: None,
+    };
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: update_config,
+    };
+    let result = execute(deps.as_mut(), env.clone(), admin_info.clone(), msg);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        ContractError::ConsensusError(ConsensusError::DuplicateMessengers {})
     );
 
     // Test zero value for threshold

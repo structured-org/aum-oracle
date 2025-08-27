@@ -7,6 +7,7 @@ use cosmwasm_std::{
 use cw_storage_plus::{Item, Map};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::ops::{Add, Div, Sub};
 
@@ -26,6 +27,15 @@ pub struct Config {
 impl Config {
     /// Validates the configuration parameters.
     pub fn validate(&self) -> Result<(), ConsensusError> {
+        if self.messengers.is_empty() {
+            return Err(ConsensusError::EmptyMessengers {});
+        }
+
+        let mut seen = HashSet::new();
+        if !self.messengers.iter().all(|addr| seen.insert(addr)) {
+            return Err(ConsensusError::DuplicateMessengers {});
+        }
+
         if self.threshold == 0 {
             return Err(ConsensusError::ZeroThreshold {});
         }
