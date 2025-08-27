@@ -1,6 +1,7 @@
 use crate::contract::{calculate_aum_in_wbtc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
+use consensus::consensus::{Config as ConsensusConfig, Round};
 use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
@@ -11,6 +12,7 @@ use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
 use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{CustodyAsset, SolanaData};
+use std::ops::Add;
 use std::str::FromStr;
 
 // Helper to create a default instantiate message
@@ -269,6 +271,70 @@ fn test_publish_data_invalid_custody() {
             ConsensusError::PrepublishError { .. }
         ))
     ));
+}
+
+#[test]
+fn test_execute_publish_up_to_date_consensus() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let api = deps.api;
+    let owner_info = message_info(&api.addr_make("owner"), &[]);
+    instantiate(
+        deps.as_mut(),
+        env.clone(),
+        owner_info,
+        default_init_msg(&api),
+    )
+    .unwrap();
+
+    let new_consensus_config = ConsensusConfig {
+        messengers: vec![
+            api.addr_make("messenger1"),
+            api.addr_make("messenger2"),
+            api.addr_make("messenger3"),
+        ],
+        threshold: 2,
+        data_delta_ppm: 10000,
+        round_length: 7000, // new round length
+    };
+
+    // Save to pending_config
+    CONSENSUS_STATE
+        .pending_config
+        .save(deps.as_mut().storage, &new_consensus_config)
+        .unwrap();
+
+    CONSENSUS_STATE
+        .pending_round
+        .save(
+            deps.as_mut().storage,
+            &Round {
+                round: 1,
+                start: 1000,
+            },
+        )
+        .unwrap();
+
+    let info = message_info(&api.addr_make("messenger1"), &[]);
+    let data = dummy_solana_data();
+
+    let msg = ExecuteMsg::PublishData { new_data: data };
+    let res = execute(deps.as_mut(), env.clone(), info, msg);
+    assert!(res.is_ok());
+
+    let response = res.unwrap();
+
+    let publish_consensus_attr = response.attributes.iter().find(|attr| {
+        attr.key == "next_round_timestamp"
+            && attr.value
+                == env
+                    .block
+                    .time
+                    .seconds()
+                    .add(new_consensus_config.round_length)
+                    .to_string()
+    });
+    assert!(publish_consensus_attr.is_some());
 }
 
 #[test]
