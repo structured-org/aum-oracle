@@ -252,13 +252,8 @@ func fetchBinanceData(
 			errsMu.Unlock()
 			return
 		}
-		for i, position := range umPositions {
-			if !slices.Contains(umPositionsList, position.Symbol) {
-				umPositions = append(umPositions[:i], umPositions[i+1:]...)
-			}
-		}
 
-		data.UmPositions = umPositions
+		data.UmPositions = filterPositions(umPositions, umPositionsList)
 	}()
 
 	wg.Add(1)
@@ -273,14 +268,7 @@ func fetchBinanceData(
 			return
 		}
 
-		balances := make([]*binance.Balance, 0)
-		for _, balance := range spotAccountInfo.Balances {
-			if slices.Contains(spotAssetsList, balance.Asset) {
-				balances = append(balances, &balance)
-			}
-		}
-
-		data.SpotBalances = balances
+		data.SpotBalances = filterBalances(spotAccountInfo.Balances, spotAssetsList)
 	}()
 
 	wg.Add(1)
@@ -323,4 +311,26 @@ func fetchBinanceData(
 		return nil, fmt.Errorf("some queries failed: %w", errors.Join(errs...))
 	}
 	return data, nil
+}
+
+// filterPositions filters out positions that are not in the requiredSymbols list.
+func filterPositions(positions []*binanceportfolio.UMPosition, requiredSymbols []string) []*binanceportfolio.UMPosition {
+	filteredPositions := make([]*binanceportfolio.UMPosition, 0, len(positions))
+	for _, position := range positions {
+		if slices.Contains(requiredSymbols, position.Symbol) {
+			filteredPositions = append(filteredPositions, position)
+		}
+	}
+	return filteredPositions
+}
+
+// filterBalances filters out balances that are not in the requiredAssets list.
+func filterBalances(balances []binance.Balance, requiredAssets []string) []*binance.Balance {
+	filteredBalances := make([]*binance.Balance, 0, len(balances))
+	for _, balance := range balances {
+		if slices.Contains(requiredAssets, balance.Asset) {
+			filteredBalances = append(filteredBalances, &balance)
+		}
+	}
+	return filteredBalances
 }
