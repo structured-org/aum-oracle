@@ -71,19 +71,14 @@ fn execute_publish_data(
 ) -> ContractResult<Response> {
     let contract_config = CONFIG.load(deps.storage)?;
 
-    let (result, pending_round) = CONSENSUS_STATE.publish_data(
-        deps.storage,
-        &env,
-        info.sender.clone(),
-        new_data,
-        contract_config,
-    )?;
-
-    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     // Only messengers can submit
     if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
+
+    let (result, pending_round) =
+        CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
     let mut res = Response::new();
 
@@ -101,6 +96,8 @@ fn execute_publish_data(
             .add_attribute("consensus_reached", outcome.round.to_string())
             .add_attribute("aum_in_wbtc", aum_amount);
     }
+
+    consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([

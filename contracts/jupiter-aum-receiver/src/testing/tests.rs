@@ -274,7 +274,7 @@ fn test_publish_data_invalid_custody() {
 }
 
 #[test]
-fn test_execute_publish_up_to_date_consensus() {
+fn test_execute_publish_data_up_to_date_consensus() {
     let mut deps = mock_dependencies();
     let env = mock_env();
     let api = deps.api;

@@ -414,7 +414,7 @@ fn test_execute_publish_data_time_based_consensus() {
 }
 
 #[test]
-fn test_execute_publish_up_to_date_consensus() {
+fn test_execute_publish_data_up_to_date_consensus() {
     // Set up a test environment
     let mut deps = mock_dependencies();
     let env = mock_env();
