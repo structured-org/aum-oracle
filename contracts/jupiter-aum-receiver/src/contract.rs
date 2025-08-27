@@ -139,7 +139,7 @@ fn execute_publish_data(
 ) -> Result<Response, ContractError> {
     let contract_config = CONFIG.load(deps.storage)?;
 
-    let mut consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     if !consensus_config.messengers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
@@ -164,7 +164,7 @@ fn execute_publish_data(
             .add_attribute("aum_in_wbtc", aum_amount);
     }
 
-    consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
 
     let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([
