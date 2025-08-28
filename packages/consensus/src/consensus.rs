@@ -219,7 +219,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
     ) -> ConsensusResult<(PublishResult<T>, Round)> {
         let mut pending_round = self.pending_round.load(storage)?;
 
-        let config = self.config.load(storage)?;
+        let mut config = self.config.load(storage)?;
 
         ConsensusData::prepublish_cleanup(&mut new_data, options)?;
 
@@ -248,7 +248,7 @@ impl<T: ConsensusData<O>, O> State<T, O> {
             // if there is some pending config, we need to write to the main config storage on round switch
             if let Some(pending_config) = self.pending_config.may_load(storage)? {
                 self.config.save(storage, &pending_config)?;
-                // clear pending config
+                config = pending_config;
                 self.pending_config.remove(storage);
             }
         }

@@ -885,3 +885,212 @@ fn test_exact_consensus_on_items_various_cases() {
         assert_eq!(all_items_equal(&items), Some(Foo(1)));
     }
 }
+
+#[test]
+fn test_finalize_round_on_update_messengers_count() {
+    // This test verifies that when a pending config updates the messengers count during round advancement,
+    // the updated messengers count is used to check if the round can be finalized, not the outdated one.
+
+    // 1) 1 → 2 messengers: First publication should NOT trigger round finalization
+    {
+        let mut deps = cosmwasm_std::testing::MockStorage::new();
+        let mut env = mock_env();
+        let start_time = 1000;
+        env.block.time = Timestamp::from_seconds(start_time);
+
+        let initial_config = Config {
+            messengers: vec![Addr::unchecked("messenger1")], // Set up initial state with 1 messenger
+            threshold: 1,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+
+        let round = Round {
+            round: 1,
+            start: start_time,
+        };
+        let state = setup_test_state(&mut deps, &initial_config, round.round, round.start);
+
+        // Save the new config with 2 messengers as pending (will be applied on round switch)
+        state
+            .save_config(
+                &mut deps,
+                Config {
+                    messengers: vec![Addr::unchecked("messenger1"), Addr::unchecked("messenger2")],
+                    threshold: 1, // Keep threshold low to focus on messengers.len() check
+                    data_delta_ppm: 10000,
+                    round_length: 3600,
+                },
+            )
+            .unwrap();
+
+        // Advance time to trigger round advancement
+        env.block.time = Timestamp::from_seconds(start_time + initial_config.round_length + 1);
+
+        // Create test data
+        let test_data = create_test_data(
+            SignedDecimal256::from_ratio(5, 10),
+            SignedDecimal256::from_ratio(1000, 1),
+            SignedDecimal256::from_ratio(2000, 1),
+            SignedDecimal256::from_ratio(500, 1),
+        );
+
+        // Publish data from only one messenger
+        // With the OLD config (1 messenger), this would trigger immediate consensus finalization
+        // With the NEW config (2 messengers), this should NOT trigger immediate consensus
+        let messenger1 = Addr::unchecked("messenger1");
+        let result = state
+            .publish_data(
+                &mut deps,
+                &env,
+                messenger1.clone(),
+                test_data.clone(),
+                create_mock_config(),
+            )
+            .unwrap();
+
+        // Verify that consensus was NOT reached immediately because we now have 2 messengers total
+        // and only 1 has submitted data (the check should be pending_data.len() == 2, not 1)
+        match result.0 {
+            crate::consensus::PublishResult::ConsensusNotReached => {
+                // This is expected - with 2 messengers total, we need both to submit before immediate consensus
+            }
+            crate::consensus::PublishResult::ConsensusReached(_) => {
+                panic!("Consensus should NOT be reached immediately with only 1 out of 2 messengers submitting data");
+            }
+        }
+
+        // Verify that the config has been updated in storage
+        let current_config = state.config.load(&deps).unwrap();
+        assert_eq!(
+            current_config.messengers.len(),
+            2,
+            "Config should have 2 messengers now"
+        );
+
+        // Verify that pending config was cleared
+        let pending_config = state.pending_config.may_load(&deps).unwrap();
+        assert!(
+            pending_config.is_none(),
+            "Pending config should be cleared after application"
+        );
+
+        // Now publish data from the second messenger - this should trigger immediate consensus
+        let messenger2 = Addr::unchecked("messenger2");
+        let test_data2 = create_test_data(
+            SignedDecimal256::from_ratio(505, 1000),
+            SignedDecimal256::from_ratio(1005, 1),
+            SignedDecimal256::from_ratio(2010, 1),
+            SignedDecimal256::from_ratio(505, 1),
+        );
+
+        let result2 = state
+            .publish_data(
+                &mut deps,
+                &env,
+                messenger2.clone(),
+                test_data2,
+                create_mock_config(),
+            )
+            .unwrap();
+
+        // Now consensus should be reached because all 2 messengers have submitted data
+        match result2.0 {
+            crate::consensus::PublishResult::ConsensusReached(outcome) => {
+                assert_eq!(outcome.round, 2, "Consensus should be reached for round 2");
+            }
+            crate::consensus::PublishResult::ConsensusNotReached => {
+                panic!("Consensus SHOULD be reached with both messengers submitting data");
+            }
+        }
+    }
+
+    // 2) 2 → 1 messengers: First publication SHOULD trigger round finalization
+    {
+        let mut deps = cosmwasm_std::testing::MockStorage::new();
+        let mut env = mock_env();
+        let start_time = 2000; // Different start time to avoid conflicts
+        env.block.time = Timestamp::from_seconds(start_time);
+
+        // Set up initial state with 2 messengers
+        let initial_config = Config {
+            messengers: vec![Addr::unchecked("messenger1"), Addr::unchecked("messenger2")],
+            threshold: 1,
+            data_delta_ppm: 10000,
+            round_length: 3600,
+        };
+
+        let round = Round {
+            round: 1,
+            start: start_time,
+        };
+        let state = setup_test_state(&mut deps, &initial_config, round.round, round.start);
+
+        // Save the new config with 1 messenger as pending (will be applied on round switch)
+        state
+            .save_config(
+                &mut deps,
+                Config {
+                    messengers: vec![Addr::unchecked("messenger1")],
+                    threshold: 1,
+                    data_delta_ppm: 10000,
+                    round_length: 3600,
+                },
+            )
+            .unwrap();
+
+        // Advance time to trigger round advancement
+        env.block.time = Timestamp::from_seconds(start_time + initial_config.round_length + 1);
+
+        // Create test data
+        let test_data = create_test_data(
+            SignedDecimal256::from_ratio(6, 10),
+            SignedDecimal256::from_ratio(1100, 1),
+            SignedDecimal256::from_ratio(2100, 1),
+            SignedDecimal256::from_ratio(600, 1),
+        );
+
+        // Publish data from only one messenger
+        // With the OLD config (2 messengers), this would NOT trigger immediate consensus finalization
+        // With the NEW config (1 messenger), this SHOULD trigger immediate consensus
+        let messenger1 = Addr::unchecked("messenger1");
+        let result = state
+            .publish_data(
+                &mut deps,
+                &env,
+                messenger1.clone(),
+                test_data.clone(),
+                create_mock_config(),
+            )
+            .unwrap();
+
+        // Verify that consensus WAS reached immediately because we now have only 1 messenger total
+        // and 1 has submitted data (the check should be pending_data.len() == 1, not 2)
+        match result.0 {
+            crate::consensus::PublishResult::ConsensusReached(outcome) => {
+                assert_eq!(
+                    outcome.round, 2,
+                    "Consensus should be reached immediately for round 2"
+                );
+            }
+            crate::consensus::PublishResult::ConsensusNotReached => {
+                panic!("Consensus SHOULD be reached immediately with 1 out of 1 messenger submitting data");
+            }
+        }
+
+        // Verify that the config has been updated in storage
+        let current_config = state.config.load(&deps).unwrap();
+        assert_eq!(
+            current_config.messengers.len(),
+            1,
+            "Config should have 1 messenger now"
+        );
+
+        // Verify that pending config was cleared
+        let pending_config = state.pending_config.may_load(&deps).unwrap();
+        assert!(
+            pending_config.is_none(),
+            "Pending config should be cleared after application"
+        );
+    }
+}
