@@ -1402,6 +1402,7 @@ dependencies = [
  "cw-ownable",
  "cw-storage-plus",
  "cw2",
+ "neutron-std",
  "serde",
  "serde_json",
  "thiserror",
