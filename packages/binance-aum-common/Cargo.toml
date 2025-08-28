@@ -16,3 +16,4 @@ thiserror = { version = "1.0" }
 hex = "0.4.3"
 sha2 = "0.10.8"
 consensus = { path = "../consensus" }
+aum-receiver-common = { path = "../aum-receiver-common" }

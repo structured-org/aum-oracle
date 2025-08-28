@@ -1,10 +1,11 @@
 use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
-use binance_aum_common::constants::WBTC_DECIMALS;
+use aum_receiver_common::constants::WBTC_DECIMALS;
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse, RoundInfoResponse};
 use binance_aum_common::error::{ContractError, ContractResult};
 use binance_aum_common::msg::{
-    ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg, RoundInfoResponse, UpdateConfig,
+    ExecuteMsg, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
 };
 use binance_aum_common::types::{AumInWBTC, BinanceData, Config};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
@@ -207,10 +208,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         return Err(ContractError::PublishedDataTooOld {});
     }
 
-    Ok(GetAumResponse {
-        aum_in_wbtc: aum_data.amount,
-        decimals: WBTC_DECIMALS,
-    })
+    Ok(aum_response_from_uwbtc(aum_data.amount))
 }
 
 pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {

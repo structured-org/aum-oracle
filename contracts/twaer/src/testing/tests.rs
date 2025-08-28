@@ -1,15 +1,14 @@
 use crate::contract::{execute, instantiate, query};
 use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
+    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use twaer_common::error::ContractError;
-use twaer_common::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
-};
+use twaer_common::msg::{ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig};
 use twaer_common::types::Config;
 
 #[test]
@@ -211,7 +210,7 @@ fn query_aum_single_oracle() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_wbtc, Uint128::from(1000000u128));
+    assert_eq!(res.aum_in_wbtc, Int256::from(1000000u128));
 }
 
 #[test]
@@ -230,13 +229,9 @@ fn query_aum_multiple_oracles() {
             contract_addr,
         } => {
             let res = if contract_addr.as_str() == oracle1.as_str() {
-                GetAumResponse {
-                    aum_in_wbtc: Uint128::from(1000000u128), // 0.01 BTC
-                }
+                aum_response_from_uwbtc(Int256::from(1000000u128))
             } else if contract_addr.as_str() == oracle2.as_str() {
-                GetAumResponse {
-                    aum_in_wbtc: Uint128::from(2000000u128), // 0.02 BTC
-                }
+                aum_response_from_uwbtc(Int256::from(2000000u128))
             } else {
                 unreachable!()
             };
@@ -249,7 +244,7 @@ fn query_aum_multiple_oracles() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_wbtc, Uint128::from(3000000u128)); // 0.03 BTC total
+    assert_eq!(res.aum_in_wbtc, Int256::from(3000000u128)); // 0.03 BTC total
 }
 
 #[test]
@@ -1118,9 +1113,7 @@ fn mock_oracle_response(
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
         WasmQuery::Smart { msg: _, .. } => {
-            let res = GetAumResponse {
-                aum_in_wbtc: Uint128::from(aum_in_wbtc),
-            };
+            let res = aum_response_from_uwbtc(Int256::from(aum_in_wbtc));
             let bin = to_json_binary(&res).unwrap();
             SystemResult::Ok(ContractResult::Ok(bin))
         }

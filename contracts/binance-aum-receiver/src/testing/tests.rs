@@ -2,9 +2,10 @@ use crate::contract::*;
 use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::testing::mock::custom_mock_dependencies;
 use crate::utils::CombinedPriceResponse;
+use aum_receiver_common::types::GetAumResponse;
 use binance_aum_common::error::ContractError;
 use binance_aum_common::msg::{
-    ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+    ExecuteMsg, GetDataResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
 use binance_aum_common::types::{AumInWBTC, BinanceData, Config, Position, SpotBalance};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusData, Round, State};

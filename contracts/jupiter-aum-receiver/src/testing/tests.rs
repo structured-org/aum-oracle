@@ -1,6 +1,7 @@
 use crate::contract::{calculate_aum_in_wbtc, execute, instantiate, query};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
+use aum_receiver_common::types::GetAumResponse;
 use consensus::error::ConsensusError;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
@@ -448,7 +449,7 @@ fn test_query_get_aum_behavior() {
     assert!(exec_res.is_ok());
     let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     let bin = res.unwrap();
-    let parsed: msg::GetAumResponse = from_json(bin).unwrap();
+    let parsed: GetAumResponse = from_json(bin).unwrap();
 
     // expected: aum_usd = 500_000, strategy_jlp_balance = 10_000, total_jlp_supply = 1_000
     // virtual price = 500_000_000 / 1_000 = 500

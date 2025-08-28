@@ -1,7 +1,8 @@
 use crate::types::SolanaData;
-use consensus::consensus::{ConsensusOutcome, Round};
+use aum_receiver_common::types::{GetAumResponse, RoundInfoResponse};
+use consensus::consensus::ConsensusOutcome;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Int256};
+use cosmwasm_std::Addr;
 
 /// InstantiateMsg defines the message used to initialize the contract.
 #[cw_serde]
@@ -109,26 +110,6 @@ pub struct ConfigResponse {
 pub struct GetDataResponse {
     /// The finalized Solana data, if available.
     pub last_published_data: Option<ConsensusOutcome<SolanaData>>,
-}
-
-/// AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)
-#[cw_serde]
-pub struct GetAumResponse {
-    /// The latest AUM in Jupiter reported by messengers
-    /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
-    pub aum_in_wbtc: Int256,
-    /// Represents the number of decimals that the aum_in_wbtc is
-    /// represented in. It is used to scale the aum_in_btc to its base BTC value.
-    /// E.g. `base_aum_in_wbtc = aum_in_wbtc / 10^decimals`
-    pub decimals: u32,
-}
-
-#[cw_serde]
-pub struct RoundInfoResponse {
-    /// Current round.
-    pub pending_round: Round,
-    /// Next round.
-    pub next_round: Round,
 }
 
 /// MigrateMsg is used for contract migration.

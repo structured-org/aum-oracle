@@ -1,4 +1,5 @@
 use crate::types::Config;
+use aum_receiver_common::types::GetAumResponse;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 
@@ -85,13 +86,6 @@ pub enum QueryMsg {
     /// on all recorded exchange rate history from RecordEr calls. This provides a real-time view
     /// of what the TWA ER would be if PublishTwaer were called at this moment.
     PredictTwaer {},
-}
-
-#[cw_serde]
-pub struct GetAumResponse {
-    /// The total BTC AUM reported by oracles.
-    /// The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC
-    pub aum_in_wbtc: Uint128,
 }
 
 #[cw_serde]

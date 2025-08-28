@@ -1,15 +1,15 @@
 use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdResult, Uint128,
+    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
+    Order, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::Bound;
 use std::ops::Sub;
 use twaer_common::error::{ContractError, ContractResult};
 use twaer_common::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
-    UpdateConfig,
+    ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig,
 };
 use twaer_common::types::{Config, TwaAggregator};
 
@@ -297,9 +297,12 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
         return Ok(Decimal::one());
     }
 
-    let aum = get_aum(deps)?;
+    let aum = get_aum_from_oracles(deps)?;
+    let aum_uint = Uint128::try_from(aum).map_err(|e| ContractError::ConversionError {
+        msg: format!("failed to convert total AUM {} to Uint128: {}", aum, e),
+    })?;
 
-    Ok(Decimal::from_ratio(aum, maxbtc_supply))
+    Ok(Decimal::from_ratio(aum_uint, maxbtc_supply))
 }
 
 /// Find the next timestamp after the given timestamp
@@ -332,8 +335,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
 }
 
 fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
-    let aum = get_aum(deps)?;
-    Ok(GetAumResponse { aum_in_wbtc: aum })
+    let aum = get_aum_from_oracles(deps)?;
+    Ok(aum_response_from_uwbtc(aum))
 }
 
 fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
@@ -347,9 +350,9 @@ fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
     })
 }
 
-fn get_aum(deps: Deps) -> ContractResult<Uint128> {
+fn get_aum_from_oracles(deps: Deps) -> ContractResult<Int256> {
     let config = CONFIG.load(deps.storage)?;
-    let mut total_aum = Uint128::zero();
+    let mut total_aum = Int256::zero();
     for oracle in config.aum_oracles.iter() {
         let aum: GetAumResponse = deps.querier.query_wasm_smart(
             oracle,
