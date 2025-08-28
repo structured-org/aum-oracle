@@ -372,7 +372,7 @@
     "get_aum": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "GetAumResponse",
-      "description": "AumResponse returns latest valid calculated aum in micro-Bitcoin (uwBTC)",
+      "description": "Response type for AUM Oracle receiver GetAum queries. **Must** return the AUM in micro-Bitcoin (uwBTC) with precision of `WBTC_DECIMALS`.",
       "type": "object",
       "required": [
         "aum_in_wbtc",
@@ -380,7 +380,7 @@
       ],
       "properties": {
         "aum_in_wbtc": {
-          "description": "The latest AUM in Jupiter reported by messengers The value is in micro-Bitcoin (uwBTC) = 1wBTC = 100000000 uwBTC",
+          "description": "The latest AUM in the AUM Oracle receiver reported by messengers scaled to `WBTC_DECIMALS`.",
           "allOf": [
             {
               "$ref": "#/definitions/Int256"
@@ -388,7 +388,7 @@
           ]
         },
         "decimals": {
-          "description": "Represents the number of decimals that the aum_in_wbtc is represented in. It is used to scale the aum_in_btc to its base BTC value. E.g. `base_aum_in_wbtc = aum_in_wbtc / 10^decimals`",
+          "description": "Represents the number of decimals that the `aum_in_wbtc` is represented in. Must always equal to `WBTC_DECIMALS`. It is used to scale the `aum_in_wbtc` to its base BTC value. E.g. `base_aum_in_btc = aum_in_wbtc / 10^decimals`.",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -635,6 +635,7 @@
     "get_round_info": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "RoundInfoResponse",
+      "description": "Response type for AUM Oracle receiver GetRoundInfo queries.",
       "type": "object",
       "required": [
         "next_round",
@@ -642,7 +643,7 @@
       ],
       "properties": {
         "next_round": {
-          "description": "Next round.",
+          "description": "The next round",
           "allOf": [
             {
               "$ref": "#/definitions/Round"
@@ -650,7 +651,7 @@
           ]
         },
         "pending_round": {
-          "description": "Current round.",
+          "description": "Currently pending round",
           "allOf": [
             {
               "$ref": "#/definitions/Round"
