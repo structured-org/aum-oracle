@@ -16,6 +16,7 @@ use cosmwasm_std::{
     to_json_binary, Addr, Coin, Deps, DepsMut, Env, Int256, MessageInfo, SignedDecimal256,
     Timestamp,
 };
+use cw_ownable::OwnershipError::NotOwner;
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -45,7 +46,6 @@ fn create_test_consensus_config() -> ConsensusConfig {
 // Helper function to create a test contract config
 fn create_test_contract_config() -> Config {
     Config {
-        owner: Addr::unchecked("admin"),
         price_data_valid_period: 100,
         required_binance_positions: vec!["BTCUSDT".to_string()],
         required_binance_spot_assets: vec!["BTC".to_string(), "USDT".to_string()],
@@ -87,6 +87,7 @@ fn create_test_data(
 // Helper function to setup storage with config and current round
 fn setup_test_state(
     deps: &mut DepsMut,
+    owner: Addr,
     config: &Config,
     consensus_config: &ConsensusConfig,
     round: u64,
@@ -106,6 +107,8 @@ fn setup_test_state(
         .unwrap();
 
     CONFIG.save(deps.storage, config).unwrap();
+
+    cw_ownable::initialize_owner(deps.storage, deps.api, Some(owner.as_ref())).unwrap();
 }
 
 fn query_last_published_data(deps: Deps, env: Env) -> GetDataResponse {
@@ -228,8 +231,10 @@ fn test_execute_publish_data() {
         round: 1,
         start: 1000,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -432,8 +437,10 @@ fn test_execute_publish_data_time_based_consensus() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -743,8 +750,10 @@ fn test_all_messengers_consensus_round_not_increased() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -840,8 +849,10 @@ fn test_partial_messengers_consensus_round_not_increased() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -958,8 +969,10 @@ fn test_no_consensus_when_threshold_not_met_and_round_passed() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -1049,8 +1062,10 @@ fn test_multiple_rounds_passing() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -1123,8 +1138,10 @@ fn test_messengers_submitting_across_multiple_rounds() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -1386,8 +1403,10 @@ fn test_messenger_cannot_publish_twice_for_same_round() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -1467,8 +1486,10 @@ fn test_delayed_messenger_submissions_within_round() {
         round: 1,
         start: start_time,
     };
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         round.round,
@@ -1586,7 +1607,6 @@ fn test_query_get_aum_basic() {
 
     // Set up configuration
     let config = Config {
-        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked("price_oracle"),
         consensus_data_valid_period: 3600, // 1 hour
         price_data_valid_period: 100,
@@ -1700,7 +1720,6 @@ fn test_query_get_aum_with_expired_data() {
 
     // Set up configuration
     let config = Config {
-        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
         price_data_valid_period: 100,
@@ -1784,7 +1803,6 @@ fn test_query_get_aum_with_negative_equity() {
 
     // Set up configuration
     let config = Config {
-        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
         price_data_valid_period: 100,
@@ -1881,8 +1899,10 @@ fn test_execute_update_config_admin_only() {
     // Set up the initial state
     let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin.clone(),
         &contract_config,
         &consensus_config,
         1,
@@ -1892,7 +1912,6 @@ fn test_execute_update_config_admin_only() {
     // Test 1: Non-admin tries to update config (should fail)
     let non_admin_info = message_info("non_admin", &[]);
     let update_config = crate::msg::UpdateConfig {
-        owner: Some("new_admin_attempt".to_string()),
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -1909,19 +1928,17 @@ fn test_execute_update_config_admin_only() {
     let result = execute(deps.as_mut(), env.clone(), non_admin_info, msg);
     assert!(result.is_err());
     match result.unwrap_err() {
-        ContractError::Unauthorized {} => {}
+        ContractError::Ownable(NotOwner) => {}
         _ => panic!("Unexpected error"),
     }
 
-    let new_admin = deps.api.addr_make("new_admin");
     let messenger1 = deps.api.addr_make("messenger1");
     let messenger2 = deps.api.addr_make("messenger2");
     let price_oracle = deps.api.addr_make("price_oracle");
 
     // Test 2: Admin successfully updates config
-    let admin_info = message_info("admin", &[]);
+    let admin_info = message_info(admin.to_string().as_str(), &[]);
     let update_config = crate::msg::UpdateConfig {
-        owner: Some(new_admin.to_string()),
         consensus_data_valid_period: Some(7200),
         price_data_valid_period: Some(200),
         required_binance_positions: Some(vec!["ETHUSDT".to_string()]),
@@ -1940,7 +1957,6 @@ fn test_execute_update_config_admin_only() {
 
     // Verify contract config was updated
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.owner, new_admin);
     assert_eq!(updated_contract_config.consensus_data_valid_period, 7200);
     assert_eq!(updated_contract_config.price_data_valid_period, 200);
     assert_eq!(
@@ -2013,8 +2029,10 @@ fn test_execute_update_config_partial_updates() {
     // Set up initial state
     let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin.clone(),
         &contract_config,
         &consensus_config,
         1,
@@ -2022,9 +2040,8 @@ fn test_execute_update_config_partial_updates() {
     );
 
     // Test partial update - only contract config fields
-    let admin_info = message_info("admin", &[]);
+    let admin_info = message_info(admin.as_ref(), &[]);
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: Some(3600),
         price_data_valid_period: Some(150),
         required_binance_positions: None,
@@ -2043,7 +2060,6 @@ fn test_execute_update_config_partial_updates() {
 
     // Verify only specified fields were updated
     let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.owner, Addr::unchecked("admin")); // unchanged
     assert_eq!(updated_contract_config.consensus_data_valid_period, 3600); // updated
     assert_eq!(updated_contract_config.price_data_valid_period, 150); // updated
     assert_eq!(
@@ -2076,7 +2092,6 @@ fn test_execute_update_config_partial_updates() {
 
     // Test partial update - only consensus config fields
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2160,8 +2175,10 @@ fn test_execute_update_config_empty_update() {
     // Set up initial state
     let consensus_config = create_test_consensus_config();
     let contract_config = create_test_contract_config();
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin.clone(),
         &contract_config,
         &consensus_config,
         1,
@@ -2169,9 +2186,8 @@ fn test_execute_update_config_empty_update() {
     );
 
     // Test empty update (all fields None)
-    let admin_info = message_info("admin", &[]);
+    let admin_info = message_info(admin.as_ref(), &[]);
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2197,96 +2213,6 @@ fn test_execute_update_config_empty_update() {
 }
 
 #[test]
-fn test_execute_update_config_admin_change() {
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-
-    // Set up initial state
-    let consensus_config = create_test_consensus_config();
-    let contract_config = create_test_contract_config();
-    setup_test_state(
-        &mut deps.as_mut(),
-        &contract_config,
-        &consensus_config,
-        1,
-        1000,
-    );
-
-    let new_admin = deps.api.addr_make("new_admin");
-    // Test admin change
-    let admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
-        owner: Some(new_admin.to_string()),
-        consensus_data_valid_period: None,
-        price_data_valid_period: None,
-        required_binance_positions: None,
-        required_binance_spot_assets: None,
-        price_oracle_contract: None,
-        messengers: None,
-        threshold: None,
-        data_delta_ppm: None,
-        round_length: None,
-    };
-    let msg = ExecuteMsg::UpdateConfig {
-        new_config: update_config,
-    };
-    let result = execute(deps.as_mut(), env.clone(), admin_info, msg);
-    assert!(result.is_ok());
-
-    // Verify admin was changed
-    let updated_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(updated_contract_config.owner, new_admin);
-
-    // Test that old admin can no longer update config
-    let old_admin_info = message_info("admin", &[]);
-    let update_config = crate::msg::UpdateConfig {
-        owner: Some("another_admin".to_string()),
-        consensus_data_valid_period: None,
-        price_data_valid_period: None,
-        required_binance_positions: None,
-        required_binance_spot_assets: None,
-        price_oracle_contract: None,
-        messengers: None,
-        threshold: None,
-        data_delta_ppm: None,
-        round_length: None,
-    };
-    let msg = ExecuteMsg::UpdateConfig {
-        new_config: update_config,
-    };
-    let result = execute(deps.as_mut(), env.clone(), old_admin_info, msg);
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        ContractError::Unauthorized => {}
-        _ => panic!("Unexpected error"),
-    }
-
-    // Test that new admin can update config
-    let new_admin_info = message_info(new_admin.as_ref(), &[]);
-    let update_config = crate::msg::UpdateConfig {
-        owner: None,
-        consensus_data_valid_period: Some(5000),
-        price_data_valid_period: None,
-        required_binance_positions: None,
-        required_binance_spot_assets: None,
-        price_oracle_contract: None,
-        messengers: None,
-        threshold: None,
-        data_delta_ppm: None,
-        round_length: None,
-    };
-    let msg = ExecuteMsg::UpdateConfig {
-        new_config: update_config,
-    };
-    let result = execute(deps.as_mut(), env.clone(), new_admin_info, msg);
-    assert!(result.is_ok());
-
-    // Verify the update was successful
-    let final_contract_config = CONFIG.load(deps.as_ref().storage).unwrap();
-    assert_eq!(final_contract_config.consensus_data_valid_period, 5000);
-}
-
-#[test]
 fn test_execute_update_config_validation() {
     let mut deps = mock_dependencies();
     let env = mock_env();
@@ -2294,8 +2220,10 @@ fn test_execute_update_config_validation() {
     // Set up initial state
     let contract_config = create_test_contract_config();
     let consensus_config = create_test_consensus_config();
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin.clone(),
         &contract_config,
         &consensus_config,
         1,
@@ -2303,9 +2231,8 @@ fn test_execute_update_config_validation() {
     );
 
     // Test zero value for consensus_data_valid_period
-    let admin_info = message_info("admin", &[]);
+    let admin_info = message_info(admin.as_ref(), &[]);
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: Some(0),
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2328,7 +2255,6 @@ fn test_execute_update_config_validation() {
 
     // Test zero value for price_data_valid_period
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: Some(0),
         required_binance_positions: None,
@@ -2351,7 +2277,6 @@ fn test_execute_update_config_validation() {
 
     // Test empty vector for messengers
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2378,7 +2303,6 @@ fn test_execute_update_config_validation() {
 
     // Test vector with duplicates for messengers
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2406,7 +2330,6 @@ fn test_execute_update_config_validation() {
 
     // Test zero value for threshold
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2429,7 +2352,6 @@ fn test_execute_update_config_validation() {
 
     // Test unreachable value for threshold
     let update_config = crate::msg::UpdateConfig {
-        owner: None,
         consensus_data_valid_period: None,
         price_data_valid_period: None,
         required_binance_positions: None,
@@ -2498,7 +2420,6 @@ fn test_query_get_aum_with_large_values() {
 
     // Set up configuration
     let config = Config {
-        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600,
         price_data_valid_period: 100,
@@ -2661,7 +2582,6 @@ fn test_query_aum_with_high_precision_prices_from_oracle() {
 
     // Set up configuration
     let config = Config {
-        owner: Addr::unchecked("admin"),
         price_oracle_contract: Addr::unchecked(price_oracle_addr),
         consensus_data_valid_period: 3600, // 1 hour
         price_data_valid_period: 100,

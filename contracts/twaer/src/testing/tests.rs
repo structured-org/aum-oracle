@@ -10,6 +10,7 @@ use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
+use cw_ownable::OwnershipError::NotOwner;
 
 #[test]
 fn proper_initialization() {
@@ -17,7 +18,6 @@ fn proper_initialization() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        owner: deps.api.addr_make("owner"),
         publisher: deps.api.addr_make("owner"),
         aum_oracles: vec![deps.api.addr_make("oracle1")],
         maxbtc_denom: None,
@@ -89,11 +89,9 @@ fn update_config_by_owner() {
     let owner = deps.api.addr_make("owner");
     let oracle1 = deps.api.addr_make("oracle1");
     let oracle2 = deps.api.addr_make("oracle2");
-    let new_owner = deps.api.addr_make("new_owner");
     let new_publisher = deps.api.addr_make("new_publisher");
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: Some(new_owner.to_string()),
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
             maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
@@ -107,7 +105,6 @@ fn update_config_by_owner() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        owner: new_owner,
         publisher: new_publisher,
         aum_oracles: vec![oracle1, oracle2],
         maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
@@ -122,11 +119,9 @@ fn update_config_by_unauthorized() {
     let mut deps = setup_contract();
     let owner = deps.api.addr_make("owner");
     let oracle1 = deps.api.addr_make("oracle1");
-    let new_owner = deps.api.addr_make("new_owner");
 
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: Some(new_owner.to_string()),
             publisher: None,
             aum_oracles: None,
             maxbtc_denom: None,
@@ -136,11 +131,10 @@ fn update_config_by_unauthorized() {
     };
 
     let err = execute_msg(&mut deps, mock_env(), &oracle1, msg).unwrap_err();
-    assert_eq!(err, ContractError::Unauthorized {});
+    assert_eq!(err, ContractError::Ownable(NotOwner));
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        owner: owner.clone(),
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_denom: None,
@@ -155,15 +149,13 @@ fn update_config_partial() {
     let mut deps = setup_contract();
     let owner = deps.api.addr_make("owner");
     let oracle1 = deps.api.addr_make("oracle1");
-    let new_owner = deps.api.addr_make("new_owner");
 
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: Some(new_owner.to_string()),
             publisher: None,
             aum_oracles: None,
             maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
-            twa_window_seconds: None,
+            twa_window_seconds: Some(85000),
             twaer_immutability_seconds: None,
         },
     };
@@ -172,11 +164,10 @@ fn update_config_partial() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        owner: new_owner,
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
-        twa_window_seconds: 86400,
+        twa_window_seconds: 85000,
         twaer_immutability_seconds: 0,
     };
     assert_config_equals(&config, &expected_config);
@@ -192,7 +183,6 @@ fn query_config() {
     let config: Config = from_json(bin).unwrap();
 
     let expected_config = Config {
-        owner: owner.clone(),
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_denom: None,
@@ -350,7 +340,6 @@ fn test_publish_twaer_by_publisher() {
     // Update config to set a different publisher
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: None,
             publisher: Some(publisher.to_string()),
             aum_oracles: None,
             maxbtc_denom: None,
@@ -398,7 +387,6 @@ fn test_twaer_immutability() {
     // Set immutability period to 3600 seconds (1 hour)
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_denom: None,
@@ -535,7 +523,7 @@ fn test_unmock_maxbtc_supply() {
         },
     )
     .unwrap_err();
-    assert_eq!(err, ContractError::Unauthorized {});
+    assert_eq!(err, ContractError::Ownable(NotOwner));
 }
 
 #[test]
@@ -546,7 +534,6 @@ fn test_reset_twaer() {
     // Set immutability period to 3600 seconds (1 hour)
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
-            owner: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_denom: None,
@@ -640,7 +627,7 @@ fn test_reset_twaer() {
         },
     )
     .unwrap_err();
-    assert_eq!(err, ContractError::Unauthorized {});
+    assert_eq!(err, ContractError::Ownable(NotOwner));
 }
 
 #[test]
@@ -1155,12 +1142,16 @@ where
 
 /// Config verification helper
 fn assert_config_equals(config: &Config, expected_config: &Config) {
-    assert_eq!(config.owner, expected_config.owner);
+    assert_eq!(config.publisher, expected_config.publisher);
     assert_eq!(config.aum_oracles, expected_config.aum_oracles);
     assert_eq!(config.maxbtc_denom, expected_config.maxbtc_denom);
     assert_eq!(
         config.twa_window_seconds,
         expected_config.twa_window_seconds
+    );
+    assert_eq!(
+        config.twaer_immutability_seconds,
+        expected_config.twaer_immutability_seconds
     );
 }
 

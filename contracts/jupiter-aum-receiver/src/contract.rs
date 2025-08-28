@@ -6,6 +6,7 @@ use cosmwasm_std::{
     SignedDecimal256, StdResult, Uint128,
 };
 use cw2::set_contract_version;
+use cw_ownable::{get_ownership, update_ownership};
 use jupiter_aum_common::constants::WBTC_DECIMALS;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
@@ -33,8 +34,9 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    cw_ownable::initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
+
     let config = Config {
-        owner: deps.api.addr_validate(&msg.owner)?,
         consensus_data_valid_period: msg.consensus_data_valid_period,
         required_custody_assets: msg.required_custody_assets,
         price_data_valid_period: msg.price_data_valid_period,
@@ -59,7 +61,7 @@ pub fn instantiate(
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
-        .add_attribute("owner", config.owner.to_string()))
+        .add_attribute("owner", msg.owner.to_string()))
 }
 
 /// Entry point for executing contract messages.
@@ -73,6 +75,10 @@ pub fn execute(
     match msg {
         ExecuteMsg::UpdateConfig { new_config } => update_config(deps, info, new_config),
         ExecuteMsg::PublishData { new_data } => execute_publish_data(deps, env, info, new_data),
+        ExecuteMsg::UpdateOwnership(action) => {
+            update_ownership(deps, &env.block, &info.sender, action)?;
+            Ok(Response::new().add_attribute("action", "update_ownership"))
+        }
     }
 }
 
@@ -85,13 +91,8 @@ fn update_config(
 ) -> Result<Response, ContractError> {
     let mut contract_config = CONFIG.load(deps.storage)?;
 
-    if info.sender != contract_config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    if let Some(new_owner) = new_config.owner {
-        contract_config.owner = deps.api.addr_validate(&new_owner)?;
-    }
+    // Only owner can update config
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     if let Some(new_consensus_data_valid_period) = new_config.consensus_data_valid_period {
         contract_config.consensus_data_valid_period = new_consensus_data_valid_period;
@@ -184,6 +185,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractErro
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
         QueryMsg::GetConfig {} => Ok(to_json_binary(&query_config(deps)?)?),
+        QueryMsg::Ownership {} => Ok(to_json_binary(&get_ownership(deps.storage)?)?),
     }
 }
 
@@ -192,7 +194,6 @@ fn query_config(deps: Deps) -> Result<ConfigResponse, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
     Ok(ConfigResponse {
-        owner: config.owner.to_string(),
         consensus_data_valid_period: config.consensus_data_valid_period,
         required_custody_assets: config.required_custody_assets,
         price_data_valid_period: config.price_data_valid_period,
