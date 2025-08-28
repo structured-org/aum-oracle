@@ -77,10 +77,9 @@ fn execute_update_config(
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> ContractResult<Response> {
-    let mut config = CONFIG.load(deps.storage)?;
-
-    // Only owner can update config
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
 
     // Update configuration if fields are provided
     if let Some(ref oracles) = new_config.aum_oracles {

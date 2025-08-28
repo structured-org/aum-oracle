@@ -89,10 +89,9 @@ fn update_config(
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> Result<Response, ContractError> {
-    let mut contract_config = CONFIG.load(deps.storage)?;
-
-    // Only owner can update config
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    let mut contract_config = CONFIG.load(deps.storage)?;
 
     if let Some(new_consensus_data_valid_period) = new_config.consensus_data_valid_period {
         contract_config.consensus_data_valid_period = new_consensus_data_valid_period;

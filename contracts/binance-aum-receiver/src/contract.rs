@@ -128,11 +128,10 @@ fn execute_update_config(
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> ContractResult<Response> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     // Load current contract config
     let mut contract_config = CONFIG.load(deps.storage)?;
-
-    // Only owner can update config
-    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     // Update contract configuration
     contract_config.update_config(deps.as_ref(), &new_config)?;
