@@ -100,6 +100,8 @@ fn execute_publish_data(
             .add_attribute("aum_in_wbtc", aum_amount);
     }
 
+    let consensus_config = CONSENSUS_STATE.config.load(deps.storage)?;
+
     let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([
         attr("action", "publish_data"),
