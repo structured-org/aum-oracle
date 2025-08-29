@@ -528,8 +528,10 @@ fn test_execute_publish_data_up_to_date_consensus() {
     // Set up initial state
     let contract_config = create_test_contract_config();
     let consensus_config = create_test_consensus_config();
+    let admin = deps.api.addr_make("admin");
     setup_test_state(
         &mut deps.as_mut(),
+        admin,
         &contract_config,
         &consensus_config,
         1,
