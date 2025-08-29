@@ -520,6 +520,67 @@ fn test_execute_publish_data_time_based_consensus() {
 }
 
 #[test]
+fn test_execute_publish_data_up_to_date_consensus() {
+    // Set up a test environment
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    // Set up initial state
+    let contract_config = create_test_contract_config();
+    let consensus_config = create_test_consensus_config();
+    setup_test_state(
+        &mut deps.as_mut(),
+        &contract_config,
+        &consensus_config,
+        1,
+        1000,
+    );
+
+    let new_round_length = consensus_config.round_length + 1000;
+    let new_consensus_config = ConsensusConfig {
+        messengers: vec![
+            Addr::unchecked("messenger1"),
+            Addr::unchecked("messenger2"),
+            Addr::unchecked("messenger3"),
+        ],
+        threshold: 2,
+        data_delta_ppm: 10000,
+        round_length: new_round_length,
+    };
+
+    // Save to pending_config
+    CONSENSUS_STATE
+        .pending_config
+        .save(deps.as_mut().storage, &new_consensus_config)
+        .unwrap();
+
+    let messenger1_info = message_info("messenger1", &[]);
+    let test_data = create_test_data(
+        SignedDecimal256::from_ratio(5, 10),
+        SignedDecimal256::from_ratio(1000, 1),
+        SignedDecimal256::from_ratio(2000, 1),
+        SignedDecimal256::from_ratio(500, 1),
+    );
+    let msg = ExecuteMsg::PublishData {
+        new_data: test_data,
+    };
+    let result = execute(deps.as_mut(), env.clone(), messenger1_info, msg);
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+
+    let expected_next_round_ts = env.block.time.seconds() + new_round_length;
+    let next_round_ts_attr = response
+        .attributes
+        .iter()
+        .find(|attr| attr.key == "next_round_timestamp");
+    assert_eq!(
+        next_round_ts_attr.unwrap().value,
+        expected_next_round_ts.to_string()
+    );
+}
+
+#[test]
 fn test_try_consensus() {
     // Test 1: Empty data array should return None
     {
