@@ -18,7 +18,6 @@ use cosmwasm_std::{
 };
 use neutron_std::types::neutron::util::precdec::PrecDec;
 use serde::{Deserialize, Serialize};
-use std::ops::Add;
 use std::str::FromStr;
 
 // Helper function to create a MessageInfo object for testing
@@ -430,6 +429,7 @@ fn test_execute_publish_data_up_to_date_consensus() {
         1000,
     );
 
+    let new_round_length = consensus_config.round_length + 1000;
     let new_consensus_config = ConsensusConfig {
         messengers: vec![
             Addr::unchecked("messenger1"),
@@ -438,7 +438,7 @@ fn test_execute_publish_data_up_to_date_consensus() {
         ],
         threshold: 2,
         data_delta_ppm: 10000,
-        round_length: 7000, // new round length
+        round_length: new_round_length,
     };
 
     // Save to pending_config
@@ -462,17 +462,15 @@ fn test_execute_publish_data_up_to_date_consensus() {
 
     let response = result.unwrap();
 
-    let publish_consensus_attr = response.attributes.iter().find(|attr| {
-        attr.key == "next_round_timestamp"
-            && attr.value
-                == env
-                    .block
-                    .time
-                    .seconds()
-                    .add(new_consensus_config.round_length)
-                    .to_string()
-    });
-    assert!(publish_consensus_attr.is_some());
+    let expected_next_round_ts = env.block.time.seconds() + new_round_length;
+    let next_round_ts_attr = response
+        .attributes
+        .iter()
+        .find(|attr| attr.key == "next_round_timestamp");
+    assert_eq!(
+        next_round_ts_attr.unwrap().value,
+        expected_next_round_ts.to_string()
+    );
 }
 
 #[test]
