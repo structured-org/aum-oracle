@@ -39,10 +39,7 @@ jobs:
 
   unit-test:
     name: Actions - unit test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ macOS-latest, ubicloud-standard-8 ]
+    runs-on: ubicloud-standard-8
     steps:
       - uses: actions/checkout@v1
         with:
