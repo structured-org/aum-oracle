@@ -239,7 +239,6 @@ fn record_er_at(
     let weighted_contribution =
         latest_rate.checked_mul(Decimal::from_ratio(latest_rate_duration, 1u64))?;
     twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_add(weighted_contribution)?;
-    twa_aggr.total_duration += latest_rate_duration;
 
     ER_HISTORY.save(storage, new_timestamp, &new_rate)?;
 
@@ -261,26 +260,26 @@ fn record_er_at(
             expired_rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
 
         twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
-        twa_aggr.total_duration -= expired_duration;
 
         ER_HISTORY.remove(storage, expired_timestamp);
     }
 
     twa_aggr.window_end = new_timestamp;
-    twa_aggr.current_twa = if twa_aggr.total_duration > 0 {
-        twa_aggr
-            .weighted_sum
-            .checked_div(Decimal::from_ratio(twa_aggr.total_duration, 1u64))?
-    } else {
-        new_rate
-    };
-
     let oldest_timestamp = ER_HISTORY
         .range(storage, None, None, Order::Ascending)
         .next()
         .transpose()?
         .map_or_else(|| Err(ContractError::NoEarliestRate {}), |(ts, _)| Ok(ts))?;
     twa_aggr.window_start = oldest_timestamp;
+
+    let total_duration = twa_aggr.window_end - twa_aggr.window_start;
+    twa_aggr.current_twa = if total_duration > 0 {
+        twa_aggr
+            .weighted_sum
+            .checked_div(Decimal::from_ratio(total_duration, 1u64))?
+    } else {
+        new_rate
+    };
 
     TWA_AGGREGATOR.save(storage, &twa_aggr)?;
     Ok(())
@@ -392,7 +391,7 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
     let total_weighted_sum = twa_buffer
         .weighted_sum
         .checked_add(additional_contribution)?;
-    let total_duration = twa_buffer.total_duration + additional_duration;
+    let total_duration = twa_buffer.window_end - twa_buffer.window_start + additional_duration;
 
     if total_duration == 0 {
         return Ok(last_rate);

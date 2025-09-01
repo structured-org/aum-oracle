@@ -22,9 +22,7 @@ pub struct Config {
 pub struct TwaAggregator {
     /// Weighted sum: Σ(rate_i × duration_i)
     pub weighted_sum: Decimal,
-    /// Total duration: Σ(duration_i)
-    pub total_duration: u64,
-    /// Current TWA: weighted_sum / total_duration
+    /// Current TWA: weighted_sum / (window_end - window_start)
     pub current_twa: Decimal,
     /// Timestamp of the oldest data point in the window
     pub window_start: u64,
@@ -36,7 +34,6 @@ impl TwaAggregator {
     pub fn from_single_point(timestamp: u64, rate: Decimal) -> Self {
         Self {
             weighted_sum: Decimal::zero(),
-            total_duration: 0,
             current_twa: rate,
             window_start: timestamp,
             window_end: timestamp,
