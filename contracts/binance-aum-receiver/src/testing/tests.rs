@@ -2000,7 +2000,7 @@ fn test_execute_update_config_admin_only() {
     let price_oracle = deps.api.addr_make("price_oracle");
 
     // Test 2: Admin successfully updates config
-    let admin_info = message_info(admin.to_string().as_str(), &[]);
+    let admin_info = message_info(admin.as_ref(), &[]);
     let update_config = crate::msg::UpdateConfig {
         consensus_data_valid_period: Some(7200),
         price_data_valid_period: Some(200),
