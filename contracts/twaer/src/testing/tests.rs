@@ -1,5 +1,5 @@
 use crate::contract::{execute, instantiate, query};
-use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
@@ -96,7 +96,7 @@ fn update_config_by_owner() {
             owner: Some(new_owner.to_string()),
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
-            maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
+            maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
             twa_window_seconds: Some(172800),         // 48 hours
             twaer_immutability_seconds: Some(172800), // 48 hours
         },
@@ -162,7 +162,7 @@ fn update_config_partial() {
             owner: Some(new_owner.to_string()),
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
+            maxbtc_denom: Some(Some("factory/neutron1/minbtc".to_string())),
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
         },
@@ -431,7 +431,7 @@ fn test_twaer_immutability() {
 }
 
 #[test]
-fn test_unmock_maxbtc_supply() {
+fn test_mock_unmock_maxbtc_supply() {
     // Set up contract with mocked supply of 500,000
     let mocked_supply = Uint128::from(500000u128);
     let mut deps = cosmwasm_std::testing::mock_dependencies();
@@ -480,13 +480,20 @@ fn test_unmock_maxbtc_supply() {
     )]);
     deps.querier.update_wasm(mock_oracle_response(aum_amount));
 
-    // Execute UnmockMaxbtcSupply to switch to real supply
+    // set maxbtc_denom to switch to real supply
     let res = execute_msg(
         &mut deps,
         mock_env(),
         &owner,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                owner: None,
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
         },
     );
     assert!(res.is_ok());
@@ -498,40 +505,73 @@ fn test_unmock_maxbtc_supply() {
         Some("factory/neutron1/maxbtc".to_string())
     );
 
-    // Verify mocked supply is zeroed out
-    let mocked_supply_after = MOCKED_MAXBTC_SUPPLY.load(&deps.storage).unwrap();
-    assert_eq!(mocked_supply_after, Uint128::zero());
-
     // Record ER using real supply
     let env2 = test_env_with_time(1000001, 101);
     execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
 
     // Verify ER is now calculated using real supply by checking the recorded ER in history
-    let history_rates_after: Vec<Decimal> = ER_HISTORY
+    let history_rates_after_unmock: Vec<Decimal> = ER_HISTORY
         .range(deps.as_ref().storage, None, None, Order::Ascending)
         .map(|item| item.unwrap().1)
         .collect();
-    assert_eq!(history_rates_after.len(), 2);
-    let recorded_er_real = history_rates_after[1]; // Second entry
+    assert_eq!(history_rates_after_unmock.len(), 2);
+    let recorded_er_real = history_rates_after_unmock[1];
     let expected_er_real = Decimal::from_ratio(aum_amount, real_supply);
     assert_eq!(recorded_er_real, expected_er_real);
-    assert_eq!(recorded_er_real, Decimal::from_ratio(4u128, 3u128)); // ≈ 1.333...
+    assert_eq!(recorded_er_real, Decimal::from_ratio(100u128, 75u128)); // ≈ 1.333...
 
     // Verify the ERs are different (proving the switch worked)
     assert_ne!(recorded_er_mocked, recorded_er_real);
 
-    // Test that unauthorized user cannot unmock supply
-    let stranger = deps.api.addr_make("stranger");
-    let err = execute_msg(
+    // Switch back to mocked supply by setting maxbtc_denom to None
+    let res = execute_msg(
         &mut deps,
         mock_env(),
-        &stranger,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        &owner,
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(None),
+                owner: None,
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
         },
-    )
-    .unwrap_err();
-    assert_eq!(err, ContractError::Unauthorized {});
+    );
+    assert!(res.is_ok());
+
+    // Verify config is updated back to None
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(config.maxbtc_denom, None);
+
+    // Set mocked supply to zero so calc_exchange_rate returns Decimal::one()
+    let res = execute_msg(
+        &mut deps,
+        mock_env(),
+        &owner,
+        ExecuteMsg::SetMockedMaxbtcSupply {
+            value: Uint128::zero(),
+        },
+    );
+    assert!(res.is_ok());
+
+    // Record ER using zero mocked supply
+    let env3 = test_env_with_time(1000002, 102);
+    execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
+
+    // Verify the recorded ER is Decimal::one() due to zero supply
+    let history_rates_after_mock: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates_after_mock.len(), 3);
+    let recorded_er_zero_supply = history_rates_after_mock[2];
+    assert_eq!(recorded_er_zero_supply, Decimal::one());
+
+    // Verify this ER is different from both previous ones
+    assert_ne!(recorded_er_zero_supply, recorded_er_mocked);
+    assert_ne!(recorded_er_zero_supply, recorded_er_real);
 }
 
 #[test]
@@ -1098,8 +1138,15 @@ fn setup_contract_with_supply(
         &mut deps,
         mock_env(),
         &owner,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                owner: None,
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
         },
     )
     .unwrap();

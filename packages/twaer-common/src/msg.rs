@@ -17,7 +17,8 @@ pub struct InstantiateMsg {
     pub twaer_immutability_seconds: u64,
 
     /// The mocked maxBTC supply used instead of the real supply before the token is minted. To
-    /// turn the real token supply usage on, the owner must execute the UnmockMaxbtcSupply msg.
+    /// turn the real token supply usage on, the owner must set the maxbtc_denom in the config.
+    /// If the supply is zero, instant exchange rate calculations return Decimal::one().
     pub mocked_maxbtc_supply: Uint128,
 }
 
@@ -43,9 +44,9 @@ pub enum ExecuteMsg {
     /// Only callable by the owner.
     ResetTwaerTo { value: Decimal },
 
-    /// Turns the real token supply usage on in exchange rate calculation.
+    /// Sets the mocked maxBTC supply which is used if config maxbtc_denom is not set.
     /// Only callable by the owner.
-    UnmockMaxbtcSupply { maxbtc_denom: String },
+    SetMockedMaxbtcSupply { value: Uint128 },
 }
 
 #[cw_serde]
@@ -56,8 +57,9 @@ pub struct UpdateConfig {
     pub publisher: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
     pub aum_oracles: Option<Vec<String>>,
-    /// New maxBTC denom.
-    pub maxbtc_denom: Option<String>,
+    /// New maxBTC denom. If the first Option is None, the value is not changed in the config.
+    /// If the first Option is Some, the second Option is the new value including None.
+    pub maxbtc_denom: Option<Option<String>>,
     /// New time window in seconds for TWA calculation.
     pub twa_window_seconds: Option<u64>,
     /// New minimal number of seconds required to pass between sequential TWAER publications.
