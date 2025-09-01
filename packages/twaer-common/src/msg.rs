@@ -86,6 +86,10 @@ pub enum QueryMsg {
     /// on all recorded exchange rate history from RecordEr calls. This provides a real-time view
     /// of what the TWA ER would be if PublishTwaer were called at this moment.
     PredictTwaer {},
+
+    #[returns(ErWindowInfoResponse)]
+    /// Returns the information about the exchange rate history window.
+    ErWindowInfo {},
 }
 
 #[cw_serde]
@@ -95,6 +99,16 @@ pub struct GetTwaerResponse {
 
     /// The timestamp when the TWAER was published.
     pub published_at: u64,
+}
+
+#[cw_serde]
+pub struct ErWindowInfoResponse {
+    /// Timestamp of the oldest data point in the window.
+    pub window_start: u64,
+    /// Timestamp of the newest data point in the window.
+    pub window_end: u64,
+    /// Total number of data points in the window.
+    pub total_points: u64,
 }
 
 /// MigrateMsg is used for contract migration.

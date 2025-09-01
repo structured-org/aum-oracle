@@ -8,7 +8,9 @@ use cosmwasm_std::{
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use twaer_common::error::ContractError;
-use twaer_common::msg::{ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig};
+use twaer_common::msg::{
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+};
 use twaer_common::types::Config;
 
 #[test]
@@ -315,6 +317,50 @@ fn test_query_twaer_no_data() {
 
     let err = query_twaer(&deps, mock_env()).unwrap_err();
     assert!(matches!(err, ContractError::TwaerNotCalculated));
+}
+
+#[test]
+fn test_query_er_window_info() {
+    let mut deps = setup_contract_with_supply(500000u128, None);
+    let owner = deps.api.addr_make("owner");
+    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            owner: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_denom: None,
+            twa_window_seconds: Some(29),
+            twaer_immutability_seconds: None,
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    let env = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env.clone(), &owner).unwrap();
+
+    let env2 = test_env_with_time(1000010, 110);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+
+    let env3 = test_env_with_time(1000020, 120);
+    record_er(&mut deps, env3.clone(), &owner).unwrap();
+
+    let res = query_msg(&deps, env3, QueryMsg::ErWindowInfo {}).unwrap();
+    let er_window_info: ErWindowInfoResponse = from_json(res).unwrap();
+    assert_eq!(er_window_info.window_start, 1000000);
+    assert_eq!(er_window_info.window_end, 1000020);
+    assert_eq!(er_window_info.total_points, 3);
+
+    // the first point should be expired with twa_window_seconds=29
+    let env4 = test_env_with_time(1000030, 130);
+    record_er(&mut deps, env4.clone(), &owner).unwrap();
+
+    let res = query_msg(&deps, env4, QueryMsg::ErWindowInfo {}).unwrap();
+    let er_window_info: ErWindowInfoResponse = from_json(res).unwrap();
+    assert_eq!(er_window_info.window_start, 1000010);
+    assert_eq!(er_window_info.window_end, 1000030);
+    assert_eq!(er_window_info.total_points, 3);
 }
 
 #[test]

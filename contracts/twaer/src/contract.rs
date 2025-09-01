@@ -9,7 +9,8 @@ use cw_storage_plus::Bound;
 use std::ops::Sub;
 use twaer_common::error::{ContractError, ContractResult};
 use twaer_common::msg::{
-    ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig,
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
 };
 use twaer_common::types::{Config, TwaAggregator};
 
@@ -331,6 +332,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetConfig {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
         QueryMsg::GetTwaer {} => Ok(to_json_binary(&query_get_twaer(deps)?)?),
         QueryMsg::PredictTwaer {} => Ok(to_json_binary(&calculate_twaer(deps, env)?)?),
+        QueryMsg::ErWindowInfo {} => Ok(to_json_binary(&query_er_window_info(deps)?)?),
     }
 }
 
@@ -400,6 +402,19 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
     total_weighted_sum
         .checked_div(Decimal::from_ratio(total_duration, 1u64))
         .map_err(ContractError::CheckedDiv)
+}
+
+fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
+    let twa_buffer = TWA_AGGREGATOR.load(deps.storage)?;
+    let total_points = ER_HISTORY
+        .range(deps.storage, None, None, Order::Ascending)
+        .count() as u64;
+
+    Ok(ErWindowInfoResponse {
+        window_start: twa_buffer.window_start,
+        window_end: twa_buffer.window_end,
+        total_points,
+    })
 }
 
 /// Migrates the contract
