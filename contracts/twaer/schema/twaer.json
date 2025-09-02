@@ -181,7 +181,8 @@
             }
           },
           "maxbtc_denom": {
-            "description": "New maxBTC denom. If the first Option is None, the value is not changed in the config. If the first Option is Some, the second Option is the new value including None.",
+            "description": "New maxBTC denom. If the first Option is None, the value is not changed in the config. If the first Option is Some, the second Option is the new value including None. JSON deserialization of this field in UpdateConfig msg is: - Missing field: None -> no change - Explicit null: Some(None) -> set to None (\"maxbtc_denom\": null) - String value: Some(Some(String)) -> set to String (\"maxbtc_denom\": \"some value\")",
+            "default": null,
             "type": [
               "string",
               "null"

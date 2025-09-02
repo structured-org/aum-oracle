@@ -1013,6 +1013,66 @@ fn test_twaer_complex_intertwining_expiration() {
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
 }
 
+#[test]
+fn test_update_maxbtc_denom_deserialization() {
+    let mut deps = setup_contract();
+    let owner = deps.api.addr_make("owner");
+
+    // Test case 1: Setting maxbtc_denom to Some(String) via JSON
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "maxbtc_denom": "factory/neutron1/maxbtc"
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was set to Some(String)
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(
+        config.maxbtc_denom,
+        Some("factory/neutron1/maxbtc".to_string())
+    );
+
+    // Test case 2: Missing field should not change config
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "twa_window_seconds": 1
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was NOT changed (should still be Some(String))
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(
+        config.maxbtc_denom,
+        Some("factory/neutron1/maxbtc".to_string())
+    );
+
+    // Test case 3: Explicit null should set to None
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "maxbtc_denom": null
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was changed to None
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(config.maxbtc_denom, None);
+}
+
 // ============================================================================
 // Test Helper Functions
 // ============================================================================

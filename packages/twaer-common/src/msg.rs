@@ -1,5 +1,6 @@
 use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
+use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 
@@ -59,6 +60,11 @@ pub struct UpdateConfig {
     pub aum_oracles: Option<Vec<String>>,
     /// New maxBTC denom. If the first Option is None, the value is not changed in the config.
     /// If the first Option is Some, the second Option is the new value including None.
+    /// JSON deserialization of this field in UpdateConfig msg is:
+    /// - Missing field: None -> no change
+    /// - Explicit null: Some(None) -> set to None ("maxbtc_denom": null)
+    /// - String value: Some(Some(String)) -> set to String ("maxbtc_denom": "some value")
+    #[serde(default, deserialize_with = "deserialize_nested_option")]
     pub maxbtc_denom: Option<Option<String>>,
     /// New time window in seconds for TWA calculation.
     pub twa_window_seconds: Option<u64>,
@@ -102,3 +108,14 @@ pub struct GetTwaerResponse {
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
 pub struct MigrateMsg {}
+
+/// Custom deserializer for Option<Option<String>> to distinguish between missing field and null.
+/// - Missing field: None
+/// - Explicit null: Some(None)
+/// - String value: Some(Some(String))
+fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
+}
