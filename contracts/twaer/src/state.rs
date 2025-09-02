@@ -20,8 +20,6 @@ pub const MOCKED_MAXBTC_SUPPLY: Item<Uint128> = Item::new("mocked_maxbtc_supply"
 
 #[cw_serde]
 pub struct Config {
-    /// Owner of the contract.
-    pub owner: Addr,
     /// The address allowed to publish the TWAER.
     pub publisher: Addr,
     /// A list of AUM oracle instances from where the contract gets individual AUMs.

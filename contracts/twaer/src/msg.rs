@@ -1,6 +1,7 @@
 use crate::state::Config;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -20,6 +21,7 @@ pub struct InstantiateMsg {
     pub mocked_maxbtc_supply: Uint128,
 }
 
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     /// Updates the contract's configuration parameters. Only callable by the owner.
@@ -49,8 +51,6 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct UpdateConfig {
-    /// New owner address.
-    pub owner: Option<String>,
     /// New publisher address.
     pub publisher: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
@@ -63,6 +63,7 @@ pub struct UpdateConfig {
     pub twaer_immutability_seconds: Option<u64>,
 }
 
+#[cw_ownable_query]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {

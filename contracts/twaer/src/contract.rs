@@ -11,7 +11,12 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Uint128,
 };
+use cw2::set_contract_version;
+use cw_ownable::{get_ownership, update_ownership};
 use cw_storage_plus::Bound;
+
+const CONTRACT_NAME: &str = "crates.io:twaer";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
 pub fn instantiate(
@@ -20,6 +25,10 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    cw_ownable::initialize_owner(deps.storage, deps.api, Some(msg.owner.as_str()))?;
+
     let oracles: Vec<Addr> = msg
         .aum_oracles
         .iter()
@@ -27,7 +36,6 @@ pub fn instantiate(
         .collect::<StdResult<_>>()?;
 
     let config = Config {
-        owner: deps.api.addr_validate(&msg.owner)?,
         publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
         maxbtc_denom: None,
@@ -49,7 +57,7 @@ pub fn execute(
 ) -> ContractResult<Response> {
     match msg {
         ExecuteMsg::UpdateConfig { new_config } => {
-            Ok(execute_update_config(deps, env, info, new_config)?)
+            Ok(execute_update_config(deps, info, new_config)?)
         }
         ExecuteMsg::RecordEr {} => Ok(execute_record_er(deps, env, info)?),
         ExecuteMsg::PublishTwaer {} => Ok(execute_publish_twaer(deps, env, info)?),
@@ -57,19 +65,21 @@ pub fn execute(
             Ok(execute_unmock_maxbtc_supply(deps, env, info, maxbtc_denom)?)
         }
         ExecuteMsg::ResetTwaerTo { value } => Ok(execute_reset_twaer_to(deps, env, info, value)?),
+        ExecuteMsg::UpdateOwnership(action) => {
+            update_ownership(deps, &env.block, &info.sender, action)?;
+            Ok(Response::new().add_attribute("action", "update_ownership"))
+        }
     }
 }
 
 fn execute_update_config(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> ContractResult<Response> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     let mut config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
 
     // Update configuration if fields are provided
     if let Some(ref oracles) = new_config.aum_oracles {
@@ -78,10 +88,6 @@ fn execute_update_config(
             .map(|addr| deps.api.addr_validate(addr))
             .collect::<StdResult<_>>()?;
         config.aum_oracles = validated_oracles;
-    }
-    if let Some(new_owner) = new_config.owner {
-        let validated_new_owner = deps.api.addr_validate(&new_owner)?;
-        config.owner = validated_new_owner;
     }
     if let Some(new_publisher) = new_config.publisher {
         let validated_new_publisher = deps.api.addr_validate(&new_publisher)?;
@@ -114,7 +120,8 @@ fn execute_record_er(deps: DepsMut, env: Env, _info: MessageInfo) -> ContractRes
 
 fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner && info.sender != config.publisher {
+
+    if !cw_ownable::is_owner(deps.storage, &info.sender)? && info.sender != config.publisher {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -139,10 +146,7 @@ fn execute_reset_twaer_to(
     info: MessageInfo,
     value: Decimal,
 ) -> ContractResult<Response> {
-    let config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
     TWAER.save(deps.storage, &(value, env.block.time.seconds()))?;
     TWA_AGGREGATOR.save(
@@ -162,11 +166,9 @@ fn execute_unmock_maxbtc_supply(
     info: MessageInfo,
     maxbtc_denom: String,
 ) -> ContractResult<Response> {
-    let mut config = CONFIG.load(deps.storage)?;
-    if info.sender != config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
+    let mut config = CONFIG.load(deps.storage)?;
     MOCKED_MAXBTC_SUPPLY.save(deps.storage, &Uint128::zero())?;
     config.maxbtc_denom = Some(maxbtc_denom);
     CONFIG.save(deps.storage, &config)?;
@@ -323,6 +325,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetConfig {} => Ok(to_json_binary(&CONFIG.load(deps.storage)?)?),
         QueryMsg::GetTwaer {} => Ok(to_json_binary(&query_get_twaer(deps)?)?),
         QueryMsg::PredictTwaer {} => Ok(to_json_binary(&calculate_twaer(deps, env)?)?),
+        QueryMsg::Ownership {} => Ok(to_json_binary(&get_ownership(deps.storage)?)?),
     }
 }
 

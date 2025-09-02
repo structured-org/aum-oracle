@@ -5,15 +5,13 @@ use consensus::consensus::{
 };
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal, Int256, SignedDecimal256, Uint128};
+use cosmwasm_std::{Decimal, Int256, SignedDecimal256, Uint128};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 /// Config defines the contract's configuration parameters.
 #[cw_serde]
 pub struct Config {
-    /// The address that is allowed to perform management actions in the contract.
-    pub owner: Addr,
     /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
     pub consensus_data_valid_period: u64,
     /// List of custody asset denoms required for consensus
