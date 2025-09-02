@@ -10,7 +10,8 @@ use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
-use cw_ownable::OwnershipError::NotOwner;
+use cw_ownable::Action;
+use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 
 #[test]
 fn proper_initialization() {
@@ -81,6 +82,68 @@ fn test_instantiate_with_invalid_oracle() {
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     assert!(matches!(err, StdError::GenericErr { .. }));
+}
+
+#[test]
+fn test_ownership() {
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let env = mock_env();
+    let first_owner = deps.api.addr_make("first_owner");
+    let second_owner = deps.api.addr_make("second_owner");
+    let other = deps.api.addr_make("other");
+    let publisher = deps.api.addr_make("publisher");
+    let oracle1 = deps.api.addr_make("oracle1");
+
+    let owner_info = message_info(&first_owner, &[]);
+    let second_owner_info = message_info(&second_owner, &[]);
+    let other_info = message_info(&other, &[]);
+
+    // Test empty vector for messengers
+    let msg = InstantiateMsg {
+        owner: first_owner.to_string(),
+        publisher: publisher.to_string(),
+        aum_oracles: vec![oracle1.to_string()],
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
+    };
+    let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
+    assert!(result.is_ok());
+
+    // owner is written in instantiate
+    let ownership = cw_ownable::get_ownership(&deps.storage).unwrap();
+    assert_eq!(ownership.owner.unwrap(), first_owner);
+
+    // non-owner cannot transfer ownership
+    let update_msg_1 = ExecuteMsg::UpdateOwnership(Action::TransferOwnership {
+        new_owner: other.to_string(),
+        expiry: None,
+    });
+    let result = execute(deps.as_mut(), env.clone(), other_info.clone(), update_msg_1).unwrap_err();
+    assert_eq!(result, ContractError::Ownable(NotOwner));
+
+    // transfer ownership writes pending owner
+    let update_msg_2 = ExecuteMsg::UpdateOwnership(Action::TransferOwnership {
+        new_owner: second_owner.to_string(),
+        expiry: None,
+    });
+    let result = execute(deps.as_mut(), env.clone(), owner_info, update_msg_2);
+    assert!(result.is_ok());
+    let ownership = cw_ownable::get_ownership(&deps.storage).unwrap();
+    assert_eq!(ownership.owner.unwrap(), first_owner);
+    assert_eq!(ownership.pending_owner.unwrap(), second_owner);
+
+    // other user cannot accept ownership
+    let update_msg_3 = ExecuteMsg::UpdateOwnership(Action::AcceptOwnership {});
+    let result = execute(deps.as_mut(), env.clone(), other_info, update_msg_3).unwrap_err();
+    assert_eq!(result, ContractError::Ownable(NotPendingOwner));
+
+    // pending owner can accept ownership
+    let update_msg_4 = ExecuteMsg::UpdateOwnership(Action::AcceptOwnership {});
+    let result = execute(deps.as_mut(), env.clone(), second_owner_info, update_msg_4);
+    assert!(result.is_ok());
+    let ownership = cw_ownable::get_ownership(&deps.storage).unwrap();
+    assert_eq!(ownership.owner.unwrap(), second_owner);
 }
 
 #[test]
