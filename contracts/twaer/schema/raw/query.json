@@ -57,6 +57,20 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "description": "Returns the information about the exchange rate history window.",
+      "type": "object",
+      "required": [
+        "er_window_info"
+      ],
+      "properties": {
+        "er_window_info": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

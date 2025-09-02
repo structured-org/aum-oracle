@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ErWindowInfoResponse",
+  "type": "object",
+  "required": [
+    "total_points",
+    "window_end",
+    "window_start"
+  ],
+  "properties": {
+    "total_points": {
+      "description": "Total number of data points in the window.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "window_end": {
+      "description": "Timestamp of the newest data point in the window.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "window_start": {
+      "description": "Timestamp of the oldest data point in the window.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false
+}
