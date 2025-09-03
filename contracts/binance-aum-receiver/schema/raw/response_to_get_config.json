@@ -72,7 +72,6 @@
       "type": "object",
       "required": [
         "consensus_data_valid_period",
-        "owner",
         "price_data_valid_period",
         "price_oracle_contract",
         "required_binance_positions",
@@ -84,14 +83,6 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
-        },
-        "owner": {
-          "description": "owner of the contract",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Addr"
-            }
-          ]
         },
         "price_data_valid_period": {
           "description": "Validity period for prices from the oracle contract in blocks. If the prices are too old, Binance AUM contract cannot rely on them in AUM calculations, and in that case, the contract just doesn't calculate AUM and returns an error in the corresponding query.",

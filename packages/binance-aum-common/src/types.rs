@@ -6,8 +6,6 @@ use cosmwasm_std::{Addr, Deps, Int256, SignedDecimal256};
 
 #[cw_serde]
 pub struct Config {
-    /// owner of the contract
-    pub owner: Addr,
     /// address of price oracle contract
     pub price_oracle_contract: Addr,
     /// Validity period for data (that reached consensus) in the contract in seconds. If the data is too old,
@@ -162,9 +160,6 @@ impl Config {
         deps: Deps,
         new_config: &crate::msg::UpdateConfig,
     ) -> ContractResult<()> {
-        if let Some(ref owner) = new_config.owner {
-            self.owner = deps.api.addr_validate(owner)?;
-        }
         if let Some(consensus_data_valid_period) = new_config.consensus_data_valid_period {
             self.consensus_data_valid_period = consensus_data_valid_period;
         }

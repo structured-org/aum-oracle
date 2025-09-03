@@ -22,3 +22,5 @@ neutron-std = { git = "https://github.com/neutron-org/neutron-std.git", branch =
 jupiter-aum-common = { path = "../../packages/jupiter-aum-common" }
 aum-receiver-common = { path = "../../packages/aum-receiver-common" }
 consensus = { path = "../../packages/consensus" }
+cw-ownable = "2.1.0"
+ed25519-zebra = { version = "=4.0.3", default-features = false }

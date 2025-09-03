@@ -1,5 +1,6 @@
 use consensus::error::ConsensusError;
 use cosmwasm_std::StdError;
+use cw_ownable::OwnershipError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -9,6 +10,9 @@ pub enum ContractError {
 
     #[error(transparent)]
     ConsensusError(#[from] ConsensusError),
+
+    #[error("{0}")]
+    Ownable(#[from] OwnershipError),
 
     #[error("Unauthorized")]
     Unauthorized {},
