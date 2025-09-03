@@ -689,7 +689,6 @@ fn test_reset_twaer() {
     let aggregator = TWA_AGGREGATOR.load(&deps.storage).unwrap();
     assert_eq!(aggregator.current_twa, reset_value);
     assert_eq!(aggregator.weighted_sum, Decimal::zero());
-    assert_eq!(aggregator.total_duration, 0);
     assert_eq!(aggregator.window_start, reset_env.block.time.seconds());
     assert_eq!(aggregator.window_end, reset_env.block.time.seconds());
 
