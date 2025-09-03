@@ -11,6 +11,7 @@ import (
 	binance "github.com/adshao/go-binance/v2"
 	portfolio "github.com/adshao/go-binance/v2/portfolio"
 	gomock "github.com/golang/mock/gomock"
+	client "github.com/structured-org/aum-messenger/client"
 	neutron "github.com/structured-org/aum-messenger/client/neutron"
 	solana "github.com/structured-org/aum-messenger/client/solana"
 )
@@ -122,10 +123,10 @@ func (m *MockNeutronAumReceiverClient) EXPECT() *MockNeutronAumReceiverClientMoc
 }
 
 // GetBinanceAumReceiverNextRound mocks base method.
-func (m *MockNeutronAumReceiverClient) GetBinanceAumReceiverNextRound(ctx context.Context) (*neutron.NextRound, error) {
+func (m *MockNeutronAumReceiverClient) GetBinanceAumReceiverNextRound(ctx context.Context) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBinanceAumReceiverNextRound", ctx)
-	ret0, _ := ret[0].(*neutron.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -137,10 +138,10 @@ func (mr *MockNeutronAumReceiverClientMockRecorder) GetBinanceAumReceiverNextRou
 }
 
 // SubmitBinanceAumData mocks base method.
-func (m *MockNeutronAumReceiverClient) SubmitBinanceAumData(ctx context.Context, data *neutron.BinanceAumData) (*neutron.NextRound, error) {
+func (m *MockNeutronAumReceiverClient) SubmitBinanceAumData(ctx context.Context, data *neutron.BinanceAumData) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubmitBinanceAumData", ctx, data)
-	ret0, _ := ret[0].(*neutron.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -175,10 +176,10 @@ func (m *MockSolanaAumReceiverClient) EXPECT() *MockSolanaAumReceiverClientMockR
 }
 
 // GetBinanceAumReceiverNextRound mocks base method.
-func (m *MockSolanaAumReceiverClient) GetBinanceAumReceiverNextRound(ctx context.Context) (*solana.NextRound, error) {
+func (m *MockSolanaAumReceiverClient) GetBinanceAumReceiverNextRound(ctx context.Context) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBinanceAumReceiverNextRound", ctx)
-	ret0, _ := ret[0].(*solana.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -190,10 +191,10 @@ func (mr *MockSolanaAumReceiverClientMockRecorder) GetBinanceAumReceiverNextRoun
 }
 
 // SubmitBinanceAumData mocks base method.
-func (m *MockSolanaAumReceiverClient) SubmitBinanceAumData(ctx context.Context, data *solana.BinanceAumData) (*solana.NextRound, error) {
+func (m *MockSolanaAumReceiverClient) SubmitBinanceAumData(ctx context.Context, data *solana.BinanceAumData) (*client.NextRound, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubmitBinanceAumData", ctx, data)
-	ret0, _ := ret[0].(*solana.NextRound)
+	ret0, _ := ret[0].(*client.NextRound)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

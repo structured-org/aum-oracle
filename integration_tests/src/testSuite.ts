@@ -1,12 +1,8 @@
 import cosmopark, { CosmoparkConfig } from '@neutron-org/cosmopark';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
-import {
-  StargateClient,
-} from '@cosmjs/stargate';
+import { StargateClient } from '@cosmjs/stargate';
 import { waitFor } from './helpers/waitFor';
-import {
-  CosmoparkNetworkConfig,
-} from '@neutron-org/cosmopark/lib/types';
+import { CosmoparkNetworkConfig } from '@neutron-org/cosmopark/lib/types';
 import { Suite } from 'vitest';
 
 const keys = [
@@ -23,107 +19,103 @@ const keys = [
 
 const networkConfigs = {
   neutron: {
-    "binary": "neutrond",
-    "chain_id": "ntrntest",
-    "denom": "untrn",
-    "image": "neutron-test:0.0.1",
-    "prefix": "neutron",
-    "loglevel": "debug",
-    "trace": true,
-    "public": true,
-    "validators": 1,
-    "validators_balance": [
-      "1900000000",
-      "100000000"
+    binary: 'neutrond',
+    chain_id: 'ntrntest',
+    denom: 'untrn',
+    image: 'neutron-test:0.0.1',
+    prefix: 'neutron',
+    loglevel: 'debug',
+    trace: true,
+    public: true,
+    validators: 1,
+    validators_balance: ['1900000000', '100000000'],
+    upload: [
+      './artifacts/contracts',
+      './artifacts/contracts_thirdparty',
+      './artifacts/scripts/init-neutrond.sh',
     ],
-    "upload": [
-      "./artifacts/contracts",
-      "./artifacts/contracts_thirdparty",
-      "./artifacts/scripts/init-neutrond.sh"
-    ],
-    "post_init": [
-      "CHAINID=ntrntest CHAIN_DIR=/opt /opt/init-neutrond.sh"
-    ],
-    "genesis_opts": {
-      "app_state.auction.params.proposer_fee": "0.25",
-      "app_state.bank.denom_metadata": [
+    post_init: ['CHAINID=ntrntest CHAIN_DIR=/opt /opt/init-neutrond.sh'],
+    genesis_opts: {
+      'app_state.auction.params.proposer_fee': '0.25',
+      'app_state.bank.denom_metadata': [
         {
-          "description": "The native staking token of the Neutron network",
-          "denom_units": [
+          description: 'The native staking token of the Neutron network',
+          denom_units: [
             {
-              "denom": "untrn",
-              "exponent": 0,
-              "aliases": [
-                "microntrn"
-              ]
+              denom: 'untrn',
+              exponent: 0,
+              aliases: ['microntrn'],
             },
             {
-              "denom": "ntrn",
-              "exponent": 6,
-              "aliases": [
-                "NTRN"
-              ]
-            }
+              denom: 'ntrn',
+              exponent: 6,
+              aliases: ['NTRN'],
+            },
           ],
-          "base": "untrn",
-          "display": "ntrn",
-          "name": "Neutron",
-          "symbol": "NTRN"
-        }
+          base: 'untrn',
+          display: 'ntrn',
+          name: 'Neutron',
+          symbol: 'NTRN',
+        },
       ],
-      "app_state.contractmanager.params.sudo_call_gas_limit": "1000000",
-      "app_state.cron.params.limit": 5,
-      "app_state.feemarket.params.min_base_gas_price": "0.0025",
-      "app_state.feemarket.params.max_learning_rate": "0.5",
-      "app_state.feemarket.params.max_block_utilization": "1000000000",
-      "app_state.feemarket.params.fee_denom": "untrn",
-      "app_state.feemarket.params.enabled": false,
-      "app_state.feemarket.params.distribute_fees": true,
-      "app_state.feemarket.state.base_gas_price": "0.0025",
-      "app_state.globalfee.params.minimum_gas_prices": [
+      'app_state.contractmanager.params.sudo_call_gas_limit': '1000000',
+      'app_state.cron.params.limit': 5,
+      'app_state.feemarket.params.min_base_gas_price': '0.0025',
+      'app_state.feemarket.params.max_learning_rate': '0.5',
+      'app_state.feemarket.params.max_block_utilization': '1000000000',
+      'app_state.feemarket.params.fee_denom': 'untrn',
+      'app_state.feemarket.params.enabled': false,
+      'app_state.feemarket.params.distribute_fees': true,
+      'app_state.feemarket.state.base_gas_price': '0.0025',
+      'app_state.globalfee.params.minimum_gas_prices': [
         {
-          "denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-          "amount": "0"
+          denom:
+            'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2',
+          amount: '0',
         },
         {
-          "denom": "untrn",
-          "amount": "0"
-        }
+          denom: 'untrn',
+          amount: '0',
+        },
       ],
-      "app_state.globalfee.params.bypass_min_fee_msg_types": [
-        "/ibc.core.channel.v1.Msg/RecvPacket",
-        "/ibc.core.channel.v1.Msg/Acknowledgement",
-        "/ibc.core.client.v1.Msg/UpdateClient"
+      'app_state.globalfee.params.bypass_min_fee_msg_types': [
+        '/ibc.core.channel.v1.Msg/RecvPacket',
+        '/ibc.core.channel.v1.Msg/Acknowledgement',
+        '/ibc.core.client.v1.Msg/UpdateClient',
       ],
-      "app_state.globalfee.params.max_total_bypass_min_fee_msg_gas_usage": "1000000",
-      "app_state.marketmap.params.market_authorities": [
-        "neutron1hxskfdxpp5hqgtjj6am6nkjefhfzj359x0ar3z"
+      'app_state.globalfee.params.max_total_bypass_min_fee_msg_gas_usage':
+        '1000000',
+      'app_state.marketmap.params.market_authorities': [
+        'neutron1hxskfdxpp5hqgtjj6am6nkjefhfzj359x0ar3z',
       ],
-      "app_state.marketmap.params.admin": "neutron1hxskfdxpp5hqgtjj6am6nkjefhfzj359x0ar3z",
-      "app_state.slashing.params.signed_blocks_window": "140000",
-      "app_state.slashing.params.min_signed_per_window": "0.050000000000000000",
-      "app_state.slashing.params.slash_fraction_double_sign": "0.010000000000000000",
-      "app_state.slashing.params.slash_fraction_downtime": "0.000100000000000000",
-      "app_state.staking.params.bond_denom": "untrn",
-      "consensus.params.block.max_gas": "1000000000",
-      "consensus.params.abci.vote_extensions_enable_height": "1"
+      'app_state.marketmap.params.admin':
+        'neutron1hxskfdxpp5hqgtjj6am6nkjefhfzj359x0ar3z',
+      'app_state.slashing.params.signed_blocks_window': '140000',
+      'app_state.slashing.params.min_signed_per_window': '0.050000000000000000',
+      'app_state.slashing.params.slash_fraction_double_sign':
+        '0.010000000000000000',
+      'app_state.slashing.params.slash_fraction_downtime':
+        '0.000100000000000000',
+      'app_state.staking.params.bond_denom': 'untrn',
+      'consensus.params.block.max_gas': '1000000000',
+      'consensus.params.abci.vote_extensions_enable_height': '1',
     },
-    "config_opts": {
-      "consensus.timeout_commit": "500ms",
-      "consensus.timeout_propose": "500ms"
+    config_opts: {
+      'consensus.timeout_commit': '500ms',
+      'consensus.timeout_propose': '500ms',
     },
-    "app_opts": {
-      "api.enable": "true",
-      "api.address": "tcp://0.0.0.0:1317",
-      "api.swagger": "true",
-      "grpc.enable": "true",
-      "grpc.address": "0.0.0.0:9090",
-      "minimum-gas-prices": "0.0025untrn",
-      "rosetta.enable": "true",
-      "telemetry.prometheus-retention-time": 1000,
-      "oracle.enabled": true,
-      "oracle.oracle_address": "oracle:8080"
-    }
+    app_opts: {
+      'api.enable': 'true',
+      'api.address': 'tcp://0.0.0.0:1317',
+      'api.swagger': 'true',
+      'grpc.enable': 'true',
+      'grpc.address': '0.0.0.0:9090',
+      'minimum-gas-prices': '0.0025untrn',
+      'rosetta.enable': 'true',
+      'telemetry.prometheus-retention-time': 1000,
+      'oracle.enabled': true,
+      'oracle.oracle_address': 'oracle:8080',
+    },
   },
 };
 
@@ -185,6 +177,11 @@ function isSuite(t: any): t is Suite {
 export const setupPark = async (
   t: Readonly<Suite | File>,
   networks: string[] = [],
+  aumMessengerConfigs: Record<string, string> = {
+    'aum-messenger-1': './configs/aum-messenger-1-config.yaml',
+    'aum-messenger-2': './configs/aum-messenger-2-config.yaml',
+    'aum-messenger-3': './configs/aum-messenger-3-config.yaml',
+  },
   opts?: NetworkOptsType, // Key is path to the param, value is Record of network name and value
 ): Promise<cosmopark> => {
   const context = ((t: Readonly<Suite | File>) => {
@@ -207,40 +204,68 @@ export const setupPark = async (
     master_mnemonic: wallets.master,
     loglevel: 'info',
     wallets: {
-      demo1: { mnemonic: wallets.demo1, balance: '1000000000' },
+      demo1: {
+        mnemonic: wallets.demo1,
+        balance: '1000000000',
+      },
       demo2: { mnemonic: wallets.demo2, balance: '1000000000' },
       demo3: { mnemonic: wallets.demo3, balance: '1000000000' },
+      predefined: {
+        mnemonic:
+          'famous peace where snap nephew stay two rebuild disorder canoe feed kite finger trigger buffalo daughter general program have convince fault report right air',
+        balance: '1000000000',
+      },
     },
     custom_containers: [
       {
         name: 'aum-messenger-1',
         image: `aum-messenger-test:0.0.1`,
-        entrypoint: '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
+        entrypoint:
+          '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
         ports: ['3001:3000'],
         depends_on: ['neutron_val1'],
-        volumes: ['./aum-messenger-1-config.yaml:/aum_messenger/config.yaml'],
+        volumes: [
+          `${aumMessengerConfigs['aum-messenger-1']}:/aum_messenger/config.yaml`,
+          './keypairs/aum-messenger-1-keypair.json:/aum_messenger/keypair.json',
+        ],
       },
       {
         name: 'aum-messenger-2',
         image: `aum-messenger-test:0.0.1`,
-        entrypoint: '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
+        entrypoint:
+          '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
         ports: ['3002:3000'],
         depends_on: ['neutron_val1'],
-        volumes: ['./aum-messenger-2-config.yaml:/aum_messenger/config.yaml'],
+        volumes: [
+          `${aumMessengerConfigs['aum-messenger-2']}:/aum_messenger/config.yaml`,
+          './keypairs/aum-messenger-2-keypair.json:/aum_messenger/keypair.json',
+        ],
       },
       {
         name: 'aum-messenger-3',
         image: `aum-messenger-test:0.0.1`,
-        entrypoint: '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
+        entrypoint:
+          '/aum_messenger/aum-messenger --config /aum_messenger/config.yaml',
         ports: ['3003:3000'],
         depends_on: ['neutron_val1'],
-        volumes: ['./aum-messenger-3-config.yaml:/aum_messenger/config.yaml'],
+        volumes: [
+          `${aumMessengerConfigs['aum-messenger-3']}:/aum_messenger/config.yaml`,
+          './keypairs/aum-messenger-3-keypair.json:/aum_messenger/keypair.json',
+        ],
       },
       {
         name: 'oracle',
         image: `skip-mev/slinky-e2e-oracle`,
         entrypoint: 'slinky --market-map-endpoint neutron_val1:9090',
         ports: ['8080:8080', '8002:8002'],
+        depends_on: ['neutron_val1'],
+        volumes: [],
+      },
+      {
+        name: 'solana',
+        image: 'solana-test:0.0.1',
+        entrypoint: 'solana-test-validator',
+        ports: ['8899:8899', '8900:8900', '9900:9900'],
         depends_on: ['neutron_val1'],
         volumes: [],
       },

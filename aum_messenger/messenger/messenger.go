@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	msgrclient "github.com/structured-org/aum-messenger/client"
 )
 
 // Messenger is the definition of the Oracle Messenger interface. An Oracle Messenger is an entity
@@ -15,7 +17,7 @@ type Messenger[T any] interface {
 	// GetNextRound retrieves information about the next round for data submission. This method
 	// helps messengers understand when they need to fetch and submit data to maintain the
 	// continuous flow of data to receivers.
-	GetNextRound(ctx context.Context) (*NextRound, error)
+	GetNextRound(ctx context.Context) (*msgrclient.NextRound, error)
 
 	// FetchData retrieves current data from off-chain or foreign chain sources. This method is
 	// responsible for gathering real-time data from external data providers, APIs, or other
@@ -26,7 +28,7 @@ type Messenger[T any] interface {
 	// This method ensures that the blockchain has the most up-to-date information about external
 	// data for decision-making and tracking purposes. The method returns information about the
 	// next round that should be processed.
-	SubmitData(ctx context.Context, data T) (*NextRound, error)
+	SubmitData(ctx context.Context, data T) (*msgrclient.NextRound, error)
 
 	// Logger returns the logger for the messenger.
 	Logger() *zap.Logger
@@ -36,7 +38,7 @@ type Messenger[T any] interface {
 // data at specified intervals. It handles the necessary context management for the messenger's
 // operation.
 func RunMessenger[T any](ctx context.Context, msgr Messenger[T], cfg OperationalConfig) {
-	var nextRound *NextRound
+	var nextRound *msgrclient.NextRound
 	var err error
 	for {
 		if nextRound == nil { // case on initialisation or on failure
@@ -89,9 +91,9 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T], cfg Operational
 func processRound[T any](
 	ctx context.Context,
 	msgr Messenger[T],
-	round *NextRound,
+	round *msgrclient.NextRound,
 	fetchTimeout time.Duration,
-) *NextRound {
+) *msgrclient.NextRound {
 	fetchCtx, fetchCancel := context.WithTimeout(ctx, fetchTimeout)
 	defer fetchCancel()
 
@@ -117,6 +119,7 @@ func processRound[T any](
 	msgr.Logger().Info("data submitted",
 		zap.Uint64("round", round.Round),
 		zap.Any("data", data),
+		zap.Uint64("timestamp", nextRound.Timestamp),
 	)
 	return nextRound
 }

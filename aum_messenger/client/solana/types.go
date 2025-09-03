@@ -1,13 +1,5 @@
 package solana
 
-// NextRound contains AUM receiver contract's next consensus round information.
-type NextRound struct {
-	// Round is the next consensus round number.
-	Round uint64
-	// Timestamp is the timestamp of the next consensus round beginning.
-	Timestamp uint64
-}
-
 // TODO: find out proper solana data types for BinanceAumData fields
 
 // BinanceAumData contains all Binance data that is a matter of consensus for the Binance AUM
@@ -47,4 +39,9 @@ type BinanceBalance struct {
 	Asset string
 	// Amount is the asset amount on the account balance.
 	Amount float64
+}
+
+type Config struct {
+	Discriminator [8]byte `json:"discriminator"`
+	RoundTime     uint16  `json:"roundTime"`
 }

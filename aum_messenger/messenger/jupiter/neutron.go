@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
-	msgr "github.com/structured-org/aum-messenger/messenger"
 	"go.uber.org/zap"
 )
 
@@ -38,12 +38,12 @@ func NewJupiterAumMessengerForNeutron(
 }
 
 // GetNextRound retrieves the next round for the Jupiter AUM receiver contract.
-func (o *JupiterAumMessengerForNeutron) GetNextRound(ctx context.Context) (*msgr.NextRound, error) {
+func (o *JupiterAumMessengerForNeutron) GetNextRound(ctx context.Context) (*msgrclient.NextRound, error) {
 	nextRound, err := o.neutronClient.GetJupiterAumReceiverNextRound(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AUM receiver next round: %w", err)
 	}
-	return &msgr.NextRound{
+	return &msgrclient.NextRound{
 		Round:     nextRound.Round,
 		Timestamp: nextRound.Timestamp,
 	}, nil
@@ -59,12 +59,12 @@ func (o *JupiterAumMessengerForNeutron) Logger() *zap.Logger {
 }
 
 // SubmitData submits the Jupiter AUM data to the Neutron AUM receiver contract.
-func (o *JupiterAumMessengerForNeutron) SubmitData(ctx context.Context, data *neutronclient.JupiterAumData) (*msgr.NextRound, error) {
+func (o *JupiterAumMessengerForNeutron) SubmitData(ctx context.Context, data *neutronclient.JupiterAumData) (*msgrclient.NextRound, error) {
 	nextRound, err := o.neutronClient.SubmitJupiterAumData(ctx, data)
 	if err != nil {
 		return nil, err
 	}
-	return &msgr.NextRound{
+	return &msgrclient.NextRound{
 		Round:     nextRound.Round,
 		Timestamp: nextRound.Timestamp,
 	}, nil

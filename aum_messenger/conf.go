@@ -7,6 +7,9 @@ import (
 
 	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
 	"github.com/structured-org/aum-messenger/messenger"
+
+	arbitrarydatamsgr "github.com/structured-org/aum-messenger/messenger/arbitrary_data"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,6 +31,10 @@ func readConfig() *config {
 }
 
 type config struct {
+	// SolanaRpcEndpoint is the endpoint of the Solana RPC.
+	SolanaRpcEndpoint string `yaml:"solana_rpc_endpoint"`
+	SolanaKeypairPath string `yaml:"solana_keypair_path"`
+
 	// BinanceUmPositionsList is the list of UM-positions to fetch from Binance.
 	BinanceUmPositionsList []string `yaml:"binance_um_positions_list"`
 	// BinanceSpotAssetsList is the list of spot assets to fetch from Binance.
@@ -61,6 +68,8 @@ type config struct {
 	MockClients bool `yaml:"mock_clients"`
 	// MockControllerPort is the port of the mock controller server.
 	MockControllerPort int `yaml:"mock_controller_port"`
+
+	NeutronContracstQueries []arbitrarydatamsgr.NeutronContractQuery `yaml:"neutron_contracts_queries"`
 }
 
 type clientsConfig struct {

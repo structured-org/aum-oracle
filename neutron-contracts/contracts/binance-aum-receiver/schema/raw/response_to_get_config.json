@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetConfigResponse",
+  "type": "object",
+  "required": [
+    "consensus_config",
+    "contract_config"
+  ],
+  "properties": {
+    "consensus_config": {
+      "description": "The current config of the consensus mechanism",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Config"
+        }
+      ]
+    },
+    "contract_config": {
+      "description": "The current config of the contract itself",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Config2"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Addr": {
+      "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+      "type": "string"
+    },
+    "Config": {
+      "description": "Describes the configuration of consensus",
+      "type": "object",
+      "required": [
+        "data_delta_ppm",
+        "messengers",
+        "round_length",
+        "threshold"
+      ],
+      "properties": {
+        "data_delta_ppm": {
+          "description": "delta in percent per million (ppm), for which two values are considered equal",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "messengers": {
+          "description": "a list of messengers that can submit data for consensus",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Addr"
+          }
+        },
+        "round_length": {
+          "description": "length of a round in seconds",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "threshold": {
+          "description": "threshold of the consensus (how many messengers must submit data for consensus to be reached)",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Config2": {
+      "type": "object",
+      "required": [
+        "consensus_data_valid_period",
+        "price_data_valid_period",
+        "price_oracle_contract",
+        "required_binance_positions",
+        "required_binance_spot_assets"
+      ],
+      "properties": {
+        "consensus_data_valid_period": {
+          "description": "Validity period for data (that reached consensus) in the contract in seconds. If the data is too old, Binance AUM contract cannot rely on it in AUM calculations, and in that case, the contract just doesn't calculate AUM and returns an error in the corresponding query.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "price_data_valid_period": {
+          "description": "Validity period for prices from the oracle contract in blocks. If the prices are too old, Binance AUM contract cannot rely on them in AUM calculations, and in that case, the contract just doesn't calculate AUM and returns an error in the corresponding query.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "price_oracle_contract": {
+          "description": "address of price oracle contract",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            }
+          ]
+        },
+        "required_binance_positions": {
+          "description": "required binance positions that messengers must provide",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_binance_spot_assets": {
+          "description": "required binance spot assets that messengers must provide",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

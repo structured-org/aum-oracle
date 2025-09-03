@@ -5,6 +5,7 @@ import (
 
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
+	msgrclient "github.com/structured-org/aum-messenger/client"
 	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
 	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 )
@@ -23,6 +24,6 @@ type SolanaClient interface {
 
 // NeutronAumReceiverClient is the definition of the expected Neutron AUM receiver client.
 type NeutronAumReceiverClient interface {
-	GetJupiterAumReceiverNextRound(ctx context.Context) (*neutronclient.NextRound, error)
-	SubmitJupiterAumData(ctx context.Context, data *neutronclient.JupiterAumData) (*neutronclient.NextRound, error)
+	GetJupiterAumReceiverNextRound(ctx context.Context) (*msgrclient.NextRound, error)
+	SubmitJupiterAumData(ctx context.Context, data *neutronclient.JupiterAumData) (*msgrclient.NextRound, error)
 }

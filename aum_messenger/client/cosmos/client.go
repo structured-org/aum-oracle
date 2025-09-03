@@ -2,7 +2,6 @@ package cosmos
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -165,13 +164,17 @@ func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*co
 	return res, nil
 }
 
-// QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
-func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
-	queryBz, err := json.Marshal(query)
+// QueryChainStatus queries the SyncInfo of the chain.
+func (c *CosmosClient) QueryChainStatus(ctx context.Context) (*cometcoretypes.SyncInfo, error) {
+	status, err := c.rpcClient.Status(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal query into json: %w", err)
+		return nil, fmt.Errorf("failed to query chain status: %w", err)
 	}
+	return &status.SyncInfo, nil
+}
 
+// QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
+func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, queryBz []byte) ([]byte, error) {
 	req := wasmtypes.QuerySmartContractStateRequest{
 		Address:   contractAddr,
 		QueryData: queryBz,
