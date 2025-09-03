@@ -7,7 +7,6 @@
     "consensus_data_valid_period",
     "data_delta_ppm",
     "messengers",
-    "owner",
     "price_data_valid_period",
     "required_custody_assets",
     "round_length",
@@ -32,10 +31,6 @@
       "items": {
         "$ref": "#/definitions/Addr"
       }
-    },
-    "owner": {
-      "description": "The current owner address.",
-      "type": "string"
     },
     "price_data_valid_period": {
       "description": "How many blocks we consider the last price from oracle as valid",

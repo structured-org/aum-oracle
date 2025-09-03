@@ -14,6 +14,7 @@ use cosmwasm_std::{
     SignedDecimal256, StdResult,
 };
 use cw2::set_contract_version;
+use cw_ownable::{get_ownership, update_ownership};
 
 const CONTRACT_NAME: &str = "crates.io:binance-aum-receiver";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -26,6 +27,8 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> ContractResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    cw_ownable::initialize_owner(deps.storage, deps.api, Some(&msg.owner))?;
 
     let consensus_config = ConsensusConfig {
         messengers: msg
@@ -42,7 +45,6 @@ pub fn instantiate(
     CONSENSUS_STATE.initialize(deps.storage, &env, consensus_config)?;
 
     let contract_config = Config {
-        owner: deps.api.addr_validate(&msg.owner)?,
         consensus_data_valid_period: msg.consensus_data_valid_period,
         required_binance_spot_assets: msg.required_binance_spot_assets,
         required_binance_positions: msg.required_binance_positions,
@@ -68,7 +70,11 @@ pub fn execute(
             Ok(execute_publish_data(deps, env, info, new_data)?)
         }
         ExecuteMsg::UpdateConfig { new_config } => {
-            Ok(execute_update_config(deps, env, info, new_config)?)
+            Ok(execute_update_config(deps, info, new_config)?)
+        }
+        ExecuteMsg::UpdateOwnership(action) => {
+            update_ownership(deps, &env.block, &info.sender, action)?;
+            Ok(Response::new().add_attribute("action", "update_ownership"))
         }
     }
 }
@@ -122,17 +128,13 @@ fn execute_publish_data(
 
 fn execute_update_config(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     new_config: UpdateConfig,
 ) -> ContractResult<Response> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
     // Load current contract config
     let mut contract_config = CONFIG.load(deps.storage)?;
-
-    // Only owner can update config
-    if info.sender != contract_config.owner {
-        return Err(ContractError::Unauthorized {});
-    }
 
     // Update contract configuration
     contract_config.update_config(deps.as_ref(), &new_config)?;
@@ -172,6 +174,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetAum {} => Ok(to_json_binary(&query_get_aum(deps, env)?)?),
         QueryMsg::GetRoundInfo {} => Ok(to_json_binary(&query_round_info(deps, env)?)?),
         QueryMsg::GetConfig {} => Ok(to_json_binary(&query_config(deps, env)?)?),
+        QueryMsg::Ownership {} => Ok(to_json_binary(&get_ownership(deps.storage)?)?),
     }
 }
 

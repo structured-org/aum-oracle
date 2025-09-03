@@ -284,12 +284,57 @@
           }
         },
         "additionalProperties": false
+      },
+      {
+        "description": "Returns the information about the exchange rate history window.",
+        "type": "object",
+        "required": [
+          "er_window_info"
+        ],
+        "properties": {
+          "er_window_info": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
       }
     ]
   },
   "migrate": null,
   "sudo": null,
   "responses": {
+    "er_window_info": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ErWindowInfoResponse",
+      "type": "object",
+      "required": [
+        "total_points",
+        "window_end",
+        "window_start"
+      ],
+      "properties": {
+        "total_points": {
+          "description": "Total number of data points in the window.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "window_end": {
+          "description": "Timestamp of the newest data point in the window.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "window_start": {
+          "description": "Timestamp of the oldest data point in the window.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
     "get_aum": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "GetAumResponse",

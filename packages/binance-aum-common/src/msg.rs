@@ -2,6 +2,7 @@ use crate::types::{BinanceData, Config};
 use aum_receiver_common::types::{GetAumResponse, RoundInfoResponse};
 use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome};
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -31,6 +32,7 @@ pub struct InstantiateMsg {
     pub price_oracle_contract: String,
 }
 
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     /// Allows a registered messenger to submit new Binance data.
@@ -43,8 +45,6 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct UpdateConfig {
-    /// New owner address
-    pub owner: Option<String>,
     /// New validity period for the consensus (in seconds)
     pub consensus_data_valid_period: Option<u64>,
     /// New validity period for price oracle (in blocks)
@@ -66,8 +66,8 @@ pub struct UpdateConfig {
     pub round_length: Option<u64>,
 }
 
+#[cw_ownable_query]
 #[cw_serde]
-#[allow(clippy::enum_variant_names)]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Returns the latest published data

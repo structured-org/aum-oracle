@@ -3,6 +3,7 @@ use aum_receiver_common::types::GetAumResponse;
 use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -23,6 +24,7 @@ pub struct InstantiateMsg {
     pub mocked_maxbtc_supply: Uint128,
 }
 
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     /// Updates the contract's configuration parameters. Only callable by the owner.
@@ -52,8 +54,6 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct UpdateConfig {
-    /// New owner address.
-    pub owner: Option<String>,
     /// New publisher address.
     pub publisher: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
@@ -72,6 +72,7 @@ pub struct UpdateConfig {
     pub twaer_immutability_seconds: Option<u64>,
 }
 
+#[cw_ownable_query]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
@@ -94,6 +95,10 @@ pub enum QueryMsg {
     /// on all recorded exchange rate history from RecordEr calls. This provides a real-time view
     /// of what the TWA ER would be if PublishTwaer were called at this moment.
     PredictTwaer {},
+
+    #[returns(ErWindowInfoResponse)]
+    /// Returns the information about the exchange rate history window.
+    ErWindowInfo {},
 }
 
 #[cw_serde]
@@ -103,6 +108,16 @@ pub struct GetTwaerResponse {
 
     /// The timestamp when the TWAER was published.
     pub published_at: u64,
+}
+
+#[cw_serde]
+pub struct ErWindowInfoResponse {
+    /// Timestamp of the oldest data point in the window.
+    pub window_start: u64,
+    /// Timestamp of the newest data point in the window.
+    pub window_end: u64,
+    /// Total number of data points in the window.
+    pub total_points: u64,
 }
 
 /// MigrateMsg is used for contract migration.
