@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "RoundInfoResponse",
+  "description": "Response type for AUM Oracle receiver GetRoundInfo queries.",
   "type": "object",
   "required": [
     "next_round",

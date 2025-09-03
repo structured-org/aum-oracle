@@ -1,5 +1,5 @@
-use crate::error::{ContractError, ContractResult};
-use crate::state::SpotBalance;
+use binance_aum_common::error::{ContractError, ContractResult};
+use binance_aum_common::types::SpotBalance;
 use cosmwasm_schema::schemars;
 use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{Deps, Int256, SignedDecimal256};

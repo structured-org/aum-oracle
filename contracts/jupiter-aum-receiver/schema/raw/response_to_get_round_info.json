@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "RoundInfoResponse",
+  "description": "Response type for AUM Oracle receiver GetRoundInfo queries.",
   "type": "object",
   "required": [
     "next_round",
@@ -8,7 +9,7 @@
   ],
   "properties": {
     "next_round": {
-      "description": "Next round.",
+      "description": "The next round",
       "allOf": [
         {
           "$ref": "#/definitions/Round"
@@ -16,7 +17,7 @@
       ]
     },
     "pending_round": {
-      "description": "Current round.",
+      "description": "Currently pending round",
       "allOf": [
         {
           "$ref": "#/definitions/Round"

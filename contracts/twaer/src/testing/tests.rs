@@ -1,17 +1,19 @@
 use crate::contract::{execute, instantiate, query};
-use crate::error::ContractError;
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
-};
-use crate::state::{Config, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
-    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Order, OwnedDeps,
+    from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
     StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
+use twaer_common::error::ContractError;
+use twaer_common::msg::{
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+};
+use twaer_common::types::Config;
 
 #[test]
 fn proper_initialization() {
@@ -263,7 +265,7 @@ fn query_aum_single_oracle() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_wbtc, Uint128::from(1000000u128));
+    assert_eq!(res.aum_in_wbtc, Int256::from(1000000u128));
 }
 
 #[test]
@@ -282,13 +284,9 @@ fn query_aum_multiple_oracles() {
             contract_addr,
         } => {
             let res = if contract_addr.as_str() == oracle1.as_str() {
-                GetAumResponse {
-                    aum_in_wbtc: Uint128::from(1000000u128), // 0.01 BTC
-                }
+                aum_response_from_uwbtc(Int256::from(1000000u128))
             } else if contract_addr.as_str() == oracle2.as_str() {
-                GetAumResponse {
-                    aum_in_wbtc: Uint128::from(2000000u128), // 0.02 BTC
-                }
+                aum_response_from_uwbtc(Int256::from(2000000u128))
             } else {
                 unreachable!()
             };
@@ -301,7 +299,7 @@ fn query_aum_multiple_oracles() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
 
-    assert_eq!(res.aum_in_wbtc, Uint128::from(3000000u128)); // 0.03 BTC total
+    assert_eq!(res.aum_in_wbtc, Int256::from(3000000u128)); // 0.03 BTC total
 }
 
 #[test]
@@ -372,6 +370,49 @@ fn test_query_twaer_no_data() {
 
     let err = query_twaer(&deps, mock_env()).unwrap_err();
     assert!(matches!(err, ContractError::TwaerNotCalculated));
+}
+
+#[test]
+fn test_query_er_window_info() {
+    let mut deps = setup_contract_with_supply(500000u128, None);
+    let owner = deps.api.addr_make("owner");
+    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_denom: None,
+            twa_window_seconds: Some(29),
+            twaer_immutability_seconds: None,
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    let env = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env.clone(), &owner).unwrap();
+
+    let env2 = test_env_with_time(1000010, 110);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+
+    let env3 = test_env_with_time(1000020, 120);
+    record_er(&mut deps, env3.clone(), &owner).unwrap();
+
+    let res = query_msg(&deps, env3, QueryMsg::ErWindowInfo {}).unwrap();
+    let er_window_info: ErWindowInfoResponse = from_json(res).unwrap();
+    assert_eq!(er_window_info.window_start, 1000000);
+    assert_eq!(er_window_info.window_end, 1000020);
+    assert_eq!(er_window_info.total_points, 3);
+
+    // the first point should be expired with twa_window_seconds=29
+    let env4 = test_env_with_time(1000030, 130);
+    record_er(&mut deps, env4.clone(), &owner).unwrap();
+
+    let res = query_msg(&deps, env4, QueryMsg::ErWindowInfo {}).unwrap();
+    let er_window_info: ErWindowInfoResponse = from_json(res).unwrap();
+    assert_eq!(er_window_info.window_start, 1000010);
+    assert_eq!(er_window_info.window_end, 1000030);
+    assert_eq!(er_window_info.total_points, 3);
 }
 
 #[test]
@@ -1167,9 +1208,7 @@ fn mock_oracle_response(
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
         WasmQuery::Smart { msg: _, .. } => {
-            let res = GetAumResponse {
-                aum_in_wbtc: Uint128::from(aum_in_wbtc),
-            };
+            let res = aum_response_from_uwbtc(Int256::from(aum_in_wbtc));
             let bin = to_json_binary(&res).unwrap();
             SystemResult::Ok(ContractResult::Ok(bin))
         }

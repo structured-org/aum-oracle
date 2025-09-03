@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "oneOf": [
+    {
+      "description": "Updates the contract's configuration parameters. Only callable by the owner. All fields are optional, allowing partial updates.",
+      "type": "object",
+      "required": [
+        "update_config"
+      ],
+      "properties": {
+        "update_config": {
+          "type": "object",
+          "required": [
+            "new_config"
+          ],
+          "properties": {
+            "new_config": {
+              "$ref": "#/definitions/UpdateConfig"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Calculates an instant exchange rate based on AUM and supply data, then records it in the exchange rate history for TWA calculation purposes. This should be called frequently to to maintain accurate time-weighted average data. The recorded rates are used internally for TWA calculations but do not directly affect the published rate.",
+      "type": "object",
+      "required": [
+        "record_er"
+      ],
+      "properties": {
+        "record_er": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Calculates and publishes the official Time-Weighted Average Exchange Rate that is exposed via GetTwaExchangeRate queries. The calculation uses the exchange rate history populated by RecordEr calls to compute the TWA over the configured time window. Only callable by the owner or publisher.",
+      "type": "object",
+      "required": [
+        "publish_twaer"
+      ],
+      "properties": {
+        "publish_twaer": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Resets the historical and aggregator values and sets the TWAER to a specific value. Only callable by the owner.",
+      "type": "object",
+      "required": [
+        "reset_twaer_to"
+      ],
+      "properties": {
+        "reset_twaer_to": {
+          "type": "object",
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "$ref": "#/definitions/Decimal"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Turns the real token supply usage on in exchange rate calculation. Only callable by the owner.",
+      "type": "object",
+      "required": [
+        "unmock_maxbtc_supply"
+      ],
+      "properties": {
+        "unmock_maxbtc_supply": {
+          "type": "object",
+          "required": [
+            "maxbtc_denom"
+          ],
+          "properties": {
+            "maxbtc_denom": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Decimal": {
+      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+      "type": "string"
+    },
+    "UpdateConfig": {
+      "type": "object",
+      "properties": {
+        "aum_oracles": {
+          "description": "A new list of AUM oracle instances from where the contract receives individual AUMs.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxbtc_denom": {
+          "description": "New maxBTC denom.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "description": "New owner address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "publisher": {
+          "description": "New publisher address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "twa_window_seconds": {
+          "description": "New time window in seconds for TWA calculation.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "twaer_immutability_seconds": {
+          "description": "New minimal number of seconds required to pass between sequential TWAER publications.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,4 +1,6 @@
 use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
+use aum_receiver_common::constants::WBTC_DECIMALS;
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse, RoundInfoResponse};
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
@@ -7,11 +9,9 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
-use jupiter_aum_common::constants::WBTC_DECIMALS;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
-    ConfigResponse, ExecuteMsg, GetAumResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg, RoundInfoResponse, UpdateConfig,
+    ConfigResponse, ExecuteMsg, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig,
 };
 use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
@@ -223,10 +223,7 @@ fn query_get_aum(deps: Deps, env: Env) -> Result<GetAumResponse, ContractError> 
         return Err(ContractError::PublishedDataTooOld {});
     }
 
-    Ok(GetAumResponse {
-        aum_in_wbtc: aum_data.amount,
-        decimals: WBTC_DECIMALS,
-    })
+    Ok(aum_response_from_uwbtc(aum_data.amount))
 }
 
 /// Returns pending and next round info.

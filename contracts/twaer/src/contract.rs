@@ -1,19 +1,19 @@
-use std::ops::Sub;
-
-use crate::error::{ContractError, ContractResult};
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
-};
-use crate::state::{
-    Config, TwaAggregator, CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR,
-};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdResult, Uint128,
+    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
+    Order, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
 use cw_storage_plus::Bound;
+use std::ops::Sub;
+use twaer_common::error::{ContractError, ContractResult};
+use twaer_common::msg::{
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
+};
+use twaer_common::types::{Config, TwaAggregator};
 
 const CONTRACT_NAME: &str = "crates.io:twaer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -294,9 +294,12 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
         return Ok(Decimal::one());
     }
 
-    let aum = get_aum(deps)?;
+    let aum = get_aum_from_oracles(deps)?;
+    let aum_uint = Uint128::try_from(aum).map_err(|e| ContractError::ConversionError {
+        msg: format!("failed to convert total AUM {} to Uint128: {}", aum, e),
+    })?;
 
-    Ok(Decimal::from_ratio(aum, maxbtc_supply))
+    Ok(Decimal::from_ratio(aum_uint, maxbtc_supply))
 }
 
 /// Find the next timestamp after the given timestamp
@@ -326,12 +329,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
         QueryMsg::GetTwaer {} => Ok(to_json_binary(&query_get_twaer(deps)?)?),
         QueryMsg::PredictTwaer {} => Ok(to_json_binary(&calculate_twaer(deps, env)?)?),
         QueryMsg::Ownership {} => Ok(to_json_binary(&get_ownership(deps.storage)?)?),
+        QueryMsg::ErWindowInfo {} => Ok(to_json_binary(&query_er_window_info(deps)?)?),
     }
 }
 
 fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
-    let aum = get_aum(deps)?;
-    Ok(GetAumResponse { aum_in_wbtc: aum })
+    let aum = get_aum_from_oracles(deps)?;
+    Ok(aum_response_from_uwbtc(aum))
 }
 
 fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
@@ -345,9 +349,9 @@ fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
     })
 }
 
-fn get_aum(deps: Deps) -> ContractResult<Uint128> {
+fn get_aum_from_oracles(deps: Deps) -> ContractResult<Int256> {
     let config = CONFIG.load(deps.storage)?;
-    let mut total_aum = Uint128::zero();
+    let mut total_aum = Int256::zero();
     for oracle in config.aum_oracles.iter() {
         let aum: GetAumResponse = deps.querier.query_wasm_smart(
             oracle,
@@ -395,4 +399,24 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
     total_weighted_sum
         .checked_div(Decimal::from_ratio(total_duration, 1u64))
         .map_err(ContractError::CheckedDiv)
+}
+
+fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
+    let twa_buffer = TWA_AGGREGATOR.load(deps.storage)?;
+    let total_points = ER_HISTORY
+        .range(deps.storage, None, None, Order::Ascending)
+        .count() as u64;
+
+    Ok(ErWindowInfoResponse {
+        window_start: twa_buffer.window_start,
+        window_end: twa_buffer.window_end,
+        total_points,
+    })
+}
+
+/// Migrates the contract
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::default())
 }

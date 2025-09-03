@@ -1,10 +1,13 @@
-use crate::error::{ContractError, ContractResult};
-use crate::msg::{
-    ExecuteMsg, GetAumResponse, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg,
-    QueryMsg, RoundInfoResponse, UpdateConfig,
-};
-use crate::state::{AumInWBTC, BinanceData, Config, AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
+use crate::state::{AUM_IN_WBTC, CONFIG, CONSENSUS_STATE};
 use crate::utils::{get_prices, spot_balance_asset_in_btc};
+use aum_receiver_common::constants::WBTC_DECIMALS;
+use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse, RoundInfoResponse};
+use binance_aum_common::error::{ContractError, ContractResult};
+use binance_aum_common::msg::{
+    ExecuteMsg, GetConfigResponse, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
+};
+use binance_aum_common::types::{AumInWBTC, BinanceData, Config};
 use consensus::consensus::{Config as ConsensusConfig, PublishResult};
 use cosmwasm_std::{
     attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
@@ -15,8 +18,6 @@ use cw_ownable::{get_ownership, update_ownership};
 
 const CONTRACT_NAME: &str = "crates.io:binance-aum-receiver";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-const WBTC_DECIMALS: u32 = 8; // WBTC via IBC Eureka has 8 decimals
 
 #[entry_point]
 pub fn instantiate(
@@ -212,17 +213,7 @@ pub fn query_get_aum(deps: Deps, env: Env) -> ContractResult<GetAumResponse> {
         return Err(ContractError::PublishedDataTooOld {});
     }
 
-    Ok(GetAumResponse {
-        aum_in_wbtc: aum_data.amount,
-        decimals: WBTC_DECIMALS,
-    })
-}
-
-/// Migrates the contract
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default())
+    Ok(aum_response_from_uwbtc(aum_data.amount))
 }
 
 pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {
@@ -263,4 +254,11 @@ pub fn calculate_aum(deps: Deps, data: BinanceData) -> ContractResult<Int256> {
         / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
 
     Ok(aum_in_wbtc)
+}
+
+/// Migrates the contract
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(Response::default())
 }

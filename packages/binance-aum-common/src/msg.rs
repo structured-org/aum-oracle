@@ -1,7 +1,7 @@
-use crate::state::{BinanceData, Config};
-use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome, Round};
+use crate::types::{BinanceData, Config};
+use aum_receiver_common::types::{GetAumResponse, RoundInfoResponse};
+use consensus::consensus::{Config as ConsensusConfig, ConsensusOutcome};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Int256;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
@@ -87,27 +87,9 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
-pub struct RoundInfoResponse {
-    /// Currently pending round
-    pub pending_round: Round,
-    /// The next round
-    pub next_round: Round,
-}
-
-#[cw_serde]
 pub struct GetDataResponse {
     /// The latest published data (can be null if there was no consensus reached)
     pub last_published_data: Option<ConsensusOutcome<BinanceData>>,
-}
-
-#[cw_serde]
-pub struct GetAumResponse {
-    /// The latest AUM in Binance reported by messengers
-    pub aum_in_wbtc: Int256,
-    /// Represents the number of decimals that the aum_in_btc is
-    /// represented in. It is used to scale the aum_in_btc to its base BTC value.
-    /// E.g. `base_aum_in_btc = aum_in_btc / 10^decimals`
-    pub decimals: u32,
 }
 
 #[cw_serde]
@@ -118,5 +100,6 @@ pub struct GetConfigResponse {
     pub contract_config: Config,
 }
 
+/// MigrateMsg is used for contract migration.
 #[cw_serde]
 pub struct MigrateMsg {}

@@ -38,6 +38,9 @@ pub enum ContractError {
 
     #[error("No earliest exchange rate found")]
     NoEarliestRate,
+
+    #[error("Conversion error: {msg}")]
+    ConversionError { msg: String },
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {
