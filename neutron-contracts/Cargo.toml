@@ -18,6 +18,7 @@ overflow-checks = true
 cosmwasm-schema = { version = "2.2.0" }
 cosmwasm-std = { version = "2.2.2" }
 cw-storage-plus = "2.0.0"
+cw-ownable = "2.1.0"
 cw2 = "2.0.0"
 neutron-std = { git = "https://github.com/neutron-org/neutron-std.git", branch = "main" }
 serde = { version = "1.0.219", features = ["derive"] }

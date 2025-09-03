@@ -22,4 +22,4 @@ neutron-std = { workspace = true }
 
 jupiter-aum-common = { workspace = true }
 consensus = { workspace = true }
-cw-ownable = { workspace = true } //"2.1.0"
+cw-ownable = { workspace = true }
