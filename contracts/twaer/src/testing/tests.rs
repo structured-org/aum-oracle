@@ -666,6 +666,19 @@ fn test_mock_unmock_maxbtc_supply() {
     // Verify this ER is different from both previous ones
     assert_ne!(recorded_er_zero_supply, recorded_er_mocked);
     assert_ne!(recorded_er_zero_supply, recorded_er_real);
+
+    // Test that unauthorized user cannot set mocked supply
+    let stranger = deps.api.addr_make("stranger");
+    let err = execute_msg(
+        &mut deps,
+        mock_env(),
+        &stranger,
+        ExecuteMsg::SetMockedMaxbtcSupply {
+            value: Uint128::from(1000000u128),
+        },
+    )
+    .unwrap_err();
+    assert!(matches!(err, ContractError::Ownable(NotOwner)));
 }
 
 #[test]
