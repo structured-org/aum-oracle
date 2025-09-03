@@ -61,8 +61,8 @@ pub fn execute(
         }
         ExecuteMsg::RecordEr {} => Ok(execute_record_er(deps, env, info)?),
         ExecuteMsg::PublishTwaer {} => Ok(execute_publish_twaer(deps, env, info)?),
-        ExecuteMsg::UnmockMaxbtcSupply { maxbtc_denom } => {
-            Ok(execute_unmock_maxbtc_supply(deps, env, info, maxbtc_denom)?)
+        ExecuteMsg::SetMockedMaxbtcSupply { value } => {
+            Ok(execute_set_maxbtc_supply(deps, env, info, value)?)
         }
         ExecuteMsg::ResetTwaerTo { value } => Ok(execute_reset_twaer_to(deps, env, info, value)?),
         ExecuteMsg::UpdateOwnership(action) => {
@@ -94,7 +94,7 @@ fn execute_update_config(
         config.publisher = validated_new_publisher;
     }
     if let Some(maxbtc_denom) = new_config.maxbtc_denom {
-        config.maxbtc_denom = Some(maxbtc_denom);
+        config.maxbtc_denom = maxbtc_denom;
     }
     if let Some(twa_window_seconds) = new_config.twa_window_seconds {
         config.twa_window_seconds = twa_window_seconds;
@@ -160,20 +160,19 @@ fn execute_reset_twaer_to(
         .add_attributes([("action", "reset_twaer_to"), ("value", &value.to_string())]))
 }
 
-fn execute_unmock_maxbtc_supply(
+fn execute_set_maxbtc_supply(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    maxbtc_denom: String,
+    value: Uint128,
 ) -> ContractResult<Response> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    let mut config = CONFIG.load(deps.storage)?;
-    MOCKED_MAXBTC_SUPPLY.save(deps.storage, &Uint128::zero())?;
-    config.maxbtc_denom = Some(maxbtc_denom);
-    CONFIG.save(deps.storage, &config)?;
+    MOCKED_MAXBTC_SUPPLY.save(deps.storage, &value)?;
 
-    Ok(Response::new().add_attribute("action", "unmock_maxbtc_supply"))
+    Ok(Response::new()
+        .add_attribute("action", "set_mocked_maxbtc_supply")
+        .add_attribute("value", value.to_string()))
 }
 
 /// Determine which exchange rates are expired and return them in ascending timestamp order.

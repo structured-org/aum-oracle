@@ -1,5 +1,5 @@
 use crate::contract::{execute, instantiate, query};
-use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
@@ -159,7 +159,7 @@ fn update_config_by_owner() {
         new_config: UpdateConfig {
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
-            maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
+            maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
             twa_window_seconds: Some(172800),         // 48 hours
             twaer_immutability_seconds: Some(172800), // 48 hours
         },
@@ -219,7 +219,7 @@ fn update_config_partial() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
+            maxbtc_denom: Some(Some("factory/neutron1/minbtc".to_string())),
             twa_window_seconds: Some(85000),
             twaer_immutability_seconds: None,
         },
@@ -527,7 +527,7 @@ fn test_twaer_immutability() {
 }
 
 #[test]
-fn test_unmock_maxbtc_supply() {
+fn test_mock_unmock_maxbtc_supply() {
     // Set up contract with mocked supply of 500,000
     let mocked_supply = Uint128::from(500000u128);
     let mut deps = cosmwasm_std::testing::mock_dependencies();
@@ -576,13 +576,19 @@ fn test_unmock_maxbtc_supply() {
     )]);
     deps.querier.update_wasm(mock_oracle_response(aum_amount));
 
-    // Execute UnmockMaxbtcSupply to switch to real supply
+    // set maxbtc_denom to switch to real supply
     let res = execute_msg(
         &mut deps,
         mock_env(),
         &owner,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
         },
     );
     assert!(res.is_ok());
@@ -594,40 +600,85 @@ fn test_unmock_maxbtc_supply() {
         Some("factory/neutron1/maxbtc".to_string())
     );
 
-    // Verify mocked supply is zeroed out
-    let mocked_supply_after = MOCKED_MAXBTC_SUPPLY.load(&deps.storage).unwrap();
-    assert_eq!(mocked_supply_after, Uint128::zero());
-
     // Record ER using real supply
     let env2 = test_env_with_time(1000001, 101);
     execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
 
     // Verify ER is now calculated using real supply by checking the recorded ER in history
-    let history_rates_after: Vec<Decimal> = ER_HISTORY
+    let history_rates_after_unmock: Vec<Decimal> = ER_HISTORY
         .range(deps.as_ref().storage, None, None, Order::Ascending)
         .map(|item| item.unwrap().1)
         .collect();
-    assert_eq!(history_rates_after.len(), 2);
-    let recorded_er_real = history_rates_after[1]; // Second entry
+    assert_eq!(history_rates_after_unmock.len(), 2);
+    let recorded_er_real = history_rates_after_unmock[1];
     let expected_er_real = Decimal::from_ratio(aum_amount, real_supply);
     assert_eq!(recorded_er_real, expected_er_real);
-    assert_eq!(recorded_er_real, Decimal::from_ratio(4u128, 3u128)); // ≈ 1.333...
+    assert_eq!(recorded_er_real, Decimal::from_ratio(100u128, 75u128)); // ≈ 1.333...
 
     // Verify the ERs are different (proving the switch worked)
     assert_ne!(recorded_er_mocked, recorded_er_real);
 
-    // Test that unauthorized user cannot unmock supply
+    // Switch back to mocked supply by setting maxbtc_denom to None
+    let res = execute_msg(
+        &mut deps,
+        mock_env(),
+        &owner,
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(None),
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
+        },
+    );
+    assert!(res.is_ok());
+
+    // Verify config is updated back to None
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(config.maxbtc_denom, None);
+
+    // Set mocked supply to zero so calc_exchange_rate returns Decimal::one()
+    let res = execute_msg(
+        &mut deps,
+        mock_env(),
+        &owner,
+        ExecuteMsg::SetMockedMaxbtcSupply {
+            value: Uint128::zero(),
+        },
+    );
+    assert!(res.is_ok());
+
+    // Record ER using zero mocked supply
+    let env3 = test_env_with_time(1000002, 102);
+    execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::RecordEr {}).unwrap();
+
+    // Verify the recorded ER is Decimal::one() due to zero supply
+    let history_rates_after_mock: Vec<Decimal> = ER_HISTORY
+        .range(deps.as_ref().storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap().1)
+        .collect();
+    assert_eq!(history_rates_after_mock.len(), 3);
+    let recorded_er_zero_supply = history_rates_after_mock[2];
+    assert_eq!(recorded_er_zero_supply, Decimal::one());
+
+    // Verify this ER is different from both previous ones
+    assert_ne!(recorded_er_zero_supply, recorded_er_mocked);
+    assert_ne!(recorded_er_zero_supply, recorded_er_real);
+
+    // Test that unauthorized user cannot set mocked supply
     let stranger = deps.api.addr_make("stranger");
     let err = execute_msg(
         &mut deps,
         mock_env(),
         &stranger,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        ExecuteMsg::SetMockedMaxbtcSupply {
+            value: Uint128::from(1000000u128),
         },
     )
     .unwrap_err();
-    assert_eq!(err, ContractError::Ownable(NotOwner));
+    assert!(matches!(err, ContractError::Ownable(NotOwner)));
 }
 
 #[test]
@@ -1067,6 +1118,66 @@ fn test_twaer_complex_intertwining_expiration() {
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
 }
 
+#[test]
+fn test_update_maxbtc_denom_deserialization() {
+    let mut deps = setup_contract();
+    let owner = deps.api.addr_make("owner");
+
+    // Test case 1: Setting maxbtc_denom to Some(String) via JSON
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "maxbtc_denom": "factory/neutron1/maxbtc"
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was set to Some(String)
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(
+        config.maxbtc_denom,
+        Some("factory/neutron1/maxbtc".to_string())
+    );
+
+    // Test case 2: Missing field should not change config
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "twa_window_seconds": 1
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was NOT changed (should still be Some(String))
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(
+        config.maxbtc_denom,
+        Some("factory/neutron1/maxbtc".to_string())
+    );
+
+    // Test case 3: Explicit null should set to None
+    let json_msg = r#"{
+        "update_config": {
+            "new_config": {
+                "maxbtc_denom": null
+            }
+        }
+    }"#;
+    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Verify config value was changed to None
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
+    let config: Config = from_json(bin).unwrap();
+    assert_eq!(config.maxbtc_denom, None);
+}
+
 // ============================================================================
 // Test Helper Functions
 // ============================================================================
@@ -1192,8 +1303,14 @@ fn setup_contract_with_supply(
         &mut deps,
         mock_env(),
         &owner,
-        ExecuteMsg::UnmockMaxbtcSupply {
-            maxbtc_denom: "factory/neutron1/maxbtc".to_string(),
+        ExecuteMsg::UpdateConfig {
+            new_config: UpdateConfig {
+                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                publisher: None,
+                aum_oracles: None,
+                twa_window_seconds: None,
+                twaer_immutability_seconds: None,
+            },
         },
     )
     .unwrap();

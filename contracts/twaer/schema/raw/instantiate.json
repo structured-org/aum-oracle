@@ -19,7 +19,7 @@
       }
     },
     "mocked_maxbtc_supply": {
-      "description": "The mocked maxBTC supply used instead of the real supply before the token is minted. To turn the real token supply usage on, the owner must execute the UnmockMaxbtcSupply msg.",
+      "description": "The mocked maxBTC supply used instead of the real supply before the token is minted. To turn the real token supply usage on, the owner must set the maxbtc_denom in the config. If the supply is zero, instant exchange rate calculations return Decimal::one().",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"
