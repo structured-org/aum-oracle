@@ -3,6 +3,7 @@ use aum_receiver_common::types::{GetAumResponse, RoundInfoResponse};
 use consensus::consensus::ConsensusOutcome;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
+use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 /// InstantiateMsg defines the message used to initialize the contract.
 #[cw_serde]
@@ -26,6 +27,7 @@ pub struct InstantiateMsg {
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
+#[cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     /// UpdateConfig updates the contract's configuration parameters.
@@ -40,8 +42,6 @@ pub enum ExecuteMsg {
 pub struct UpdateConfig {
     /// Contract config updates.
     ///
-    /// New owner address.
-    pub owner: Option<String>,
     /// New validity period for data in seconds.
     pub consensus_data_valid_period: Option<u64>,
     /// New required custody asset denoms.
@@ -62,8 +62,8 @@ pub struct UpdateConfig {
 }
 
 /// QueryMsg defines the messages that can be queried from the contract to get information.
+#[cw_ownable_query]
 #[cw_serde]
-#[allow(clippy::enum_variant_names)]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     /// GetData returns the last Solana data that was successfully published (consensus has been reached).
@@ -87,8 +87,6 @@ pub enum QueryMsg {
 /// ConfigResponse contains the current contract configuration.
 #[cw_serde]
 pub struct ConfigResponse {
-    /// The current owner address.
-    pub owner: String,
     /// The current valid period in seconds.
     pub consensus_data_valid_period: u64,
     /// List of custody asset denoms required for consensus

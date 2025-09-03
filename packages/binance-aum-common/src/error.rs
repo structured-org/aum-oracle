@@ -1,5 +1,6 @@
 use consensus::error::ConsensusError;
 use cosmwasm_std::{SignedDecimal256RangeExceeded, StdError};
+use cw_ownable::OwnershipError;
 use thiserror::Error;
 
 pub type ContractResult<T> = Result<T, ContractError>;
@@ -8,6 +9,9 @@ pub type ContractResult<T> = Result<T, ContractError>;
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    Ownable(#[from] OwnershipError),
 
     #[error(transparent)]
     ConsensusError(#[from] ConsensusError),

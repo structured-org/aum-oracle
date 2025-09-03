@@ -12,3 +12,5 @@ cosmwasm-std = { version = "2.2.0" }
 thiserror = "1"
 cosmwasm-schema = { version = "2.2.0" }
 aum-receiver-common = { path = "../aum-receiver-common" }
+ed25519-zebra = { version = "=4.0.3", default-features = false }
+cw-ownable = "2.1.0"

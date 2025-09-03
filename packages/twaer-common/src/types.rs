@@ -3,8 +3,6 @@ use cosmwasm_std::{Addr, Decimal};
 
 #[cw_serde]
 pub struct Config {
-    /// Owner of the contract.
-    pub owner: Addr,
     /// The address allowed to publish the TWAER.
     pub publisher: Addr,
     /// A list of AUM oracle instances from where the contract gets individual AUMs.

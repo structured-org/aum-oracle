@@ -1,4 +1,5 @@
 use cosmwasm_std::StdError;
+use cw_ownable::OwnershipError;
 use thiserror::Error;
 
 pub type ContractResult<T> = Result<T, ContractError>;
@@ -7,6 +8,9 @@ pub type ContractResult<T> = Result<T, ContractError>;
 pub enum ContractError {
     #[error(transparent)]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    Ownable(#[from] OwnershipError),
 
     #[error("Unauthorized")]
     Unauthorized,
