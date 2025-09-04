@@ -155,7 +155,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "ed25519-zebra",
- "schemars",
  "serde",
 ]
 
@@ -199,10 +198,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-ownable",
  "ed25519-zebra",
- "hex",
- "schemars",
  "serde",
- "sha2",
  "thiserror",
 ]
 
@@ -222,7 +218,6 @@ dependencies = [
  "neutron-std",
  "serde",
  "serde_json",
- "thiserror",
 ]
 
 [[package]]
@@ -278,7 +273,6 @@ dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
  "ed25519-zebra",
- "schemars",
  "serde",
  "thiserror",
 ]
@@ -383,7 +377,7 @@ dependencies = [
  "rmp-serde",
  "schemars",
  "serde",
- "serde-json-wasm 1.0.1",
+ "serde-json-wasm",
  "sha2",
  "static_assertions",
  "thiserror",
@@ -808,7 +802,6 @@ dependencies = [
  "cosmwasm-std",
  "cw-ownable",
  "ed25519-zebra",
- "schemars",
  "serde",
  "thiserror",
 ]
@@ -855,8 +848,8 @@ checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
 name = "neutron-std"
-version = "8.0.0"
-source = "git+https://github.com/neutron-org/neutron-std?branch=main#d8aee0ee79d53ac882840b6334537263570e44bf"
+version = "6.0.0"
+source = "git+https://github.com/neutron-org/neutron-std.git?rev=f8c350c9de7fe02b383bd10a9c2bbdf13e854d44#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
 dependencies = [
  "bech32 0.9.1",
  "chrono",
@@ -870,7 +863,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde-cw-value",
- "serde-json-wasm 1.0.1",
+ "serde-json-wasm",
  "serde_json",
  "speedate",
  "tendermint-proto",
@@ -880,7 +873,7 @@ dependencies = [
 [[package]]
 name = "neutron-std-derive"
 version = "0.20.1"
-source = "git+https://github.com/neutron-org/neutron-std?branch=main#d8aee0ee79d53ac882840b6334537263570e44bf"
+source = "git+https://github.com/neutron-org/neutron-std.git?rev=f8c350c9de7fe02b383bd10a9c2bbdf13e854d44#f8c350c9de7fe02b383bd10a9c2bbdf13e854d44"
 dependencies = [
  "itertools 0.10.5",
  "proc-macro2",
@@ -1217,15 +1210,6 @@ dependencies = [
 
 [[package]]
 name = "serde-json-wasm"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e9213a07d53faa0b8dd81e767a54a8188a242fdb9be99ab75ec576a774bfdd7"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "serde-json-wasm"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f05da0d153dd4595bdffd5099dc0e9ce425b205ee648eb93437ff7302af8c9a5"
@@ -1451,9 +1435,7 @@ dependencies = [
  "cw2",
  "ed25519-zebra",
  "serde",
- "serde-json-wasm 0.5.2",
  "serde_json",
- "thiserror",
  "twaer-common",
 ]
 

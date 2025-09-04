@@ -13,3 +13,15 @@ incremental = false
 # Please do not disable these. Doing so will cause overflow checks in
 # all workspace members to stop working. Overflows should be errors.
 overflow-checks = true
+
+[workspace.dependencies]
+neutron-std = { git = "https://github.com/neutron-org/neutron-std.git", rev = "f8c350c9de7fe02b383bd10a9c2bbdf13e854d44" }
+cosmwasm-schema = { version = "2.2.0" }
+cosmwasm-std = { version = "2.2.0", features = ["cosmwasm_1_1"] }
+cw-storage-plus = "2.0.0"
+cw2 = "2.0.0"
+cw-ownable = "2.1.0"
+ed25519-zebra = { version = "=4.0.3", default-features = false }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+thiserror = "1"
