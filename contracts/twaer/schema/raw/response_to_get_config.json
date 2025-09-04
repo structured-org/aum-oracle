@@ -4,7 +4,6 @@
   "type": "object",
   "required": [
     "aum_oracles",
-    "owner",
     "publisher",
     "twa_window_seconds",
     "twaer_immutability_seconds"
@@ -22,14 +21,6 @@
       "type": [
         "string",
         "null"
-      ]
-    },
-    "owner": {
-      "description": "Owner of the contract.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Addr"
-        }
       ]
     },
     "publisher": {

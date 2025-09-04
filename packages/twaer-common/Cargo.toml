@@ -8,9 +8,9 @@ license = "Apache-2.0"
 repository = "https://github.com/structured-org/aum-oracle/"
 
 [dependencies]
-cosmwasm-std = { version = "2.2.0" }
-thiserror = "1"
-cosmwasm-schema = { version = "2.2.0" }
+cosmwasm-std = { workspace = true }
+thiserror = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-ownable = { workspace = true }
+ed25519-zebra = { workspace = true }
 aum-receiver-common = { path = "../aum-receiver-common" }
-ed25519-zebra = { version = "=4.0.3", default-features = false }
-cw-ownable = "2.1.0"
