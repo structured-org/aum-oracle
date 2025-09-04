@@ -20,3 +20,4 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 ed25519-zebra = { workspace = true }
 cosmwasm-schema = { workspace = true }
+getrandom = {workspace = true}
