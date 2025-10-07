@@ -166,7 +166,7 @@ func (c *CosmosClient) SignAndBroadcast(ctx context.Context, msg types.Msg) (*co
 }
 
 // QuerySmartContract queries a CosmWasm smart contract with provided state query JSON or raw bytes.
-func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, query interface{}) ([]byte, error) {
+func (c *CosmosClient) QuerySmartContract(ctx context.Context, contractAddr string, query any) ([]byte, error) {
 	queryBz, err := json.Marshal(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal query into json: %w", err)
