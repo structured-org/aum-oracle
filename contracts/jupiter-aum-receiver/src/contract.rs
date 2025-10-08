@@ -151,7 +151,7 @@ fn execute_publish_data(
     let (result, pending_round) =
         CONSENSUS_STATE.publish_data(deps.storage, &env, info.sender, new_data, contract_config)?;
 
-    let mut res = Response::new().add_attribute("action", "publish_consensus");
+    let mut res = Response::new();
 
     if let PublishResult::ConsensusReached(outcome) = result {
         let aum_amount = calculate_aum(deps.as_ref(), env, outcome.data)?;
@@ -171,6 +171,7 @@ fn execute_publish_data(
 
     let next_round = pending_round.next_round(consensus_config.round_length);
     res = res.add_attributes([
+        attr("action", "publish_data"),
         attr("next_round", next_round.round.to_string()),
         attr("next_round_timestamp", next_round.start.to_string()),
         attr("round", pending_round.round.to_string()),

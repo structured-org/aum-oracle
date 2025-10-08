@@ -69,8 +69,8 @@ func (c *Client) GetJupiterAumReceiverNextRound(ctx context.Context) (*NextRound
 // SubmitBinanceAumData submits the Binance AUM data to the Binance AUM receiver contract.
 func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData) (*NextRound, error) {
 	c.logger.Info("submitting binance aum data")
-	msg := map[string]interface{}{
-		"publish_data": map[string]interface{}{
+	msg := map[string]any{
+		"publish_data": map[string]any{
 			"new_data": data,
 		},
 	}
@@ -97,8 +97,8 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 // SubmitJupiterAumData submits the Jupiter AUM data to the Jupiter AUM receiver contract.
 func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData) (*NextRound, error) {
 	c.logger.Info("submitting jupiter aum data")
-	msg := map[string]interface{}{
-		"publish_data": map[string]interface{}{
+	msg := map[string]any{
+		"publish_data": map[string]any{
 			"new_data": data,
 		},
 	}
@@ -124,7 +124,7 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 
 // internal: query round info from smart contract
 func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRoundResponse, error) {
-	msg := map[string]interface{}{"get_round_info": struct{}{}}
+	msg := map[string]any{"get_round_info": struct{}{}}
 	resBz, err := c.client.QuerySmartContract(ctx, contract, msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query smart contract: %w", err)
