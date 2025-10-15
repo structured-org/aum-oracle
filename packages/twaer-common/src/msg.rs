@@ -53,7 +53,7 @@ pub enum ExecuteMsg {
 
     /// Removes a specific ER datapoint from history and TWA Aggregator.
     /// Only callable by the owner.
-    RemoveERDatapoint {er_timestamp: u64},
+    RemoveERDatapoint { er_timestamp: u64 },
 }
 
 #[cw_serde]

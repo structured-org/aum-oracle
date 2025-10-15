@@ -1,6 +1,9 @@
 use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
-use cosmwasm_std::{entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo, Order, Response, StdResult, Storage, Uint128};
+use cosmwasm_std::{
+    entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
+    Order, Response, StdResult, Storage, Uint128,
+};
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
 use cw_storage_plus::Bound;
@@ -66,7 +69,9 @@ pub fn execute(
             update_ownership(deps, &env.block, &info.sender, action)?;
             Ok(Response::new().add_attribute("action", "update_ownership"))
         }
-        ExecuteMsg::RemoveERDatapoint {er_timestamp} => execute_remove_er_datapoint(deps, env, info, er_timestamp)
+        ExecuteMsg::RemoveERDatapoint { er_timestamp } => {
+            execute_remove_er_datapoint(deps, env, info, er_timestamp)
+        }
     }
 }
 
@@ -286,7 +291,11 @@ fn record_er_at(
 
 /// Removes a specific ER data point from ER history and twa aggregator
 /// The function returns updated TwaAggregator that must be saved to the storage manually
-fn remove_er_contribution(storage: &mut dyn Storage, mut twa_aggr: TwaAggregator, er_timestamp: u64) -> ContractResult<TwaAggregator> {
+fn remove_er_contribution(
+    storage: &mut dyn Storage,
+    mut twa_aggr: TwaAggregator,
+    er_timestamp: u64,
+) -> ContractResult<TwaAggregator> {
     let rate = ER_HISTORY.load(storage, er_timestamp)?;
 
     let next_timestamp = find_next_timestamp_after(storage, er_timestamp)?.ok_or(
@@ -297,8 +306,7 @@ fn remove_er_contribution(storage: &mut dyn Storage, mut twa_aggr: TwaAggregator
     // how long the rate was active
     let expired_duration = next_timestamp - er_timestamp;
     // contribution of the rate
-    let expired_contribution =
-        rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
+    let expired_contribution = rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
 
     twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
 

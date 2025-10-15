@@ -460,36 +460,19 @@ fn test_remove_er_datapoint_success() {
     let base_time = 1_000_000u64;
     deps.querier
         .update_wasm(mock_oracle_response(2_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time, 100),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time, 100), &owner).unwrap();
 
     deps.querier
         .update_wasm(mock_oracle_response(3_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time + 10, 101),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time + 10, 101), &owner).unwrap();
 
     deps.querier
         .update_wasm(mock_oracle_response(4_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time + 20, 102),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time + 20, 102), &owner).unwrap();
 
     let timestamp_to_remove = base_time + 10;
     let aggregator_before = TWA_AGGREGATOR.load(&deps.storage).unwrap();
-    let rate_to_remove = ER_HISTORY
-        .load(&deps.storage, timestamp_to_remove)
-        .unwrap();
+    let rate_to_remove = ER_HISTORY.load(&deps.storage, timestamp_to_remove).unwrap();
     let next_timestamp = ER_HISTORY
         .range(&deps.storage, None, None, Order::Ascending)
         .filter_map(|item| item.ok())
@@ -542,21 +525,11 @@ fn test_remove_er_datapoint_unauthorized() {
     let base_time = 2_000_000u64;
     deps.querier
         .update_wasm(mock_oracle_response(2_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time, 200),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time, 200), &owner).unwrap();
 
     deps.querier
         .update_wasm(mock_oracle_response(3_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time + 10, 201),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time + 10, 201), &owner).unwrap();
 
     let err = execute_msg(
         &mut deps,
@@ -581,21 +554,11 @@ fn test_remove_er_datapoint_latest_entry_fails() {
     let base_time = 3_000_000u64;
     deps.querier
         .update_wasm(mock_oracle_response(2_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time, 300),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time, 300), &owner).unwrap();
 
     deps.querier
         .update_wasm(mock_oracle_response(3_000_000u128));
-    record_er(
-        &mut deps,
-        test_env_with_time(base_time + 10, 301),
-        &owner,
-    )
-    .unwrap();
+    record_er(&mut deps, test_env_with_time(base_time + 10, 301), &owner).unwrap();
 
     let last_timestamp = base_time + 10;
     let err = execute_msg(
