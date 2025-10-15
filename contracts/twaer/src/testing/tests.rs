@@ -9,6 +9,7 @@ use cosmwasm_std::{
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
+use std::str::FromStr;
 use twaer_common::error::ContractError;
 use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
@@ -403,6 +404,14 @@ fn test_query_er_window_info() {
     assert_eq!(er_window_info.window_start, 1000000);
     assert_eq!(er_window_info.window_end, 1000020);
     assert_eq!(er_window_info.total_points, 3);
+    assert_eq!(
+        er_window_info.data_points,
+        [
+            (1000000, Decimal::from_str("2").unwrap()),
+            (1000010, Decimal::from_str("2").unwrap()),
+            (1000020, Decimal::from_str("2").unwrap())
+        ]
+    );
 
     // the first point should be expired with twa_window_seconds=29
     let env4 = test_env_with_time(1000030, 130);
@@ -413,6 +422,14 @@ fn test_query_er_window_info() {
     assert_eq!(er_window_info.window_start, 1000010);
     assert_eq!(er_window_info.window_end, 1000030);
     assert_eq!(er_window_info.total_points, 3);
+    assert_eq!(
+        er_window_info.data_points,
+        [
+            (1000010, Decimal::from_str("2").unwrap()),
+            (1000020, Decimal::from_str("2").unwrap()),
+            (1000030, Decimal::from_str("2").unwrap()),
+        ]
+    );
 }
 
 #[test]
@@ -433,6 +450,171 @@ fn test_record_er_cleanup() {
     // Should only have 1 data point now (the old one was cleaned up)
     let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
+}
+
+#[test]
+fn test_remove_er_datapoint_success() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+
+    let base_time = 1_000_000u64;
+    deps.querier
+        .update_wasm(mock_oracle_response(2_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time, 100),
+        &owner,
+    )
+    .unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(3_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time + 10, 101),
+        &owner,
+    )
+    .unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(4_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time + 20, 102),
+        &owner,
+    )
+    .unwrap();
+
+    let timestamp_to_remove = base_time + 10;
+    let aggregator_before = TWA_AGGREGATOR.load(&deps.storage).unwrap();
+    let rate_to_remove = ER_HISTORY
+        .load(&deps.storage, timestamp_to_remove)
+        .unwrap();
+    let next_timestamp = ER_HISTORY
+        .range(&deps.storage, None, None, Order::Ascending)
+        .filter_map(|item| item.ok())
+        .map(|(ts, _)| ts)
+        .find(|&ts| ts > timestamp_to_remove)
+        .unwrap();
+    let duration = next_timestamp - timestamp_to_remove;
+    let contribution = rate_to_remove
+        .checked_mul(Decimal::from_ratio(duration as u128, 1u128))
+        .unwrap();
+    let expected_weighted_sum = aggregator_before
+        .weighted_sum
+        .checked_sub(contribution)
+        .unwrap();
+
+    let remove_env = test_env_with_time(base_time + 25, 103);
+    let res = execute_msg(
+        &mut deps,
+        remove_env,
+        &owner,
+        ExecuteMsg::RemoveERDatapoint {
+            er_timestamp: timestamp_to_remove,
+        },
+    )
+    .unwrap();
+
+    assert!(res
+        .attributes
+        .iter()
+        .any(|attr| attr.key == "action" && attr.value == "execute_remove_er_datapoint"));
+    assert!(res.attributes.iter().any(|attr| {
+        attr.key == "er_timestamp" && attr.value == timestamp_to_remove.to_string()
+    }));
+
+    let aggregator_after = TWA_AGGREGATOR.load(&deps.storage).unwrap();
+    assert_eq!(aggregator_after.weighted_sum, expected_weighted_sum);
+    assert_eq!(aggregator_after.current_twa, aggregator_before.current_twa);
+    assert!(ER_HISTORY.has(&deps.storage, base_time));
+    assert!(ER_HISTORY.has(&deps.storage, base_time + 20));
+    assert!(!ER_HISTORY.has(&deps.storage, timestamp_to_remove));
+    assert_eq!(query_data_point_count(&deps).unwrap(), 2);
+}
+
+#[test]
+fn test_remove_er_datapoint_unauthorized() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+    let stranger = deps.api.addr_make("stranger");
+
+    let base_time = 2_000_000u64;
+    deps.querier
+        .update_wasm(mock_oracle_response(2_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time, 200),
+        &owner,
+    )
+    .unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(3_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time + 10, 201),
+        &owner,
+    )
+    .unwrap();
+
+    let err = execute_msg(
+        &mut deps,
+        test_env_with_time(base_time + 20, 202),
+        &stranger,
+        ExecuteMsg::RemoveERDatapoint {
+            er_timestamp: base_time,
+        },
+    )
+    .unwrap_err();
+    assert_eq!(err, ContractError::Ownable(NotOwner));
+
+    assert!(ER_HISTORY.has(&deps.storage, base_time));
+    assert_eq!(query_data_point_count(&deps).unwrap(), 2);
+}
+
+#[test]
+fn test_remove_er_datapoint_latest_entry_fails() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+
+    let base_time = 3_000_000u64;
+    deps.querier
+        .update_wasm(mock_oracle_response(2_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time, 300),
+        &owner,
+    )
+    .unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(3_000_000u128));
+    record_er(
+        &mut deps,
+        test_env_with_time(base_time + 10, 301),
+        &owner,
+    )
+    .unwrap();
+
+    let last_timestamp = base_time + 10;
+    let err = execute_msg(
+        &mut deps,
+        test_env_with_time(base_time + 20, 302),
+        &owner,
+        ExecuteMsg::RemoveERDatapoint {
+            er_timestamp: last_timestamp,
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::NoNextTimestamp {
+            timestamp: last_timestamp
+        }
+    );
+
+    assert!(ER_HISTORY.has(&deps.storage, last_timestamp));
 }
 
 #[test]
