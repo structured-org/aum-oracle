@@ -188,7 +188,9 @@ fn execute_remove_er_datapoint(
 
     let mut twa_aggr = TWA_AGGREGATOR.load(deps.storage)?;
 
-    if let Some(new_twa_aggr) = remove_er_contribution(deps.storage, twa_aggr.clone(), er_timestamp)? {
+    if let Some(new_twa_aggr) =
+        remove_er_contribution(deps.storage, twa_aggr.clone(), er_timestamp)?
+    {
         twa_aggr = new_twa_aggr;
         TWA_AGGREGATOR.save(deps.storage, &twa_aggr)?;
     } else {
@@ -266,86 +268,70 @@ fn record_er_at(
     let window_start = new_timestamp.sub(config.twa_window_seconds);
     let expired_rates = determine_expired_rates(storage, window_start)?;
 
-    // Remove contributions from rates that are no longer in the window
+    // Remove expired rates from history (just removal, no recalculation yet)
     for (expired_timestamp, _) in expired_rates {
-        if let Some(new_twa_aggr) = remove_er_contribution(storage, twa_aggr.clone(), expired_timestamp)? {
-            twa_aggr = new_twa_aggr;
-        } else {
-            TWA_AGGREGATOR.remove(storage);
-        }
+        ER_HISTORY.remove(storage, expired_timestamp);
     }
 
-    twa_aggr.window_end = new_timestamp;
-    let oldest_timestamp = ER_HISTORY
-        .range(storage, None, None, Order::Ascending)
-        .next()
-        .transpose()?
-        .map_or_else(|| Err(ContractError::NoEarliestRate {}), |(ts, _)| Ok(ts))?;
-    twa_aggr.window_start = oldest_timestamp;
-
-    let total_duration = twa_aggr.window_end - twa_aggr.window_start;
-    twa_aggr.current_twa = if total_duration > 0 {
-        twa_aggr
-            .weighted_sum
-            .checked_div(Decimal::from_ratio(total_duration, 1u64))?
+    // Recalculate aggregator based on remaining history after all removals
+    if let Some(new_twa_aggr) = recalculate_twa_aggregator(storage)? {
+        TWA_AGGREGATOR.save(storage, &new_twa_aggr)?;
     } else {
-        new_rate
-    };
-
-    TWA_AGGREGATOR.save(storage, &twa_aggr)?;
+        TWA_AGGREGATOR.remove(storage);
+    }
     Ok(())
 }
 
-/// Removes a specific ER data point from ER history and updates twa aggregator in the storage
-/// The function returns a boolean flag
-/// If it's true, TwaAggregator must be cleared
-fn remove_er_contribution(
-    storage: &mut dyn Storage,
-    mut twa_aggr: TwaAggregator,
-    er_timestamp: u64,
-) -> ContractResult<Option<TwaAggregator>> {
-    let removed_rate = ER_HISTORY.load(storage, er_timestamp)?;
+/// Recalculates the TWA aggregator from scratch based on current ER history
+/// Returns None if history is empty
+fn recalculate_twa_aggregator(storage: &dyn Storage) -> ContractResult<Option<TwaAggregator>> {
+    let history: Vec<(u64, Decimal)> = ER_HISTORY
+        .range(storage, None, None, Order::Ascending)
+        .collect::<StdResult<Vec<_>>>()?;
 
-    ER_HISTORY.remove(storage, er_timestamp);
-
-    if ER_HISTORY.is_empty(storage) {
+    if history.is_empty() {
         return Ok(None);
     }
 
-    let next_timestamp = find_next_timestamp_after(storage, er_timestamp)?.ok_or(
-        ContractError::NoNextTimestamp {
-            timestamp: er_timestamp,
-        },
-    )?;
+    if history.len() == 1 {
+        // Only one point exists
+        let (timestamp, rate) = history[0];
+        return Ok(Some(TwaAggregator::from_single_point(timestamp, rate)));
+    }
 
-    // how long the rate was active
-    let expired_duration = next_timestamp - er_timestamp;
-    // contribution of the rate
-    let expired_contribution =
-        removed_rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
+    // Calculate weighted sum from consecutive pairs
+    let mut weighted_sum = Decimal::zero();
+    for i in 0..history.len() - 1 {
+        let (start_ts, start_rate) = history[i];
+        let (end_ts, _) = history[i + 1];
+        let duration = end_ts - start_ts;
+        let contribution = start_rate.checked_mul(Decimal::from_ratio(duration, 1u64))?;
+        weighted_sum = weighted_sum.checked_add(contribution)?;
+    }
 
-    twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
+    let window_start = history[0].0;
+    let window_end = history.last().unwrap().0;
+    let total_duration = window_end - window_start;
+    let current_twa = weighted_sum.checked_div(Decimal::from_ratio(total_duration, 1u64))?;
 
-    Ok(Some(twa_aggr))
+    Ok(Some(TwaAggregator {
+        weighted_sum,
+        current_twa,
+        window_start,
+        window_end,
+    }))
 }
 
-/// Find the next timestamp after the given timestamp
-fn find_next_timestamp_after(
-    storage: &dyn cosmwasm_std::Storage,
-    after_timestamp: u64,
-) -> ContractResult<Option<u64>> {
-    let next = ER_HISTORY
-        .range(
-            storage,
-            Some(Bound::exclusive(after_timestamp)),
-            None,
-            Order::Ascending,
-        )
-        .next()
-        .transpose()?
-        .map(|(timestamp, _)| timestamp);
-
-    Ok(next)
+/// Removes a specific ER data point from ER history and updates twa
+/// The function either returns an updated aggregator that must be saved to the storage
+/// or None, meaning the aggregator is empty and the storage must be cleared
+fn remove_er_contribution(
+    storage: &mut dyn Storage,
+    _twa_aggr: TwaAggregator,
+    er_timestamp: u64,
+) -> ContractResult<Option<TwaAggregator>> {
+    ER_HISTORY.remove(storage, er_timestamp);
+    recalculate_twa_aggregator(storage)
 }
 
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
