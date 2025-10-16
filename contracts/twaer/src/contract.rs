@@ -188,9 +188,12 @@ fn execute_remove_er_datapoint(
 
     let mut twa_aggr = TWA_AGGREGATOR.load(deps.storage)?;
 
-    twa_aggr = remove_er_contribution(deps.storage, twa_aggr, er_timestamp)?;
-
-    TWA_AGGREGATOR.save(deps.storage, &twa_aggr)?;
+    if let Some(new_twa_aggr) = remove_er_contribution(deps.storage, twa_aggr.clone(), er_timestamp)? {
+        twa_aggr = new_twa_aggr;
+        TWA_AGGREGATOR.save(deps.storage, &twa_aggr)?;
+    } else {
+        TWA_AGGREGATOR.remove(deps.storage);
+    }
 
     Ok(Response::new()
         .add_attribute("action", "execute_remove_er_datapoint")
@@ -265,7 +268,11 @@ fn record_er_at(
 
     // Remove contributions from rates that are no longer in the window
     for (expired_timestamp, _) in expired_rates {
-        twa_aggr = remove_er_contribution(storage, twa_aggr, expired_timestamp)?
+        if let Some(new_twa_aggr) = remove_er_contribution(storage, twa_aggr.clone(), expired_timestamp)? {
+            twa_aggr = new_twa_aggr;
+        } else {
+            TWA_AGGREGATOR.remove(storage);
+        }
     }
 
     twa_aggr.window_end = new_timestamp;
@@ -289,30 +296,56 @@ fn record_er_at(
     Ok(())
 }
 
-/// Removes a specific ER data point from ER history and twa aggregator
-/// The function returns updated TwaAggregator that must be saved to the storage manually
+/// Removes a specific ER data point from ER history and updates twa aggregator in the storage
+/// The function returns a boolean flag
+/// If it's true, TwaAggregator must be cleared
 fn remove_er_contribution(
     storage: &mut dyn Storage,
     mut twa_aggr: TwaAggregator,
     er_timestamp: u64,
-) -> ContractResult<TwaAggregator> {
-    let rate = ER_HISTORY.load(storage, er_timestamp)?;
+) -> ContractResult<Option<TwaAggregator>> {
+    let removed_rate = ER_HISTORY.load(storage, er_timestamp)?;
+
+    ER_HISTORY.remove(storage, er_timestamp);
+
+    if ER_HISTORY.is_empty(storage) {
+        return Ok(None);
+    }
 
     let next_timestamp = find_next_timestamp_after(storage, er_timestamp)?.ok_or(
         ContractError::NoNextTimestamp {
             timestamp: er_timestamp,
         },
     )?;
+
     // how long the rate was active
     let expired_duration = next_timestamp - er_timestamp;
     // contribution of the rate
-    let expired_contribution = rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
+    let expired_contribution =
+        removed_rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
 
     twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
 
-    ER_HISTORY.remove(storage, er_timestamp);
+    Ok(Some(twa_aggr))
+}
 
-    Ok(twa_aggr)
+/// Find the next timestamp after the given timestamp
+fn find_next_timestamp_after(
+    storage: &dyn cosmwasm_std::Storage,
+    after_timestamp: u64,
+) -> ContractResult<Option<u64>> {
+    let next = ER_HISTORY
+        .range(
+            storage,
+            Some(Bound::exclusive(after_timestamp)),
+            None,
+            Order::Ascending,
+        )
+        .next()
+        .transpose()?
+        .map(|(timestamp, _)| timestamp);
+
+    Ok(next)
 }
 
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
@@ -333,25 +366,6 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     })?;
 
     Ok(Decimal::from_ratio(aum_uint, maxbtc_supply))
-}
-
-/// Find the next timestamp after the given timestamp
-fn find_next_timestamp_after(
-    storage: &dyn cosmwasm_std::Storage,
-    after_timestamp: u64,
-) -> ContractResult<Option<u64>> {
-    let next = ER_HISTORY
-        .range(
-            storage,
-            Some(Bound::exclusive(after_timestamp)),
-            None,
-            Order::Ascending,
-        )
-        .next()
-        .transpose()?
-        .map(|(timestamp, _)| timestamp);
-
-    Ok(next)
 }
 
 #[entry_point]
