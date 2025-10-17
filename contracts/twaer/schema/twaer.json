@@ -158,6 +158,30 @@
         "additionalProperties": false
       },
       {
+        "description": "Removes a specific ER datapoint from history and TWA Aggregator. Only callable by the owner.",
+        "type": "object",
+        "required": [
+          "remove_e_r_datapoint"
+        ],
+        "properties": {
+          "remove_e_r_datapoint": {
+            "type": "object",
+            "required": [
+              "er_timestamp"
+            ],
+            "properties": {
+              "er_timestamp": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
         "description": "Update the contract's ownership. The `action` to be provided can be either to propose transferring ownership to an account, accept a pending ownership transfer, or renounce the ownership permanently.",
         "type": "object",
         "required": [
@@ -439,11 +463,31 @@
       "title": "ErWindowInfoResponse",
       "type": "object",
       "required": [
+        "data_points",
         "total_points",
         "window_end",
         "window_start"
       ],
       "properties": {
+        "data_points": {
+          "description": "Data points itself",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              },
+              {
+                "$ref": "#/definitions/Decimal"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2
+          }
+        },
         "total_points": {
           "description": "Total number of data points in the window.",
           "type": "integer",
@@ -463,7 +507,13 @@
           "minimum": 0.0
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "definitions": {
+        "Decimal": {
+          "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+          "type": "string"
+        }
+      }
     },
     "get_aum": {
       "$schema": "http://json-schema.org/draft-07/schema#",

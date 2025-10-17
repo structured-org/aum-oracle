@@ -186,9 +186,7 @@ fn execute_remove_er_datapoint(
 ) -> ContractResult<Response> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    if let Some(new_twa_aggr) =
-        remove_er_contribution(deps.storage, er_timestamp)?
-    {
+    if let Some(new_twa_aggr) = remove_er_contribution(deps.storage, er_timestamp)? {
         TWA_AGGREGATOR.save(deps.storage, &new_twa_aggr)?;
     } else {
         TWA_AGGREGATOR.remove(deps.storage);
