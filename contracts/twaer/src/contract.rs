@@ -186,13 +186,10 @@ fn execute_remove_er_datapoint(
 ) -> ContractResult<Response> {
     cw_ownable::assert_owner(deps.storage, &info.sender)?;
 
-    let mut twa_aggr = TWA_AGGREGATOR.load(deps.storage)?;
-
     if let Some(new_twa_aggr) =
-        remove_er_contribution(deps.storage, twa_aggr.clone(), er_timestamp)?
+        remove_er_contribution(deps.storage, er_timestamp)?
     {
-        twa_aggr = new_twa_aggr;
-        TWA_AGGREGATOR.save(deps.storage, &twa_aggr)?;
+        TWA_AGGREGATOR.save(deps.storage, &new_twa_aggr)?;
     } else {
         TWA_AGGREGATOR.remove(deps.storage);
     }
@@ -327,7 +324,6 @@ fn recalculate_twa_aggregator(storage: &dyn Storage) -> ContractResult<Option<Tw
 /// or None, meaning the aggregator is empty and the storage must be cleared
 fn remove_er_contribution(
     storage: &mut dyn Storage,
-    _twa_aggr: TwaAggregator,
     er_timestamp: u64,
 ) -> ContractResult<Option<TwaAggregator>> {
     ER_HISTORY.remove(storage, er_timestamp);
