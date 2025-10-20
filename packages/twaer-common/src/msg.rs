@@ -2,7 +2,7 @@ use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
 use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
@@ -62,14 +62,14 @@ pub struct UpdateConfig {
     pub publisher: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
     pub aum_oracles: Option<Vec<String>>,
-    /// New maxBTC denom. If the first Option is None, the value is not changed in the config.
+    /// New maxBTC core contract. If the first Option is None, the value is not changed in the config.
     /// If the first Option is Some, the second Option is the new value including None.
     /// JSON deserialization of this field in UpdateConfig msg is:
     /// - Missing field: None -> no change
-    /// - Explicit null: Some(None) -> set to None ("maxbtc_denom": null)
-    /// - String value: Some(Some(String)) -> set to String ("maxbtc_denom": "some value")
+    /// - Explicit null: Some(None) -> set to None ("maxbtc_core_contract": null)
+    /// - String value: Some(Some(Addr)) -> set to String ("maxbtc_core_contract": "some value")
     #[serde(default, deserialize_with = "deserialize_nested_option")]
-    pub maxbtc_denom: Option<Option<String>>,
+    pub maxbtc_core_contract: Option<Option<Addr>>,
     /// New time window in seconds for TWA calculation.
     pub twa_window_seconds: Option<u64>,
     /// New minimal number of seconds required to pass between sequential TWAER publications.
@@ -134,7 +134,7 @@ pub struct MigrateMsg {}
 /// - Missing field: None
 /// - Explicit null: Some(None)
 /// - String value: Some(Some(String))
-fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<Addr>>, D::Error>
 where
     D: Deserializer<'de>,
 {

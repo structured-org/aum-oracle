@@ -14,7 +14,7 @@ use twaer_common::error::ContractError;
 use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
-use twaer_common::types::{Config, TwaAggregator};
+use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
 #[test]
 fn proper_initialization() {
@@ -24,7 +24,7 @@ fn proper_initialization() {
     let expected_config = Config {
         publisher: deps.api.addr_make("owner"),
         aum_oracles: vec![deps.api.addr_make("oracle1")],
-        maxbtc_denom: None,
+        maxbtc_core_contract: None,
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -160,7 +160,7 @@ fn update_config_by_owner() {
         new_config: UpdateConfig {
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
-            maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+            maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
             twa_window_seconds: Some(172800),         // 48 hours
             twaer_immutability_seconds: Some(172800), // 48 hours
         },
@@ -173,7 +173,7 @@ fn update_config_by_owner() {
     let expected_config = Config {
         publisher: new_publisher,
         aum_oracles: vec![oracle1, oracle2],
-        maxbtc_denom: Some("factory/neutron1/maxbtc".to_string()),
+        maxbtc_core_contract: Some(Addr::unchecked("neutron1")),
         twa_window_seconds: 172800,
         twaer_immutability_seconds: 172800,
     };
@@ -190,7 +190,7 @@ fn update_config_by_unauthorized() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: None,
+            maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
         },
@@ -203,7 +203,7 @@ fn update_config_by_unauthorized() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: None,
+        maxbtc_core_contract: None,
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -220,7 +220,7 @@ fn update_config_partial() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: Some(Some("factory/neutron1/minbtc".to_string())),
+            maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
             twa_window_seconds: Some(85000),
             twaer_immutability_seconds: None,
         },
@@ -232,7 +232,7 @@ fn update_config_partial() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: Some("factory/neutron1/minbtc".to_string()),
+        maxbtc_core_contract: Some(Addr::unchecked("neutron1")),
         twa_window_seconds: 85000,
         twaer_immutability_seconds: 0,
     };
@@ -251,7 +251,7 @@ fn query_config() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_denom: None,
+        maxbtc_core_contract: None,
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -383,7 +383,7 @@ fn test_query_er_window_info() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: None,
+            maxbtc_core_contract: None,
             twa_window_seconds: Some(29),
             twaer_immutability_seconds: None,
         },
@@ -654,7 +654,7 @@ fn test_publish_twaer_by_publisher() {
         new_config: UpdateConfig {
             publisher: Some(publisher.to_string()),
             aum_oracles: None,
-            maxbtc_denom: None,
+            maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
         },
@@ -701,7 +701,7 @@ fn test_twaer_immutability() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: None,
+            maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: Some(3600),
         },
@@ -791,7 +791,7 @@ fn test_mock_unmock_maxbtc_supply() {
         &owner,
         ExecuteMsg::UpdateConfig {
             new_config: UpdateConfig {
-                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
                 publisher: None,
                 aum_oracles: None,
                 twa_window_seconds: None,
@@ -804,8 +804,8 @@ fn test_mock_unmock_maxbtc_supply() {
     // Verify config is updated
     let config = CONFIG.load(&deps.storage).unwrap();
     assert_eq!(
-        config.maxbtc_denom,
-        Some("factory/neutron1/maxbtc".to_string())
+        config.maxbtc_core_contract,
+        Some(Addr::unchecked("neutron1"))
     );
 
     // Record ER using real supply
@@ -833,7 +833,7 @@ fn test_mock_unmock_maxbtc_supply() {
         &owner,
         ExecuteMsg::UpdateConfig {
             new_config: UpdateConfig {
-                maxbtc_denom: Some(None),
+                maxbtc_core_contract: Some(None),
                 publisher: None,
                 aum_oracles: None,
                 twa_window_seconds: None,
@@ -845,7 +845,7 @@ fn test_mock_unmock_maxbtc_supply() {
 
     // Verify config is updated back to None
     let config = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(config.maxbtc_denom, None);
+    assert_eq!(config.maxbtc_core_contract, None);
 
     // Set mocked supply to zero so calc_exchange_rate returns Decimal::one()
     let res = execute_msg(
@@ -899,7 +899,7 @@ fn test_reset_twaer() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_denom: None,
+            maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: Some(3600),
         },
@@ -1335,7 +1335,7 @@ fn test_update_maxbtc_denom_deserialization() {
     let json_msg = r#"{
         "update_config": {
             "new_config": {
-                "maxbtc_denom": "factory/neutron1/maxbtc"
+                "maxbtc_core_contract": "neutron1"
             }
         }
     }"#;
@@ -1346,8 +1346,8 @@ fn test_update_maxbtc_denom_deserialization() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
     let config: Config = from_json(bin).unwrap();
     assert_eq!(
-        config.maxbtc_denom,
-        Some("factory/neutron1/maxbtc".to_string())
+        config.maxbtc_core_contract,
+        Some(Addr::unchecked("neutron1"))
     );
 
     // Test case 2: Missing field should not change config
@@ -1365,15 +1365,15 @@ fn test_update_maxbtc_denom_deserialization() {
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
     let config: Config = from_json(bin).unwrap();
     assert_eq!(
-        config.maxbtc_denom,
-        Some("factory/neutron1/maxbtc".to_string())
+        config.maxbtc_core_contract,
+        Some(Addr::unchecked("neutron1"))
     );
 
     // Test case 3: Explicit null should set to None
     let json_msg = r#"{
         "update_config": {
             "new_config": {
-                "maxbtc_denom": null
+                "maxbtc_core_contract": null
             }
         }
     }"#;
@@ -1383,7 +1383,7 @@ fn test_update_maxbtc_denom_deserialization() {
     // Verify config value was changed to None
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
     let config: Config = from_json(bin).unwrap();
-    assert_eq!(config.maxbtc_denom, None);
+    assert_eq!(config.maxbtc_core_contract, None);
 }
 
 // ============================================================================
@@ -1513,7 +1513,7 @@ fn setup_contract_with_supply(
         &owner,
         ExecuteMsg::UpdateConfig {
             new_config: UpdateConfig {
-                maxbtc_denom: Some(Some("factory/neutron1/maxbtc".to_string())),
+                maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
                 publisher: None,
                 aum_oracles: None,
                 twa_window_seconds: None,
@@ -1531,7 +1531,19 @@ fn mock_oracle_response(
     aum_in_wbtc: u128,
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
-        WasmQuery::Smart { msg: _, .. } => {
+        WasmQuery::Smart {
+            msg: _,
+            contract_addr,
+        } => {
+            if contract_addr == "neutron1" {
+                let res = MaxBTCCoreConfig {
+                    deposit_denom: "wbtc".to_string(),
+                    maxbtc_denom: "maxbtc".to_string(),
+                };
+                let bin = to_json_binary(&res).unwrap();
+                return SystemResult::Ok(ContractResult::Ok(bin));
+            }
+
             let res = aum_response_from_uwbtc(Int256::from(aum_in_wbtc));
             let bin = to_json_binary(&res).unwrap();
             SystemResult::Ok(ContractResult::Ok(bin))
@@ -1570,7 +1582,10 @@ where
 fn assert_config_equals(config: &Config, expected_config: &Config) {
     assert_eq!(config.publisher, expected_config.publisher);
     assert_eq!(config.aum_oracles, expected_config.aum_oracles);
-    assert_eq!(config.maxbtc_denom, expected_config.maxbtc_denom);
+    assert_eq!(
+        config.maxbtc_core_contract,
+        expected_config.maxbtc_core_contract
+    );
     assert_eq!(
         config.twa_window_seconds,
         expected_config.twa_window_seconds

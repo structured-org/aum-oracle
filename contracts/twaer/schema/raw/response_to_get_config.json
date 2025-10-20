@@ -16,11 +16,15 @@
         "$ref": "#/definitions/Addr"
       }
     },
-    "maxbtc_denom": {
-      "description": "The tokenfactory denom of the maxBTC token. If set to None, the MOCKED_MAXBTC_SUPPLY is used in exchange rate calculation.",
-      "type": [
-        "string",
-        "null"
+    "maxbtc_core_contract": {
+      "description": "The address of the maxBTC core contract. If set to None, the MOCKED_MAXBTC_SUPPLY is used in exchange rate calculation.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Addr"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "publisher": {

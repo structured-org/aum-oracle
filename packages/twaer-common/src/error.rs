@@ -39,6 +39,9 @@ pub enum ContractError {
     #[error("No earliest exchange rate found")]
     NoEarliestRate,
 
+    #[error("maxBTC denom is not set")]
+    MaxBTCDenomNotSet,
+
     #[error("Conversion error: {msg}")]
     ConversionError { msg: String },
 }
