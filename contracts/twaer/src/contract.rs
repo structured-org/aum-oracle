@@ -486,7 +486,13 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.maxbtc_core_contract = msg.maxbtc_core_contract;
+
+    CONFIG.save(deps.storage, &config)?;
+
     Ok(Response::default())
 }

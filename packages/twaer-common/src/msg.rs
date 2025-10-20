@@ -128,7 +128,9 @@ pub struct ErWindowInfoResponse {
 
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub maxbtc_core_contract: Option<Addr>,
+}
 
 /// Custom deserializer for Option<Option<String>> to distinguish between missing field and null.
 /// - Missing field: None

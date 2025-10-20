@@ -305,7 +305,7 @@ fn query_aum_multiple_oracles() {
 
 #[test]
 fn test_record_er() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
     deps.querier.update_wasm(mock_oracle_response(1000000u128));
@@ -319,7 +319,7 @@ fn test_record_er() {
 
 #[test]
 fn test_record_er_by_stranger() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let stranger = deps.api.addr_make("stranger");
     deps.querier.update_wasm(mock_oracle_response(1000000u128));
 
@@ -375,7 +375,7 @@ fn test_query_twaer_no_data() {
 
 #[test]
 fn test_query_er_window_info() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
     deps.querier.update_wasm(mock_oracle_response(1000000u128));
 
@@ -434,7 +434,7 @@ fn test_query_er_window_info() {
 
 #[test]
 fn test_record_er_cleanup() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
     deps.querier.update_wasm(mock_oracle_response(1000000u128));
@@ -454,7 +454,7 @@ fn test_record_er_cleanup() {
 
 #[test]
 fn test_remove_er_datapoint_success() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
     let base_time = 1_000_000u64;
@@ -615,7 +615,7 @@ fn test_remove_last_er_datapoint_flow() {
 
 #[test]
 fn test_remove_er_datapoint_unauthorized() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
     let stranger = deps.api.addr_make("stranger");
 
@@ -645,7 +645,7 @@ fn test_remove_er_datapoint_unauthorized() {
 
 #[test]
 fn test_publish_twaer_by_publisher() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
     let publisher = deps.api.addr_make("publisher");
 
@@ -693,7 +693,7 @@ fn test_publish_twaer_by_publisher() {
 
 #[test]
 fn test_twaer_immutability() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
     // Set immutability period to 3600 seconds (1 hour)
@@ -778,14 +778,15 @@ fn test_mock_unmock_maxbtc_supply() {
     let deposits = 750000u128;
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "neutron1",
-        &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
-            amount: Uint128::from(real_supply),
-        },
+        &[
+            cosmwasm_std::Coin {
+                denom: "factory/neutron1/maxbtc".to_string(),
+                amount: Uint128::from(real_supply),
+            },
             cosmwasm_std::Coin {
                 denom: "wbtc".to_string(),
                 amount: Uint128::from(deposits),
-            }
+            },
         ],
     )]);
     deps.querier.update_wasm(mock_oracle_response(aum_amount));
@@ -825,9 +826,12 @@ fn test_mock_unmock_maxbtc_supply() {
         .collect();
     assert_eq!(history_rates_after_unmock.len(), 2);
     let recorded_er_real = history_rates_after_unmock[1];
-    let expected_er_real = Decimal::from_ratio(aum_amount+deposits, real_supply);
+    let expected_er_real = Decimal::from_ratio(aum_amount + deposits, real_supply);
     assert_eq!(recorded_er_real, expected_er_real);
-    assert_eq!(recorded_er_real, Decimal::from_ratio(100u128+75u128, 75u128)); // ≈ 2.333...
+    assert_eq!(
+        recorded_er_real,
+        Decimal::from_ratio(100u128 + 75u128, 75u128)
+    ); // ≈ 2.333...
 
     // Verify the ERs are different (proving the switch worked)
     assert_ne!(recorded_er_mocked, recorded_er_real);
@@ -897,7 +901,7 @@ fn test_mock_unmock_maxbtc_supply() {
 
 #[test]
 fn test_reset_twaer() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  None);
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
     // Set immutability period to 3600 seconds (1 hour)
@@ -1000,7 +1004,7 @@ fn test_reset_twaer() {
 
 #[test]
 fn test_twaer_long_time_period() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  Some(3600)); // 1 hour window
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, Some(3600)); // 1 hour window
     let owner = deps.api.addr_make("owner");
 
     let base_time = 1000000u64;
@@ -1135,7 +1139,7 @@ fn test_twaer_long_time_period() {
 
 #[test]
 fn test_twaer_complex_intertwining_expiration() {
-    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0,  Some(1800)); // 30 minute window
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, Some(1800)); // 30 minute window
     let owner = deps.api.addr_make("owner");
 
     let base_time = 2000000u64;
