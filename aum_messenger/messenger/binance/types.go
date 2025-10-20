@@ -45,9 +45,6 @@ type BinanceAumData struct {
 	WithdrawableUsdt string
 }
 
-type BinanceRateLimitData struct {
-}
-
 // ToNeutronAumData converts BinanceAumData to BinanceAumData representation that is used by the
 // Neutron AUM contract.
 func (d *BinanceAumData) ToNeutronAumData() (*neutronclient.BinanceAumData, error) {
