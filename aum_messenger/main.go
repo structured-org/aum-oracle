@@ -98,7 +98,12 @@ func main() {
 
 	case false: // prod run. populate deps with real clients
 		jupiterClient := jupiterclient.NewClient(conf.Clients.Solana.RpcEndpoint)
-		binanceClient := binanceclient.NewClient(conf.Clients.Binance.ApiKey, conf.Clients.Binance.ApiSecret)
+		binanceClient := binanceclient.NewClient(
+			conf.Clients.Binance.SpotUrl,
+			conf.Clients.Binance.PmUrl,
+			conf.Clients.Binance.ApiKey,
+			conf.Clients.Binance.ApiSecret,
+		)
 
 		binanceMsgrForNeutronDeps.binanceClient = binanceClient
 		binanceMsgrForNeutronDeps.neutronClient = neutronClient

@@ -14,6 +14,7 @@ require (
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/golang/mock v1.6.0
 	github.com/neutron-org/neutron-logger v0.0.0-20221027125151-535167f2dd73
+	github.com/prometheus/client_golang v1.20.5
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -132,7 +133,6 @@ require (
 	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
