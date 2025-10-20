@@ -9,11 +9,12 @@ use cosmwasm_std::{
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
+use std::str::FromStr;
 use twaer_common::error::ContractError;
 use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
-use twaer_common::types::Config;
+use twaer_common::types::{Config, TwaAggregator};
 
 #[test]
 fn proper_initialization() {
@@ -403,6 +404,14 @@ fn test_query_er_window_info() {
     assert_eq!(er_window_info.window_start, 1000000);
     assert_eq!(er_window_info.window_end, 1000020);
     assert_eq!(er_window_info.total_points, 3);
+    assert_eq!(
+        er_window_info.data_points,
+        [
+            (1000000, Decimal::from_str("2").unwrap()),
+            (1000010, Decimal::from_str("2").unwrap()),
+            (1000020, Decimal::from_str("2").unwrap())
+        ]
+    );
 
     // the first point should be expired with twa_window_seconds=29
     let env4 = test_env_with_time(1000030, 130);
@@ -413,6 +422,14 @@ fn test_query_er_window_info() {
     assert_eq!(er_window_info.window_start, 1000010);
     assert_eq!(er_window_info.window_end, 1000030);
     assert_eq!(er_window_info.total_points, 3);
+    assert_eq!(
+        er_window_info.data_points,
+        [
+            (1000010, Decimal::from_str("2").unwrap()),
+            (1000020, Decimal::from_str("2").unwrap()),
+            (1000030, Decimal::from_str("2").unwrap()),
+        ]
+    );
 }
 
 #[test]
@@ -433,6 +450,197 @@ fn test_record_er_cleanup() {
     // Should only have 1 data point now (the old one was cleaned up)
     let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
+}
+
+#[test]
+fn test_remove_er_datapoint_success() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+
+    let base_time = 1_000_000u64;
+    deps.querier
+        .update_wasm(mock_oracle_response(2_000_000u128));
+    record_er(&mut deps, test_env_with_time(base_time, 100), &owner).unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(3_000_000u128));
+    record_er(&mut deps, test_env_with_time(base_time + 10, 101), &owner).unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(4_000_000u128));
+    record_er(&mut deps, test_env_with_time(base_time + 20, 102), &owner).unwrap();
+
+    let timestamp_to_remove = base_time + 10;
+    let remove_env = test_env_with_time(base_time + 25, 103);
+    let res = execute_msg(
+        &mut deps,
+        remove_env,
+        &owner,
+        ExecuteMsg::RemoveERDatapoint {
+            er_timestamp: timestamp_to_remove,
+        },
+    )
+    .unwrap();
+
+    assert!(res
+        .attributes
+        .iter()
+        .any(|attr| attr.key == "action" && attr.value == "execute_remove_er_datapoint"));
+    assert!(res.attributes.iter().any(|attr| {
+        attr.key == "er_timestamp" && attr.value == timestamp_to_remove.to_string()
+    }));
+
+    let aggregator_after = TWA_AGGREGATOR.load(&deps.storage).unwrap();
+    let history_after = load_er_history(&deps);
+    assert_eq!(history_after.len(), 2);
+    assert!(!history_after
+        .iter()
+        .any(|(timestamp, _)| *timestamp == timestamp_to_remove));
+    let expected_after = expected_twa_aggregator(&history_after).unwrap();
+    assert_eq!(aggregator_after.window_start, expected_after.window_start);
+    assert_eq!(aggregator_after.window_end, expected_after.window_end);
+    assert_eq!(aggregator_after.weighted_sum, expected_after.weighted_sum);
+    assert_eq!(aggregator_after.current_twa, expected_after.current_twa);
+    assert!(ER_HISTORY.has(&deps.storage, base_time));
+    assert!(ER_HISTORY.has(&deps.storage, base_time + 20));
+    assert!(!ER_HISTORY.has(&deps.storage, timestamp_to_remove));
+    assert_eq!(query_data_point_count(&deps).unwrap(), 2);
+}
+
+#[test]
+fn test_remove_last_er_datapoint_flow() {
+    // Case 1: remove the only data point
+    {
+        let mut deps = setup_contract_with_supply(1_000_000u128, None);
+        let owner = deps.api.addr_make("owner");
+        let base_time = 1_000_000u64;
+
+        record_er_with_aum(&mut deps, &owner, base_time, 100, 2_000_000u128);
+
+        execute_msg(
+            &mut deps,
+            test_env_with_time(base_time + 1, 101),
+            &owner,
+            ExecuteMsg::RemoveERDatapoint {
+                er_timestamp: base_time,
+            },
+        )
+        .unwrap();
+
+        assert!(ER_HISTORY.is_empty(&deps.storage));
+        assert!(TWA_AGGREGATOR.may_load(&deps.storage).unwrap().is_none());
+    }
+
+    // Case 2: remove the latest point from an extended history and keep repeating
+    {
+        let mut deps = setup_contract_with_supply(1_000_000u128, None);
+        let owner = deps.api.addr_make("owner");
+        let base_time = 2_000_000u64;
+        let data_points = [
+            (base_time, 200u64, 2_000_000u128),
+            (base_time + 15, 201u64, 2_500_000u128),
+            (base_time + 40, 202u64, 3_000_000u128),
+            (base_time + 70, 203u64, 1_500_000u128),
+            (base_time + 120, 204u64, 1_000_000u128),
+        ];
+
+        for (timestamp, height, aum) in data_points {
+            record_er_with_aum(&mut deps, &owner, timestamp, height, aum);
+        }
+
+        let mut removal_timestamp = base_time + 120;
+        execute_msg(
+            &mut deps,
+            test_env_with_time(removal_timestamp + 5, 300),
+            &owner,
+            ExecuteMsg::RemoveERDatapoint {
+                er_timestamp: removal_timestamp,
+            },
+        )
+        .unwrap();
+
+        let mut history = load_er_history(&deps);
+        assert_eq!(history.len(), 4);
+        assert!(!history.iter().any(|(ts, _)| *ts == removal_timestamp));
+
+        let mut aggregator = TWA_AGGREGATOR.may_load(&deps.storage).unwrap().unwrap();
+        let expected_aggr = expected_twa_aggregator(&history).unwrap();
+        assert_eq!(aggregator.window_start, expected_aggr.window_start);
+        assert_eq!(aggregator.window_end, expected_aggr.window_end);
+        assert_eq!(aggregator.weighted_sum, expected_aggr.weighted_sum);
+        assert_eq!(aggregator.current_twa, expected_aggr.current_twa);
+
+        let env_at_window_end = test_env_with_time(aggregator.window_end, 301);
+        let predicted = query_predict_twaer(&deps, env_at_window_end).unwrap();
+        assert_eq!(predicted, expected_aggr.current_twa);
+
+        let mut removal_height = 400u64;
+        while !history.is_empty() {
+            removal_timestamp = history.last().unwrap().0;
+            removal_height += 1;
+            execute_msg(
+                &mut deps,
+                test_env_with_time(removal_timestamp + 5, removal_height),
+                &owner,
+                ExecuteMsg::RemoveERDatapoint {
+                    er_timestamp: removal_timestamp,
+                },
+            )
+            .unwrap();
+
+            history = load_er_history(&deps);
+            let stored_aggregator = TWA_AGGREGATOR.may_load(&deps.storage).unwrap();
+            match expected_twa_aggregator(&history) {
+                None => {
+                    assert!(stored_aggregator.is_none());
+                    assert!(ER_HISTORY.is_empty(&deps.storage));
+                    break;
+                }
+                Some(expected) => {
+                    aggregator = stored_aggregator.expect("aggregator must remain");
+                    assert_eq!(aggregator.window_start, expected.window_start);
+                    assert_eq!(aggregator.window_end, expected.window_end);
+                    assert_eq!(aggregator.weighted_sum, expected.weighted_sum);
+                    assert_eq!(aggregator.current_twa, expected.current_twa);
+
+                    let env_at_window_end =
+                        test_env_with_time(aggregator.window_end, removal_height + 1);
+                    let predicted = query_predict_twaer(&deps, env_at_window_end).unwrap();
+                    assert_eq!(predicted, expected.current_twa);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_remove_er_datapoint_unauthorized() {
+    let mut deps = setup_contract_with_supply(1000000u128, None);
+    let owner = deps.api.addr_make("owner");
+    let stranger = deps.api.addr_make("stranger");
+
+    let base_time = 2_000_000u64;
+    deps.querier
+        .update_wasm(mock_oracle_response(2_000_000u128));
+    record_er(&mut deps, test_env_with_time(base_time, 200), &owner).unwrap();
+
+    deps.querier
+        .update_wasm(mock_oracle_response(3_000_000u128));
+    record_er(&mut deps, test_env_with_time(base_time + 10, 201), &owner).unwrap();
+
+    let err = execute_msg(
+        &mut deps,
+        test_env_with_time(base_time + 20, 202),
+        &stranger,
+        ExecuteMsg::RemoveERDatapoint {
+            er_timestamp: base_time,
+        },
+    )
+    .unwrap_err();
+    assert_eq!(err, ContractError::Ownable(NotOwner));
+
+    assert!(ER_HISTORY.has(&deps.storage, base_time));
+    assert_eq!(query_data_point_count(&deps).unwrap(), 2);
 }
 
 #[test]
@@ -1391,6 +1599,73 @@ where
     T: cosmwasm_std::Querier,
 {
     execute_msg(deps, env, owner, ExecuteMsg::RecordEr {})
+}
+
+/// Record helper that updates the oracle mock before recording
+fn record_er_with_aum(
+    deps: &mut OwnedDeps<MockStorage, MockApi, MockQuerier<Empty>>,
+    owner: &Addr,
+    timestamp: u64,
+    block_height: u64,
+    aum: u128,
+) {
+    deps.querier.update_wasm(mock_oracle_response(aum));
+    record_er(deps, test_env_with_time(timestamp, block_height), owner).unwrap();
+}
+
+/// Load ER history sorted in ascending timestamp order
+fn load_er_history<T>(deps: &OwnedDeps<MockStorage, MockApi, T>) -> Vec<(u64, Decimal)>
+where
+    T: cosmwasm_std::Querier,
+{
+    ER_HISTORY
+        .range(&deps.storage, None, None, Order::Ascending)
+        .map(|item| item.unwrap())
+        .collect()
+}
+
+/// Calculate the expected TWA aggregator for a given ER history snapshot
+fn expected_twa_aggregator(points: &[(u64, Decimal)]) -> Option<TwaAggregator> {
+    if points.is_empty() {
+        return None;
+    }
+
+    if points.len() == 1 {
+        let (timestamp, rate) = points[0];
+        return Some(TwaAggregator::from_single_point(timestamp, rate));
+    }
+
+    let mut weighted_sum = Decimal::zero();
+    for window in points.windows(2) {
+        let (start_ts, start_rate) = window[0];
+        let (end_ts, _) = window[1];
+        let duration = end_ts - start_ts;
+        if duration == 0 {
+            continue;
+        }
+        let contribution = start_rate
+            .checked_mul(Decimal::from_ratio(duration, 1u64))
+            .unwrap();
+        weighted_sum = weighted_sum.checked_add(contribution).unwrap();
+    }
+
+    let window_start = points.first().unwrap().0;
+    let window_end = points.last().unwrap().0;
+    let total_duration = window_end - window_start;
+    let current_twa = if total_duration == 0 {
+        points.last().unwrap().1
+    } else {
+        weighted_sum
+            .checked_div(Decimal::from_ratio(total_duration, 1u64))
+            .unwrap()
+    };
+
+    Some(TwaAggregator {
+        weighted_sum,
+        current_twa,
+        window_start,
+        window_end,
+    })
 }
 
 /// Query data point count helper - reads directly from state

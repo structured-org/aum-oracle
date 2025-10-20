@@ -50,6 +50,10 @@ pub enum ExecuteMsg {
     /// Sets the mocked maxBTC supply which is used if config maxbtc_denom is not set.
     /// Only callable by the owner.
     SetMockedMaxbtcSupply { value: Uint128 },
+
+    /// Removes a specific ER datapoint from history and TWA Aggregator.
+    /// Only callable by the owner.
+    RemoveERDatapoint { er_timestamp: u64 },
 }
 
 #[cw_serde]
@@ -118,6 +122,8 @@ pub struct ErWindowInfoResponse {
     pub window_end: u64,
     /// Total number of data points in the window.
     pub total_points: u64,
+    /// Data points itself
+    pub data_points: Vec<(u64, Decimal)>,
 }
 
 /// MigrateMsg is used for contract migration.

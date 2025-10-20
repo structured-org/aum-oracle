@@ -2,7 +2,7 @@ use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGAT
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
-    Order, Response, StdResult, Uint128,
+    Order, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
@@ -68,6 +68,9 @@ pub fn execute(
         ExecuteMsg::UpdateOwnership(action) => {
             update_ownership(deps, &env.block, &info.sender, action)?;
             Ok(Response::new().add_attribute("action", "update_ownership"))
+        }
+        ExecuteMsg::RemoveERDatapoint { er_timestamp } => {
+            execute_remove_er_datapoint(deps, env, info, er_timestamp)
         }
     }
 }
@@ -175,6 +178,25 @@ fn execute_set_maxbtc_supply(
         .add_attribute("value", value.to_string()))
 }
 
+fn execute_remove_er_datapoint(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    er_timestamp: u64,
+) -> ContractResult<Response> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    if let Some(new_twa_aggr) = remove_er_contribution(deps.storage, er_timestamp)? {
+        TWA_AGGREGATOR.save(deps.storage, &new_twa_aggr)?;
+    } else {
+        TWA_AGGREGATOR.remove(deps.storage);
+    }
+
+    Ok(Response::new()
+        .add_attribute("action", "execute_remove_er_datapoint")
+        .add_attribute("er_timestamp", er_timestamp.to_string()))
+}
+
 /// Determine which exchange rates are expired and return them in ascending timestamp order.
 fn determine_expired_rates(
     storage: &mut dyn cosmwasm_std::Storage,
@@ -241,43 +263,69 @@ fn record_er_at(
     let window_start = new_timestamp.sub(config.twa_window_seconds);
     let expired_rates = determine_expired_rates(storage, window_start)?;
 
-    // Remove contributions from rates that are no longer in the window
-    for (expired_timestamp, expired_rate) in expired_rates {
-        let next_timestamp = find_next_timestamp_after(storage, expired_timestamp)?.ok_or(
-            ContractError::NoNextTimestamp {
-                timestamp: expired_timestamp,
-            },
-        )?;
-        // how long the rate was active
-        let expired_duration = next_timestamp - expired_timestamp;
-        // contribution of the rate
-        let expired_contribution =
-            expired_rate.checked_mul(Decimal::from_ratio(expired_duration, 1u64))?;
-
-        twa_aggr.weighted_sum = twa_aggr.weighted_sum.checked_sub(expired_contribution)?;
-
+    // Remove expired rates from history (just removal, no recalculation yet)
+    for (expired_timestamp, _) in expired_rates {
         ER_HISTORY.remove(storage, expired_timestamp);
     }
 
-    twa_aggr.window_end = new_timestamp;
-    let oldest_timestamp = ER_HISTORY
-        .range(storage, None, None, Order::Ascending)
-        .next()
-        .transpose()?
-        .map_or_else(|| Err(ContractError::NoEarliestRate {}), |(ts, _)| Ok(ts))?;
-    twa_aggr.window_start = oldest_timestamp;
-
-    let total_duration = twa_aggr.window_end - twa_aggr.window_start;
-    twa_aggr.current_twa = if total_duration > 0 {
-        twa_aggr
-            .weighted_sum
-            .checked_div(Decimal::from_ratio(total_duration, 1u64))?
+    // Recalculate aggregator based on remaining history after all removals
+    if let Some(new_twa_aggr) = recalculate_twa_aggregator(storage)? {
+        TWA_AGGREGATOR.save(storage, &new_twa_aggr)?;
     } else {
-        new_rate
-    };
-
-    TWA_AGGREGATOR.save(storage, &twa_aggr)?;
+        TWA_AGGREGATOR.remove(storage);
+    }
     Ok(())
+}
+
+/// Recalculates the TWA aggregator from scratch based on current ER history
+/// Returns None if history is empty
+fn recalculate_twa_aggregator(storage: &dyn Storage) -> ContractResult<Option<TwaAggregator>> {
+    let history: Vec<(u64, Decimal)> = ER_HISTORY
+        .range(storage, None, None, Order::Ascending)
+        .collect::<StdResult<Vec<_>>>()?;
+
+    if history.is_empty() {
+        return Ok(None);
+    }
+
+    if history.len() == 1 {
+        // Only one point exists
+        let (timestamp, rate) = history[0];
+        return Ok(Some(TwaAggregator::from_single_point(timestamp, rate)));
+    }
+
+    // Calculate weighted sum from consecutive pairs
+    let mut weighted_sum = Decimal::zero();
+    for i in 0..history.len() - 1 {
+        let (start_ts, start_rate) = history[i];
+        let (end_ts, _) = history[i + 1];
+        let duration = end_ts - start_ts;
+        let contribution = start_rate.checked_mul(Decimal::from_ratio(duration, 1u64))?;
+        weighted_sum = weighted_sum.checked_add(contribution)?;
+    }
+
+    let window_start = history[0].0;
+    let window_end = history.last().unwrap().0;
+    let total_duration = window_end - window_start;
+    let current_twa = weighted_sum.checked_div(Decimal::from_ratio(total_duration, 1u64))?;
+
+    Ok(Some(TwaAggregator {
+        weighted_sum,
+        current_twa,
+        window_start,
+        window_end,
+    }))
+}
+
+/// Removes a specific ER data point from ER history and updates twa
+/// The function either returns an updated aggregator that must be saved to the storage
+/// or None, meaning the aggregator is empty and the storage must be cleared
+fn remove_er_contribution(
+    storage: &mut dyn Storage,
+    er_timestamp: u64,
+) -> ContractResult<Option<TwaAggregator>> {
+    ER_HISTORY.remove(storage, er_timestamp);
+    recalculate_twa_aggregator(storage)
 }
 
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
@@ -298,25 +346,6 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     })?;
 
     Ok(Decimal::from_ratio(aum_uint, maxbtc_supply))
-}
-
-/// Find the next timestamp after the given timestamp
-fn find_next_timestamp_after(
-    storage: &dyn cosmwasm_std::Storage,
-    after_timestamp: u64,
-) -> ContractResult<Option<u64>> {
-    let next = ER_HISTORY
-        .range(
-            storage,
-            Some(Bound::exclusive(after_timestamp)),
-            None,
-            Order::Ascending,
-        )
-        .next()
-        .transpose()?
-        .map(|(timestamp, _)| timestamp);
-
-    Ok(next)
 }
 
 #[entry_point]
@@ -401,14 +430,16 @@ fn calculate_twaer(deps: Deps, env: Env) -> ContractResult<Decimal> {
 
 fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
     let twa_buffer = TWA_AGGREGATOR.load(deps.storage)?;
-    let total_points = ER_HISTORY
+    let data_points = ER_HISTORY
         .range(deps.storage, None, None, Order::Ascending)
-        .count() as u64;
+        .collect::<StdResult<Vec<(u64, Decimal)>>>()?;
+    let total_points = data_points.len() as u64;
 
     Ok(ErWindowInfoResponse {
         window_start: twa_buffer.window_start,
         window_end: twa_buffer.window_end,
         total_points,
+        data_points,
     })
 }
 

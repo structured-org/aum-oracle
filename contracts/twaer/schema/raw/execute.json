@@ -97,6 +97,30 @@
       "additionalProperties": false
     },
     {
+      "description": "Removes a specific ER datapoint from history and TWA Aggregator. Only callable by the owner.",
+      "type": "object",
+      "required": [
+        "remove_e_r_datapoint"
+      ],
+      "properties": {
+        "remove_e_r_datapoint": {
+          "type": "object",
+          "required": [
+            "er_timestamp"
+          ],
+          "properties": {
+            "er_timestamp": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Update the contract's ownership. The `action` to be provided can be either to propose transferring ownership to an account, accept a pending ownership transfer, or renounce the ownership permanently.",
       "type": "object",
       "required": [
