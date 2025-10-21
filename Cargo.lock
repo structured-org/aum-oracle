@@ -1451,7 +1451,7 @@ dependencies = [
 
 [[package]]
 name = "twaer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aum-receiver-common",
  "cosmwasm-schema",

@@ -13,7 +13,7 @@ use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
     UpdateConfig,
 };
-use twaer_common::types::{Config, TwaAggregator};
+use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
 const CONTRACT_NAME: &str = "crates.io:twaer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -38,7 +38,7 @@ pub fn instantiate(
     let config = Config {
         publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
-        maxbtc_denom: None,
+        maxbtc_core_contract: None,
         twa_window_seconds: msg.twa_window_seconds,
         twaer_immutability_seconds: msg.twaer_immutability_seconds,
     };
@@ -96,8 +96,8 @@ fn execute_update_config(
         let validated_new_publisher = deps.api.addr_validate(&new_publisher)?;
         config.publisher = validated_new_publisher;
     }
-    if let Some(maxbtc_denom) = new_config.maxbtc_denom {
-        config.maxbtc_denom = maxbtc_denom;
+    if let Some(maxbtc_core) = new_config.maxbtc_core_contract {
+        config.maxbtc_core_contract = maxbtc_core;
     }
     if let Some(twa_window_seconds) = new_config.twa_window_seconds {
         config.twa_window_seconds = twa_window_seconds;
@@ -331,8 +331,15 @@ fn remove_er_contribution(
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     let config = CONFIG.load(deps.storage)?;
 
-    let maxbtc_supply = match config.maxbtc_denom {
-        Some(maxbtc_denom) => deps.querier.query_supply(maxbtc_denom)?.amount,
+    let maxbtc_supply = match config.maxbtc_core_contract {
+        Some(maxbtc_core) => {
+            let maxbtc_config = query_maxbtc_config(deps, maxbtc_core.clone())?;
+            let maxbtc_denom = "factory/".to_owned()
+                + maxbtc_core.as_str()
+                + "/"
+                + maxbtc_config.maxbtc_denom.as_str();
+            deps.querier.query_supply(maxbtc_denom)?.amount
+        }
         None => MOCKED_MAXBTC_SUPPLY.load(deps.storage)?,
     };
 
@@ -340,7 +347,7 @@ fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
         return Ok(Decimal::one());
     }
 
-    let aum = get_aum_from_oracles(deps)?;
+    let aum = get_aum(deps)?;
     let aum_uint = Uint128::try_from(aum).map_err(|e| ContractError::ConversionError {
         msg: format!("failed to convert total AUM {} to Uint128: {}", aum, e),
     })?;
@@ -361,7 +368,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> ContractResult<Binary> {
 }
 
 fn query_get_aum(deps: Deps) -> ContractResult<GetAumResponse> {
-    let aum = get_aum_from_oracles(deps)?;
+    let aum = get_aum(deps)?;
     Ok(aum_response_from_uwbtc(aum))
 }
 
@@ -374,6 +381,40 @@ fn query_get_twaer(deps: Deps) -> ContractResult<GetTwaerResponse> {
         twaer,
         published_at,
     })
+}
+
+pub fn query_maxbtc_config(
+    deps: Deps,
+    maxbtc_core_contract: Addr,
+) -> ContractResult<MaxBTCCoreConfig> {
+    let config: MaxBTCCoreConfig = deps.querier.query_wasm_smart(
+        maxbtc_core_contract,
+        &serde_json::json!({
+          "config": {}
+        }),
+    )?;
+
+    Ok(config)
+}
+
+fn get_aum(deps: Deps) -> ContractResult<Int256> {
+    let config = CONFIG.load(deps.storage)?;
+
+    let maxbtc_core_balance: Int256 = match config.maxbtc_core_contract {
+        Some(maxbtc_core_contract) => {
+            let maxbtc_config = query_maxbtc_config(deps, maxbtc_core_contract.clone())?;
+            let maxbtc_balance = deps
+                .querier
+                .query_balance(maxbtc_core_contract, maxbtc_config.deposit_denom)?;
+
+            Int256::from(maxbtc_balance.amount)
+        }
+        None => Int256::zero(),
+    };
+
+    let oracles_aum = get_aum_from_oracles(deps)?;
+
+    Ok(oracles_aum + maxbtc_core_balance)
 }
 
 fn get_aum_from_oracles(deps: Deps) -> ContractResult<Int256> {
@@ -445,7 +486,13 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let mut config = CONFIG.load(deps.storage)?;
+    config.maxbtc_core_contract = msg.maxbtc_core_contract;
+
+    CONFIG.save(deps.storage, &config)?;
+
     Ok(Response::default())
 }

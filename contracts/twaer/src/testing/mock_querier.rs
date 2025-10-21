@@ -22,7 +22,7 @@ pub fn mock_dependencies() -> OwnedDeps<MockStorage, MockApi, WasmMockQuerier> {
 pub struct WasmMockQuerier {
     base: MockQuerier,
     // Map from contract_addr => response binary for WASM queries
-    wasm_responses: HashMap<String, Binary>,
+    pub wasm_responses: HashMap<String, Binary>,
 }
 
 impl WasmMockQuerier {
