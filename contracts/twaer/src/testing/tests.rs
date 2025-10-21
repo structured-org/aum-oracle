@@ -24,7 +24,7 @@ fn proper_initialization() {
     let expected_config = Config {
         publisher: deps.api.addr_make("owner"),
         aum_oracles: vec![deps.api.addr_make("oracle1")],
-        maxbtc_core_contract: None,
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -44,6 +44,7 @@ fn test_instantiate_with_invalid_owner() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -63,6 +64,7 @@ fn test_instantiate_with_invalid_publisher() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -81,6 +83,7 @@ fn test_instantiate_with_invalid_oracle() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -109,6 +112,7 @@ fn test_ownership() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
     assert!(result.is_ok());
@@ -160,7 +164,7 @@ fn update_config_by_owner() {
         new_config: UpdateConfig {
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
-            maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
+            maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: Some(172800),         // 48 hours
             twaer_immutability_seconds: Some(172800), // 48 hours
         },
@@ -173,7 +177,7 @@ fn update_config_by_owner() {
     let expected_config = Config {
         publisher: new_publisher,
         aum_oracles: vec![oracle1, oracle2],
-        maxbtc_core_contract: Some(Addr::unchecked("neutron1")),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 172800,
         twaer_immutability_seconds: 172800,
     };
@@ -190,7 +194,7 @@ fn update_config_by_unauthorized() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_core_contract: None,
+            maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
         },
@@ -203,7 +207,7 @@ fn update_config_by_unauthorized() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_core_contract: None,
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -220,7 +224,7 @@ fn update_config_partial() {
         new_config: UpdateConfig {
             publisher: None,
             aum_oracles: None,
-            maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
+            maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: Some(85000),
             twaer_immutability_seconds: None,
         },
@@ -232,7 +236,7 @@ fn update_config_partial() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_core_contract: Some(Addr::unchecked("neutron1")),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 85000,
         twaer_immutability_seconds: 0,
     };
@@ -251,7 +255,7 @@ fn query_config() {
     let expected_config = Config {
         publisher: owner,
         aum_oracles: vec![oracle1],
-        maxbtc_core_contract: None,
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
     };
@@ -261,7 +265,10 @@ fn query_config() {
 #[test]
 fn query_aum_single_oracle() {
     let mut deps = setup_contract_with_standard_querier();
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     let bin = query_msg(&deps, mock_env(), QueryMsg::GetAum {}).unwrap();
     let res: GetAumResponse = from_json(bin).unwrap();
@@ -288,6 +295,13 @@ fn query_aum_multiple_oracles() {
                 aum_response_from_uwbtc(Int256::from(1000000u128))
             } else if contract_addr.as_str() == oracle2.as_str() {
                 aum_response_from_uwbtc(Int256::from(2000000u128))
+            } else if contract_addr.as_str() == deps.api.addr_make("maxbtc_core_contract").as_str() {
+                let res = MaxBTCCoreConfig {
+                    deposit_denom: "wbtc".to_string(),
+                    maxbtc_denom: "maxbtc".to_string(),
+                };
+                let bin = to_json_binary(&res).unwrap();
+                return SystemResult::Ok(ContractResult::Ok(bin));
             } else {
                 unreachable!()
             };
@@ -308,7 +322,10 @@ fn test_record_er() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     let env = test_env_with_time(1000000, 100);
     record_er(&mut deps, env.clone(), &owner).unwrap();
@@ -321,7 +338,10 @@ fn test_record_er() {
 fn test_record_er_by_stranger() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let stranger = deps.api.addr_make("stranger");
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     let env = test_env_with_time(1000000, 100);
     record_er(&mut deps, env.clone(), &stranger).unwrap();
@@ -345,12 +365,16 @@ fn test_record_er_with_zero_maxbtc_supply() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: mocked_supply,
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // Set up oracle to return AUM of 1,000,000 uwBTC
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     // Record ER using mocked supply
     let env1 = test_env_with_time(1000000, 100);
@@ -377,7 +401,10 @@ fn test_query_twaer_no_data() {
 fn test_query_er_window_info() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
@@ -389,6 +416,7 @@ fn test_query_er_window_info() {
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+    execute_msg(&mut deps, mock_env(), &owner, ExecuteMsg::Unmock {}).unwrap();
 
     let env = test_env_with_time(1000000, 100);
     record_er(&mut deps, env.clone(), &owner).unwrap();
@@ -437,7 +465,10 @@ fn test_record_er_cleanup() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(500000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
-    deps.querier.update_wasm(mock_oracle_response(1000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1000000u128,
+    ));
 
     // Store data point that will be outside the window
     let env1 = test_env_with_time(1000000, 100);
@@ -458,16 +489,22 @@ fn test_remove_er_datapoint_success() {
     let owner = deps.api.addr_make("owner");
 
     let base_time = 1_000_000u64;
-    deps.querier
-        .update_wasm(mock_oracle_response(2_000_000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2_000_000u128,
+    ));
     record_er(&mut deps, test_env_with_time(base_time, 100), &owner).unwrap();
 
-    deps.querier
-        .update_wasm(mock_oracle_response(3_000_000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3_000_000u128,
+    ));
     record_er(&mut deps, test_env_with_time(base_time + 10, 101), &owner).unwrap();
 
-    deps.querier
-        .update_wasm(mock_oracle_response(4_000_000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        4_000_000u128,
+    ));
     record_er(&mut deps, test_env_with_time(base_time + 20, 102), &owner).unwrap();
 
     let timestamp_to_remove = base_time + 10;
@@ -620,12 +657,16 @@ fn test_remove_er_datapoint_unauthorized() {
     let stranger = deps.api.addr_make("stranger");
 
     let base_time = 2_000_000u64;
-    deps.querier
-        .update_wasm(mock_oracle_response(2_000_000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2_000_000u128,
+    ));
     record_er(&mut deps, test_env_with_time(base_time, 200), &owner).unwrap();
 
-    deps.querier
-        .update_wasm(mock_oracle_response(3_000_000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3_000_000u128,
+    ));
     record_er(&mut deps, test_env_with_time(base_time + 10, 201), &owner).unwrap();
 
     let err = execute_msg(
@@ -661,7 +702,10 @@ fn test_publish_twaer_by_publisher() {
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
 
-    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
 
     // Record some ER data first
     let env = test_env_with_time(1000000, 100);
@@ -708,7 +752,10 @@ fn test_twaer_immutability() {
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
 
-    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
 
     // Record some ER data first
     let env1 = test_env_with_time(1000000, 100);
@@ -750,13 +797,17 @@ fn test_mock_unmock_maxbtc_supply() {
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: mocked_supply,
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
     // Set up oracle to return AUM of 1,000,000 uwBTC
     let aum_amount = 1000000u128;
-    deps.querier.update_wasm(mock_oracle_response(aum_amount));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        aum_amount,
+    ));
 
     // Record ER using mocked supply
     let env1 = test_env_with_time(1000000, 100);
@@ -777,10 +828,11 @@ fn test_mock_unmock_maxbtc_supply() {
     let real_supply = 750000u128;
     let deposits = 750000u128;
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
-        "neutron1",
+        deps.api.addr_make("maxbtc_core_contract").as_str(),
         &[
             cosmwasm_std::Coin {
-                denom: "factory/neutron1/maxbtc".to_string(),
+                denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                    .to_string(),
                 amount: Uint128::from(real_supply),
             },
             cosmwasm_std::Coin {
@@ -789,31 +841,14 @@ fn test_mock_unmock_maxbtc_supply() {
             },
         ],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(aum_amount));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        aum_amount,
+    ));
 
-    // set maxbtc_denom to switch to real supply
-    let res = execute_msg(
-        &mut deps,
-        mock_env(),
-        &owner,
-        ExecuteMsg::UpdateConfig {
-            new_config: UpdateConfig {
-                maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
-                publisher: None,
-                aum_oracles: None,
-                twa_window_seconds: None,
-                twaer_immutability_seconds: None,
-            },
-        },
-    );
+    // unmock to switch to real supply
+    let res = execute_msg(&mut deps, mock_env(), &owner, ExecuteMsg::Unmock {});
     assert!(res.is_ok());
-
-    // Verify config is updated
-    let config = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(
-        config.maxbtc_core_contract,
-        Some(Addr::unchecked("neutron1"))
-    );
 
     // Record ER using real supply
     let env2 = test_env_with_time(1000001, 101);
@@ -841,21 +876,11 @@ fn test_mock_unmock_maxbtc_supply() {
         &mut deps,
         mock_env(),
         &owner,
-        ExecuteMsg::UpdateConfig {
-            new_config: UpdateConfig {
-                maxbtc_core_contract: Some(None),
-                publisher: None,
-                aum_oracles: None,
-                twa_window_seconds: None,
-                twaer_immutability_seconds: None,
-            },
+        ExecuteMsg::SetMockedMaxbtcSupply {
+            value: Uint128::zero(),
         },
     );
     assert!(res.is_ok());
-
-    // Verify config is updated back to None
-    let config = CONFIG.load(&deps.storage).unwrap();
-    assert_eq!(config.maxbtc_core_contract, None);
 
     // Set mocked supply to zero so calc_exchange_rate returns Decimal::one()
     let res = execute_msg(
@@ -916,7 +941,10 @@ fn test_reset_twaer() {
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
 
-    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
 
     // Record multiple ER data points to populate history
     let env1 = test_env_with_time(1000000, 100);
@@ -1011,7 +1039,10 @@ fn test_twaer_long_time_period() {
 
     // === Data Point 1: t=0, Supply=1M, AUM=2M, Rate=2.0 ===
     let env1 = test_env_with_time(base_time, 100);
-    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
     record_er(&mut deps, env1.clone(), &owner).unwrap();
 
     // Check TWA after Point 1: Only one point, so TWA = 2.0
@@ -1023,11 +1054,15 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(1500000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(2400000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2400000u128,
+    ));
     record_er(&mut deps, env2.clone(), &owner).unwrap();
 
     // Check TWA after Point 2: Rate 2.0 active for 900s, then Rate 1.6 at t=900
@@ -1046,11 +1081,15 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(2000000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(2000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
     record_er(&mut deps, env3.clone(), &owner).unwrap();
 
     // Check TWA after Point 3: Rate 2.0 for 900s, Rate 1.6 for 900s, Rate 1.0 at t=1800
@@ -1069,11 +1108,15 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(1800000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(1800000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        1800000u128,
+    ));
     record_er(&mut deps, env4.clone(), &owner).unwrap();
 
     // Check TWA after Point 4: Rate 2.0 for 900s, Rate 1.6 for 900s, Rate 1.0 for 900s, Rate 1.0 at t=2700
@@ -1148,7 +1191,10 @@ fn test_twaer_complex_intertwining_expiration() {
 
     // Point 1: t=0, Rate=3.0
     let env1 = test_env_with_time(base_time, 100);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env1.clone(), &owner).unwrap();
 
     // Check TWA after Point 1: Only one point, so TWA = 3.0
@@ -1160,11 +1206,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(1200000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env2.clone(), &owner).unwrap();
 
     // Check TWA after Point 2: Rate 3.0 active for 300s, then Rate 2.5 at t=300
@@ -1177,11 +1227,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(1500000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env3.clone(), &owner).unwrap();
 
     // Check TWA after Point 3: Rate 3.0 for 300s, Rate 2.5 for 300s, Rate 2.0 at t=600
@@ -1199,11 +1253,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(2000000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env4.clone(), &owner).unwrap();
 
     // Check TWA after Point 4: Rate 3.0 for 300s, Rate 2.5 for 300s, Rate 2.0 for 600s, Rate 1.5 at t=1200
@@ -1218,11 +1276,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(3000000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env5.clone(), &owner).unwrap();
 
     // Check TWA after Point 5: Window is [100s, 1900s], Point 1 expired
@@ -1240,11 +1302,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(3750000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env6.clone(), &owner).unwrap();
 
     // Check TWA after Point 6: Window is [400s, 2200s], Point 2 expired
@@ -1260,11 +1326,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(5000000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env7.clone(), &owner).unwrap();
 
     // Check TWA after Point 7: Window is [700s, 2500s], Point 3 expired
@@ -1297,11 +1367,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(7500000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(3000000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        3000000u128,
+    ));
     record_er(&mut deps, env8.clone(), &owner).unwrap();
 
     // Check TWA after Point 8: Window is [2200s, 4000s], Points 4,5 expired, Point 6 remains
@@ -1320,11 +1394,15 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: "factory/neutron1/maxbtc".to_string(),
+            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
+                .to_string(),
             amount: Uint128::from(5000000u128),
         }],
     )]);
-    deps.querier.update_wasm(mock_oracle_response(2500000u128));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2500000u128,
+    ));
     record_er(&mut deps, env9.clone(), &owner).unwrap();
 
     // Check TWA after Point 9: Only one data point remains at t=6000s with Rate=0.5
@@ -1334,66 +1412,6 @@ fn test_twaer_complex_intertwining_expiration() {
 
     // Should have only 1 point (everything else expired)
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
-}
-
-#[test]
-fn test_update_maxbtc_denom_deserialization() {
-    let mut deps = setup_contract();
-    let owner = deps.api.addr_make("owner");
-
-    // Test case 1: Setting maxbtc_denom to Some(String) via JSON
-    let json_msg = r#"{
-        "update_config": {
-            "new_config": {
-                "maxbtc_core_contract": "neutron1"
-            }
-        }
-    }"#;
-    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
-    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
-
-    // Verify config value was set to Some(String)
-    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
-    let config: Config = from_json(bin).unwrap();
-    assert_eq!(
-        config.maxbtc_core_contract,
-        Some(Addr::unchecked("neutron1"))
-    );
-
-    // Test case 2: Missing field should not change config
-    let json_msg = r#"{
-        "update_config": {
-            "new_config": {
-                "twa_window_seconds": 1
-            }
-        }
-    }"#;
-    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
-    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
-
-    // Verify config value was NOT changed (should still be Some(String))
-    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
-    let config: Config = from_json(bin).unwrap();
-    assert_eq!(
-        config.maxbtc_core_contract,
-        Some(Addr::unchecked("neutron1"))
-    );
-
-    // Test case 3: Explicit null should set to None
-    let json_msg = r#"{
-        "update_config": {
-            "new_config": {
-                "maxbtc_core_contract": null
-            }
-        }
-    }"#;
-    let msg: ExecuteMsg = serde_json::from_str(json_msg).unwrap();
-    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
-
-    // Verify config value was changed to None
-    let bin = query_msg(&deps, mock_env(), QueryMsg::GetConfig {}).unwrap();
-    let config: Config = from_json(bin).unwrap();
-    assert_eq!(config.maxbtc_core_contract, None);
 }
 
 // ============================================================================
@@ -1442,6 +1460,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
         twa_window_seconds: config.twa_window_seconds,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1479,6 +1498,7 @@ fn setup_contract_with_standard_querier_and_config(
         twa_window_seconds: config.twa_window_seconds,
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1496,10 +1516,14 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
         storage: cosmwasm_std::testing::MockStorage::default(),
         api: cosmwasm_std::testing::MockApi::default(),
         querier: cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
-            "neutron1",
+            MockApi::default().addr_make("maxbtc_core_contract").as_str(),
             &[
                 cosmwasm_std::Coin {
-                    denom: "factory/neutron1/maxbtc".to_string(),
+                    denom: format!(
+                        "factory/{}/maxbtc",
+                        MockApi::default().addr_make("maxbtc_core_contract").as_str()
+                    )
+                    .to_string(),
                     amount: Uint128::from(supply_amount),
                 },
                 cosmwasm_std::Coin {
@@ -1513,6 +1537,8 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
 
     let owner = deps.api.addr_make("owner");
     let oracle1 = deps.api.addr_make("oracle1");
+    let maxbtc_core_contract = deps.api.addr_make("maxbtc_core_contract");
+
     let msg = InstantiateMsg {
         owner: owner.to_string(),
         publisher: owner.to_string(),
@@ -1520,6 +1546,7 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
         twa_window_seconds: twa_window_seconds.unwrap_or(86400),
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1530,7 +1557,7 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
         &owner,
         ExecuteMsg::UpdateConfig {
             new_config: UpdateConfig {
-                maxbtc_core_contract: Some(Some(Addr::unchecked("neutron1"))),
+                maxbtc_core_contract: Some(maxbtc_core_contract.to_string()),
                 publisher: None,
                 aum_oracles: None,
                 twa_window_seconds: None,
@@ -1540,11 +1567,16 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
     )
     .unwrap();
     assert_eq!(0, res.messages.len());
+
+    let res = execute_msg(&mut deps, mock_env(), &owner, ExecuteMsg::Unmock {}).unwrap();
+    assert_eq!(0, res.messages.len());
+
     deps
 }
 
 /// Mock oracle response helper
 fn mock_oracle_response(
+    maxbtc_contract: String,
     aum_in_wbtc: u128,
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
@@ -1552,7 +1584,7 @@ fn mock_oracle_response(
             msg: _,
             contract_addr,
         } => {
-            if contract_addr == "neutron1" {
+            if *contract_addr == maxbtc_contract {
                 let res = MaxBTCCoreConfig {
                     deposit_denom: "wbtc".to_string(),
                     maxbtc_denom: "maxbtc".to_string(),
@@ -1641,7 +1673,10 @@ fn record_er_with_aum(
     block_height: u64,
     aum: u128,
 ) {
-    deps.querier.update_wasm(mock_oracle_response(aum));
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        aum,
+    ));
     record_er(deps, test_env_with_time(timestamp, block_height), owner).unwrap();
 }
 

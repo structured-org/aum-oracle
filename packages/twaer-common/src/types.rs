@@ -7,9 +7,8 @@ pub struct Config {
     pub publisher: Addr,
     /// A list of AUM oracle instances from where the contract gets individual AUMs.
     pub aum_oracles: Vec<Addr>,
-    /// The address of the maxBTC core contract. If set to None, the MOCKED_MAXBTC_SUPPLY
-    /// is used in exchange rate calculation.
-    pub maxbtc_core_contract: Option<Addr>,
+    /// The address of the maxBTC core contract.
+    pub maxbtc_core_contract: Addr,
     /// Time window in seconds for TWA calculation (e.g., 86400 for 24 hours).
     pub twa_window_seconds: u64,
     /// The minimal number of seconds required to pass between sequential TWAER publications.
