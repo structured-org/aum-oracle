@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
+	"github.com/avast/retry-go/v4"
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -74,10 +76,28 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 			"new_data": data,
 		},
 	}
-	resp, err := c.sendExecuteMsg(ctx, c.binanceAumContract, msg)
+
+	var resp *cometcoretypes.ResultBroadcastTxCommit
+	var err error
+
+	err = retry.Do(
+		func() error {
+			var innerError error
+			resp, innerError = c.sendExecuteMsg(ctx, c.binanceAumContract, msg)
+			return innerError
+		},
+		// Configuration options
+		retry.Attempts(3),                   // Try 3 times
+		retry.Delay(1*time.Second),          // Initial delay
+		retry.DelayType(retry.BackOffDelay), // Use exponential backoff
+		retry.OnRetry(func(n uint, err error) {
+			c.logger.Info("Retry publish binance data attempt one more time")
+		}),
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	c.logger.Info("submitted binance aum data",
 		zap.Uint32("code", resp.TxResult.Code),
 		zap.String("tx_hash", resp.Hash.String()),
@@ -102,10 +122,28 @@ func (c *Client) SubmitJupiterAumData(ctx context.Context, data *JupiterAumData)
 			"new_data": data,
 		},
 	}
-	resp, err := c.sendExecuteMsg(ctx, c.jupiterAumContract, msg)
+
+	var resp *cometcoretypes.ResultBroadcastTxCommit
+	var err error
+
+	err = retry.Do(
+		func() error {
+			var innerError error
+			resp, innerError = c.sendExecuteMsg(ctx, c.jupiterAumContract, msg)
+			return innerError
+		},
+		// Configuration options
+		retry.Attempts(3),                   // Try 3 times
+		retry.Delay(1*time.Second),          // Initial delay
+		retry.DelayType(retry.BackOffDelay), // Use exponential backoff
+		retry.OnRetry(func(n uint, err error) {
+			c.logger.Info("Retry publish jupiter data attempt one more time")
+		}),
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	c.logger.Info("submitted jupiter aum data",
 		zap.Uint32("code", resp.TxResult.Code),
 		zap.String("tx_hash", resp.Hash.String()),
