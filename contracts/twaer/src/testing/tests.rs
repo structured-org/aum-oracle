@@ -295,7 +295,8 @@ fn query_aum_multiple_oracles() {
                 aum_response_from_uwbtc(Int256::from(1000000u128))
             } else if contract_addr.as_str() == oracle2.as_str() {
                 aum_response_from_uwbtc(Int256::from(2000000u128))
-            } else if contract_addr.as_str() == deps.api.addr_make("maxbtc_core_contract").as_str() {
+            } else if contract_addr.as_str() == deps.api.addr_make("maxbtc_core_contract").as_str()
+            {
                 let res = MaxBTCCoreConfig {
                     deposit_denom: "wbtc".to_string(),
                     maxbtc_denom: "maxbtc".to_string(),
@@ -831,8 +832,11 @@ fn test_mock_unmock_maxbtc_supply() {
         deps.api.addr_make("maxbtc_core_contract").as_str(),
         &[
             cosmwasm_std::Coin {
-                denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                    .to_string(),
+                denom: format!(
+                    "factory/{}/maxbtc",
+                    deps.api.addr_make("maxbtc_core_contract").as_str()
+                )
+                .to_string(),
                 amount: Uint128::from(real_supply),
             },
             cosmwasm_std::Coin {
@@ -1054,8 +1058,11 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(1500000u128),
         }],
     )]);
@@ -1081,8 +1088,11 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(2000000u128),
         }],
     )]);
@@ -1108,8 +1118,11 @@ fn test_twaer_long_time_period() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(1800000u128),
         }],
     )]);
@@ -1206,8 +1219,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(1200000u128),
         }],
     )]);
@@ -1227,8 +1243,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(1500000u128),
         }],
     )]);
@@ -1253,8 +1272,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(2000000u128),
         }],
     )]);
@@ -1276,8 +1298,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(3000000u128),
         }],
     )]);
@@ -1302,8 +1327,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(3750000u128),
         }],
     )]);
@@ -1326,8 +1354,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(5000000u128),
         }],
     )]);
@@ -1367,8 +1398,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(7500000u128),
         }],
     )]);
@@ -1394,8 +1428,11 @@ fn test_twaer_complex_intertwining_expiration() {
     deps.querier = cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
         "",
         &[cosmwasm_std::Coin {
-            denom: format!("factory/{}/maxbtc", deps.api.addr_make("maxbtc_core_contract").as_str())
-                .to_string(),
+            denom: format!(
+                "factory/{}/maxbtc",
+                deps.api.addr_make("maxbtc_core_contract").as_str()
+            )
+            .to_string(),
             amount: Uint128::from(5000000u128),
         }],
     )]);
@@ -1516,12 +1553,16 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
         storage: cosmwasm_std::testing::MockStorage::default(),
         api: cosmwasm_std::testing::MockApi::default(),
         querier: cosmwasm_std::testing::MockQuerier::<Empty>::new(&[(
-            MockApi::default().addr_make("maxbtc_core_contract").as_str(),
+            MockApi::default()
+                .addr_make("maxbtc_core_contract")
+                .as_str(),
             &[
                 cosmwasm_std::Coin {
                     denom: format!(
                         "factory/{}/maxbtc",
-                        MockApi::default().addr_make("maxbtc_core_contract").as_str()
+                        MockApi::default()
+                            .addr_make("maxbtc_core_contract")
+                            .as_str()
                     )
                     .to_string(),
                     amount: Uint128::from(supply_amount),
