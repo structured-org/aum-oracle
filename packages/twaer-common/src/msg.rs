@@ -1,6 +1,5 @@
 use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
-use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
@@ -17,6 +16,8 @@ pub struct InstantiateMsg {
     pub twa_window_seconds: u64,
     /// The minimal number of seconds required to pass between sequential TWAER publications.
     pub twaer_immutability_seconds: u64,
+    /// The address of the maxBTC core contract.
+    pub maxbtc_core_contract: String,
 
     /// The mocked maxBTC supply used instead of the real supply before the token is minted. To
     /// turn the real token supply usage on, the owner must set the maxbtc_denom in the config.
@@ -54,6 +55,9 @@ pub enum ExecuteMsg {
     /// Removes a specific ER datapoint from history and TWA Aggregator.
     /// Only callable by the owner.
     RemoveERDatapoint { er_timestamp: u64 },
+
+    /// Removes the mocked supply from the contract. From that point the contract will use the real supply of maxBTC tokens
+    Unmock {},
 }
 
 #[cw_serde]
@@ -62,14 +66,8 @@ pub struct UpdateConfig {
     pub publisher: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
     pub aum_oracles: Option<Vec<String>>,
-    /// New maxBTC core contract. If the first Option is None, the value is not changed in the config.
-    /// If the first Option is Some, the second Option is the new value including None.
-    /// JSON deserialization of this field in UpdateConfig msg is:
-    /// - Missing field: None -> no change
-    /// - Explicit null: Some(None) -> set to None ("maxbtc_core_contract": null)
-    /// - String value: Some(Some(Addr)) -> set to String ("maxbtc_core_contract": "some value")
-    #[serde(default, deserialize_with = "deserialize_nested_option")]
-    pub maxbtc_core_contract: Option<Option<Addr>>,
+    /// New maxBTC core contract.
+    pub maxbtc_core_contract: Option<String>,
     /// New time window in seconds for TWA calculation.
     pub twa_window_seconds: Option<u64>,
     /// New minimal number of seconds required to pass between sequential TWAER publications.
@@ -129,16 +127,5 @@ pub struct ErWindowInfoResponse {
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
 pub struct MigrateMsg {
-    pub maxbtc_core_contract: Option<Addr>,
-}
-
-/// Custom deserializer for Option<Option<String>> to distinguish between missing field and null.
-/// - Missing field: None
-/// - Explicit null: Some(None)
-/// - String value: Some(Some(String))
-fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<Addr>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(Some(Option::deserialize(deserializer)?))
+    pub maxbtc_core_contract: Addr,
 }

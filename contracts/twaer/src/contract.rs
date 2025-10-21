@@ -38,7 +38,7 @@ pub fn instantiate(
     let config = Config {
         publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
-        maxbtc_core_contract: None,
+        maxbtc_core_contract: deps.api.addr_validate(&msg.maxbtc_core_contract)?,
         twa_window_seconds: msg.twa_window_seconds,
         twaer_immutability_seconds: msg.twaer_immutability_seconds,
     };
@@ -72,7 +72,15 @@ pub fn execute(
         ExecuteMsg::RemoveERDatapoint { er_timestamp } => {
             execute_remove_er_datapoint(deps, env, info, er_timestamp)
         }
+        ExecuteMsg::Unmock {} => execute_unmock(deps, info),
     }
+}
+
+fn execute_unmock(deps: DepsMut, info: MessageInfo) -> ContractResult<Response> {
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    MOCKED_MAXBTC_SUPPLY.remove(deps.storage);
+    Ok(Response::new().add_attribute("action", "unmock"))
 }
 
 fn execute_update_config(
@@ -97,7 +105,7 @@ fn execute_update_config(
         config.publisher = validated_new_publisher;
     }
     if let Some(maxbtc_core) = new_config.maxbtc_core_contract {
-        config.maxbtc_core_contract = maxbtc_core;
+        config.maxbtc_core_contract = deps.api.addr_validate(&maxbtc_core)?;
     }
     if let Some(twa_window_seconds) = new_config.twa_window_seconds {
         config.twa_window_seconds = twa_window_seconds;
@@ -331,16 +339,16 @@ fn remove_er_contribution(
 fn calc_exchange_rate(deps: Deps) -> ContractResult<Decimal> {
     let config = CONFIG.load(deps.storage)?;
 
-    let maxbtc_supply = match config.maxbtc_core_contract {
-        Some(maxbtc_core) => {
-            let maxbtc_config = query_maxbtc_config(deps, maxbtc_core.clone())?;
+    let maxbtc_supply = match MOCKED_MAXBTC_SUPPLY.may_load(deps.storage)? {
+        Some(mocked_supply) => mocked_supply,
+        None => {
+            let maxbtc_config = query_maxbtc_config(deps, config.maxbtc_core_contract.clone())?;
             let maxbtc_denom = "factory/".to_owned()
-                + maxbtc_core.as_str()
+                + config.maxbtc_core_contract.as_str()
                 + "/"
                 + maxbtc_config.maxbtc_denom.as_str();
             deps.querier.query_supply(maxbtc_denom)?.amount
         }
-        None => MOCKED_MAXBTC_SUPPLY.load(deps.storage)?,
     };
 
     if maxbtc_supply.is_zero() {
@@ -400,21 +408,14 @@ pub fn query_maxbtc_config(
 fn get_aum(deps: Deps) -> ContractResult<Int256> {
     let config = CONFIG.load(deps.storage)?;
 
-    let maxbtc_core_balance: Int256 = match config.maxbtc_core_contract {
-        Some(maxbtc_core_contract) => {
-            let maxbtc_config = query_maxbtc_config(deps, maxbtc_core_contract.clone())?;
-            let maxbtc_balance = deps
-                .querier
-                .query_balance(maxbtc_core_contract, maxbtc_config.deposit_denom)?;
-
-            Int256::from(maxbtc_balance.amount)
-        }
-        None => Int256::zero(),
-    };
+    let maxbtc_config = query_maxbtc_config(deps, config.maxbtc_core_contract.clone())?;
+    let maxbtc_balance = deps
+        .querier
+        .query_balance(config.maxbtc_core_contract, maxbtc_config.deposit_denom)?;
 
     let oracles_aum = get_aum_from_oracles(deps)?;
 
-    Ok(oracles_aum + maxbtc_core_balance)
+    Ok(oracles_aum + Int256::from(maxbtc_balance.amount))
 }
 
 fn get_aum_from_oracles(deps: Deps) -> ContractResult<Int256> {

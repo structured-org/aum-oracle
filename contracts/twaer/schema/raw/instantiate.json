@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "aum_oracles",
+    "maxbtc_core_contract",
     "mocked_maxbtc_supply",
     "owner",
     "publisher",
@@ -17,6 +18,10 @@
       "items": {
         "type": "string"
       }
+    },
+    "maxbtc_core_contract": {
+      "description": "The address of the maxBTC core contract.",
+      "type": "string"
     },
     "mocked_maxbtc_supply": {
       "description": "The mocked maxBTC supply used instead of the real supply before the token is minted. To turn the real token supply usage on, the owner must set the maxbtc_denom in the config. If the supply is zero, instant exchange rate calculations return Decimal::one().",

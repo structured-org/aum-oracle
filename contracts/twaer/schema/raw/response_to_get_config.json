@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "aum_oracles",
+    "maxbtc_core_contract",
     "publisher",
     "twa_window_seconds",
     "twaer_immutability_seconds"
@@ -17,13 +18,10 @@
       }
     },
     "maxbtc_core_contract": {
-      "description": "The address of the maxBTC core contract. If set to None, the MOCKED_MAXBTC_SUPPLY is used in exchange rate calculation.",
-      "anyOf": [
+      "description": "The address of the maxBTC core contract.",
+      "allOf": [
         {
           "$ref": "#/definitions/Addr"
-        },
-        {
-          "type": "null"
         }
       ]
     },
