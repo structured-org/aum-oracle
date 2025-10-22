@@ -1,4 +1,4 @@
-use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, OLD_CONFIG, TWAER, TWA_AGGREGATOR};
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
@@ -490,10 +490,17 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let mut config = CONFIG.load(deps.storage)?;
-    config.maxbtc_core_contract = msg.maxbtc_core_contract;
+    let old_config = OLD_CONFIG.load(deps.storage)?;
 
-    CONFIG.save(deps.storage, &config)?;
+    let new_config = Config {
+        publisher: old_config.publisher,
+        aum_oracles: old_config.aum_oracles,
+        maxbtc_core_contract: msg.maxbtc_core_contract,
+        twa_window_seconds: old_config.twa_window_seconds,
+        twaer_immutability_seconds: old_config.twaer_immutability_seconds,
+    };
+
+    CONFIG.save(deps.storage, &new_config)?;
 
     Ok(Response::default())
 }
