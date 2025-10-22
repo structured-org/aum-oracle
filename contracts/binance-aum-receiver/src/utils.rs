@@ -49,10 +49,10 @@ pub fn spot_balance_asset_in_btc(
     max_blocks_old: u64,
     sb: &SpotBalance,
 ) -> ContractResult<SignedDecimal256> {
-    // we don't have WBTC in slinky yet, so we just assume wBTC == BTC and return 1
+    // we don't have WBTC in slinky yet, so we just assume wBTC == BTC and return wBTC amount
     // TODO: remove this once we have WBTC in slinky
     if sb.asset == "WBTC" {
-        return Ok(SignedDecimal256::one());
+        return Ok(sb.amount);
     }
 
     let price_in_btc = get_prices(
