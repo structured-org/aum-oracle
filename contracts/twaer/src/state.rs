@@ -17,4 +17,5 @@ pub const TWA_AGGREGATOR: Item<TwaAggregator> = Item::new("twa_aggregator");
 pub const ER_HISTORY: Map<u64, Decimal> = Map::new("er_history");
 
 /// The mocked maxBTC supply used instead of the real supply before the token is minted.
+/// If item is empty, the real supply is used for TWAER calculations
 pub const MOCKED_MAXBTC_SUPPLY: Item<Uint128> = Item::new("mocked_maxbtc_supply");
