@@ -13,7 +13,7 @@ use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
     UpdateConfig,
 };
-use twaer_common::types::{Config, MaxBTCCoreConfig, OldConfig, TwaAggregator};
+use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
 const CONTRACT_NAME: &str = "crates.io:twaer";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -493,7 +493,7 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
     let old_config = OLD_CONFIG.load(deps.storage)?;
 
     let new_config = Config {
-        publisher:old_config.publisher,
+        publisher: old_config.publisher,
         aum_oracles: old_config.aum_oracles,
         maxbtc_core_contract: msg.maxbtc_core_contract,
         twa_window_seconds: old_config.twa_window_seconds,
