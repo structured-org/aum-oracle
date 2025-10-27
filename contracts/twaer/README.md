@@ -14,17 +14,41 @@ The TWA calculation uses the formula: `TWA = Σ(rate_i × duration_i) / Σ(durat
 
 Calculates the current exchange rate based on AUM and supply data, stores it in the exchange rate history, and updates the internal TWA aggregator. Should be called frequently to maintain accurate time-weighted data.
 
-**Permissions**: Permissionless
+**Permissions**: Owner or recorder
 
 ### `PublishTwaer {}`
 
-Calculates and publishes a TWA exchange rate that can be retrieved via `GetTwaer` queries.
+Calculates and publishes a TWA exchange rate that can be retrieved via `GetTwaer` queries. Publication is rate-limited by the `twaer_immutability_seconds` configuration parameter.
 
-**Permissions**: Owner only
+**Permissions**: Owner or publisher
 
 ### `UpdateConfig { new_config }`
 
 Allows modification of contract configuration. All fields are optional for partial updates.
+
+**Permissions**: Owner only
+
+### `ResetTwaerTo { value }`
+
+Resets the historical and aggregator values and sets the TWAER to a specific value. This clears all exchange rate history and starts fresh with the provided rate.
+
+**Permissions**: Owner only
+
+### `SetMockedMaxbtcSupply { value }`
+
+Sets the mocked maxBTC supply which is used if the real token supply is not available (before token minting). When mocked supply is set, the contract uses this value instead of querying the actual token supply.
+
+**Permissions**: Owner only
+
+### `RemoveERDatapoint { er_timestamp }`
+
+Removes a specific exchange rate datapoint from history and updates the TWA aggregator accordingly.
+
+**Permissions**: Owner only
+
+### `Unmock {}`
+
+Removes the mocked supply from the contract. After calling this, the contract will use the real supply of maxBTC tokens from the blockchain.
 
 **Permissions**: Owner only
 
@@ -44,4 +68,12 @@ Returns the published TWA exchange rate. The rate is only updated when `PublishT
 
 ### `PredictTwaer {}`
 
-Calculates what the TWA exchange rate rate would be if `PublishTwaer` were called at this moment. Useful for decision-making about when to publish official rates.
+Calculates what the TWA exchange rate would be if `PublishTwaer` were called at this moment. This provides a real-time preview based on current exchange rate history without actually publishing the rate.
+
+### `ErWindowInfo {}`
+
+Returns information about the exchange rate history window, including the window start/end timestamps, total number of data points, and the actual data points themselves.
+
+### `Ownership {}`
+
+Returns the current ownership information of the contract (from `cw_ownable`).
