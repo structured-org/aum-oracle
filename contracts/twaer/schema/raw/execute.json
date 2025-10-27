@@ -25,7 +25,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Calculates an instant exchange rate based on AUM and supply data, then records it in the exchange rate history for TWA calculation purposes. This should be called frequently to to maintain accurate time-weighted average data. The recorded rates are used internally for TWA calculations but do not directly affect the published rate.",
+      "description": "Calculates an instant exchange rate based on AUM and supply data, then records it in the exchange rate history for TWA calculation purposes. This should be called frequently to to maintain accurate time-weighted average data. The recorded rates are used internally for TWA calculations but do not directly affect the published rate. Only callable by the owner or recorder.",
       "type": "object",
       "required": [
         "record_er"
@@ -289,6 +289,13 @@
         },
         "publisher": {
           "description": "New publisher address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recorder": {
+          "description": "New recorder address.",
           "type": [
             "string",
             "null"

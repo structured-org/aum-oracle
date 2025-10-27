@@ -8,6 +8,7 @@
     "mocked_maxbtc_supply",
     "owner",
     "publisher",
+    "recorder",
     "twa_window_seconds",
     "twaer_immutability_seconds"
   ],
@@ -37,6 +38,10 @@
     },
     "publisher": {
       "description": "The address allowed to publish the TWAER.",
+      "type": "string"
+    },
+    "recorder": {
+      "description": "The address allowed to record the exchange rate.",
       "type": "string"
     },
     "twa_window_seconds": {

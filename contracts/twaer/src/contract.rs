@@ -1,4 +1,4 @@
-use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, OLD_CONFIG, TWAER, TWA_AGGREGATOR};
+use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
@@ -36,6 +36,7 @@ pub fn instantiate(
         .collect::<StdResult<_>>()?;
 
     let config = Config {
+        recorder: deps.api.addr_validate(&msg.recorder)?,
         publisher: deps.api.addr_validate(&msg.publisher)?,
         aum_oracles: oracles,
         maxbtc_core_contract: deps.api.addr_validate(&msg.maxbtc_core_contract)?,
@@ -100,6 +101,10 @@ fn execute_update_config(
             .collect::<StdResult<_>>()?;
         config.aum_oracles = validated_oracles;
     }
+    if let Some(new_recorder) = new_config.recorder {
+        let validated_new_recorder = deps.api.addr_validate(&new_recorder)?;
+        config.recorder = validated_new_recorder;
+    }
     if let Some(new_publisher) = new_config.publisher {
         let validated_new_publisher = deps.api.addr_validate(&new_publisher)?;
         config.publisher = validated_new_publisher;
@@ -118,7 +123,12 @@ fn execute_update_config(
     Ok(Response::new().add_attribute("action", "update_config"))
 }
 
-fn execute_record_er(deps: DepsMut, env: Env, _info: MessageInfo) -> ContractResult<Response> {
+fn execute_record_er(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
+    let config = CONFIG.load(deps.storage)?;
+    if !cw_ownable::is_owner(deps.storage, &info.sender)? && info.sender != config.recorder {
+        return Err(ContractError::Unauthorized {});
+    }
+
     let exchange_rate = calc_exchange_rate(deps.as_ref())?;
     let timestamp = env.block.time.seconds();
     record_er_at(deps.storage, exchange_rate, timestamp)?;
@@ -490,16 +500,15 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let old_config = OLD_CONFIG.load(deps.storage)?;
-
+    let old_config = CONFIG.load(deps.storage)?;
     let new_config = Config {
-        publisher: old_config.publisher,
-        aum_oracles: old_config.aum_oracles,
-        maxbtc_core_contract: msg.maxbtc_core_contract,
+        recorder: deps.api.addr_validate(&msg.recorder)?,
+        publisher: old_config.publisher.clone(),
+        aum_oracles: old_config.aum_oracles.clone(),
+        maxbtc_core_contract: old_config.maxbtc_core_contract.clone(),
         twa_window_seconds: old_config.twa_window_seconds,
         twaer_immutability_seconds: old_config.twaer_immutability_seconds,
     };
-
     CONFIG.save(deps.storage, &new_config)?;
 
     Ok(Response::default())

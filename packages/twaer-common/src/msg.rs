@@ -1,13 +1,15 @@
 use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Owner of the contract authorized to perform privileged operations.
     pub owner: String,
+    /// The address allowed to record the exchange rate.
+    pub recorder: String,
     /// The address allowed to publish the TWAER.
     pub publisher: String,
     /// A list of AUM oracle instances from where the contract gets individual AUMs.
@@ -36,6 +38,7 @@ pub enum ExecuteMsg {
     /// exchange rate history for TWA calculation purposes. This should be called frequently to
     /// to maintain accurate time-weighted average data. The recorded rates are used internally
     /// for TWA calculations but do not directly affect the published rate.
+    /// Only callable by the owner or recorder.
     RecordEr {},
 
     /// Calculates and publishes the official Time-Weighted Average Exchange Rate that is exposed
@@ -64,6 +67,8 @@ pub enum ExecuteMsg {
 pub struct UpdateConfig {
     /// New publisher address.
     pub publisher: Option<String>,
+    /// New recorder address.
+    pub recorder: Option<String>,
     /// A new list of AUM oracle instances from where the contract receives individual AUMs.
     pub aum_oracles: Option<Vec<String>>,
     /// New maxBTC core contract.
@@ -127,5 +132,6 @@ pub struct ErWindowInfoResponse {
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
 pub struct MigrateMsg {
-    pub maxbtc_core_contract: Addr,
+    // The address capable of recording the exchange rate after the migration.
+    pub recorder: String,
 }

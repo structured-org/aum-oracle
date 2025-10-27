@@ -1,6 +1,6 @@
 {
   "contract_name": "twaer",
-  "contract_version": "0.1.1",
+  "contract_version": "0.2.0",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -12,6 +12,7 @@
       "mocked_maxbtc_supply",
       "owner",
       "publisher",
+      "recorder",
       "twa_window_seconds",
       "twaer_immutability_seconds"
     ],
@@ -41,6 +42,10 @@
       },
       "publisher": {
         "description": "The address allowed to publish the TWAER.",
+        "type": "string"
+      },
+      "recorder": {
+        "description": "The address allowed to record the exchange rate.",
         "type": "string"
       },
       "twa_window_seconds": {
@@ -91,7 +96,7 @@
         "additionalProperties": false
       },
       {
-        "description": "Calculates an instant exchange rate based on AUM and supply data, then records it in the exchange rate history for TWA calculation purposes. This should be called frequently to to maintain accurate time-weighted average data. The recorded rates are used internally for TWA calculations but do not directly affect the published rate.",
+        "description": "Calculates an instant exchange rate based on AUM and supply data, then records it in the exchange rate history for TWA calculation purposes. This should be called frequently to to maintain accurate time-weighted average data. The recorded rates are used internally for TWA calculations but do not directly affect the published rate. Only callable by the owner or recorder.",
         "type": "object",
         "required": [
           "record_er"
@@ -360,6 +365,13 @@
               "null"
             ]
           },
+          "recorder": {
+            "description": "New recorder address.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "twa_window_seconds": {
             "description": "New time window in seconds for TWA calculation.",
             "type": [
@@ -574,6 +586,7 @@
         "aum_oracles",
         "maxbtc_core_contract",
         "publisher",
+        "recorder",
         "twa_window_seconds",
         "twaer_immutability_seconds"
       ],
@@ -595,6 +608,14 @@
         },
         "publisher": {
           "description": "The address allowed to publish the TWAER.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            }
+          ]
+        },
+        "recorder": {
+          "description": "The address allowed to record the exchange rate.",
           "allOf": [
             {
               "$ref": "#/definitions/Addr"
