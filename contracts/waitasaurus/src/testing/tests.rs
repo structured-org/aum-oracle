@@ -22,9 +22,9 @@ fn proper_initialization() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        unlocker: deps.api.addr_make("unlocker").to_string(),
-        locker: deps.api.addr_make("locker").to_string(),
-        contract: deps.api.addr_make("receiver_contract").to_string(),
+        unlocker: deps.api.addr_make("unlocker"),
+        locker: deps.api.addr_make("locker"),
+        contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
     };
     let owner = deps.api.addr_make("owner");
@@ -40,9 +40,9 @@ fn test_instantiate_with_invalid_owner() {
     let msg = InstantiateMsg {
         owner: "invalid...address...".to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };
@@ -59,9 +59,9 @@ fn test_instantiate_with_invalid_locker() {
     let msg = InstantiateMsg {
         owner: owner.to_string(),
         config: Config {
-            locker: "invalid...address...".to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: Addr::unchecked("invalid...address..."),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };
@@ -78,9 +78,9 @@ fn test_instantiate_with_invalid_unlocker() {
     let msg = InstantiateMsg {
         owner: owner.to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: "invalid...address...".to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: Addr::unchecked("invalid...address..."),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };
@@ -97,9 +97,9 @@ fn test_instantiate_with_invalid_contract() {
     let msg = InstantiateMsg {
         owner: owner.to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: "invalid...address...".to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: Addr::unchecked("invalid...address..."),
             asset: "asset".to_string(),
         },
     };
@@ -124,9 +124,9 @@ fn test_ownership() {
     let msg = InstantiateMsg {
         owner: first_owner.to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };
@@ -187,9 +187,9 @@ fn update_config_by_owner() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        locker: deps.api.addr_make("new_locker").to_string(),
-        unlocker: deps.api.addr_make("new_unlocker").to_string(),
-        contract: deps.api.addr_make("new_contract").to_string(),
+        locker: deps.api.addr_make("new_locker"),
+        unlocker: deps.api.addr_make("new_unlocker"),
+        contract: deps.api.addr_make("new_contract"),
         asset: "new_asset".to_string(),
     };
     assert_config_equals(&config, &expected_config);
@@ -214,9 +214,9 @@ fn update_config_by_unauthorized() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
-        locker: deps.api.addr_make("locker").to_string(),
-        unlocker: deps.api.addr_make("unlocker").to_string(),
-        contract: deps.api.addr_make("receiver_contract").to_string(),
+        locker: deps.api.addr_make("locker"),
+        unlocker: deps.api.addr_make("unlocker"),
+        contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
     };
     assert_config_equals(&config, &expected_config);
@@ -229,9 +229,9 @@ fn query_config() {
     let config: Config = from_json(bin).unwrap();
 
     let expected_config = Config {
-        locker: deps.api.addr_make("locker").to_string(),
-        unlocker: deps.api.addr_make("unlocker").to_string(),
-        contract: deps.api.addr_make("receiver_contract").to_string(),
+        locker: deps.api.addr_make("locker"),
+        unlocker: deps.api.addr_make("unlocker"),
+        contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
     };
     assert_config_equals(&config, &expected_config);
@@ -489,9 +489,9 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
     let msg = InstantiateMsg {
         owner: deps.api.addr_make("owner").to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };
@@ -514,9 +514,9 @@ fn setup_contract_with_standard_querier_and_config() -> OwnedDeps<MockStorage, M
     let msg = InstantiateMsg {
         owner: owner.to_string(),
         config: Config {
-            locker: deps.api.addr_make("locker").to_string(),
-            unlocker: deps.api.addr_make("unlocker").to_string(),
-            contract: deps.api.addr_make("receiver_contract").to_string(),
+            locker: deps.api.addr_make("locker"),
+            unlocker: deps.api.addr_make("unlocker"),
+            contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
         },
     };

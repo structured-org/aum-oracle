@@ -4,7 +4,7 @@ use binance_aum_common::msg::GetDataResponse;
 use binance_aum_common::msg::QueryMsg as BinanceAumQueryMsg;
 
 use cosmwasm_std::{
-    entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     SignedDecimal256, StdResult,
 };
 use cw2::set_contract_version;
@@ -27,9 +27,9 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(msg.owner.as_str()))?;
-    deps.api.addr_validate(&msg.config.locker)?;
-    deps.api.addr_validate(&msg.config.unlocker)?;
-    deps.api.addr_validate(&msg.config.contract)?;
+    deps.api.addr_validate(msg.config.locker.as_ref())?;
+    deps.api.addr_validate(msg.config.unlocker.as_ref())?;
+    deps.api.addr_validate(msg.config.contract.as_ref())?;
     CONFIG.save(deps.storage, &msg.config)?;
     STATE.save(deps.storage, &State::Unlocked {})?;
     Ok(Response::default())
@@ -64,16 +64,13 @@ fn execute_update_config(
 
     // Update configuration if fields are provided
     if let Some(locker) = new_config.locker {
-        deps.api.addr_validate(&locker)?;
-        config.locker = locker;
+        config.locker = deps.api.addr_validate(&locker)?;
     }
     if let Some(unlocker) = new_config.unlocker {
-        deps.api.addr_validate(&unlocker)?;
-        config.unlocker = unlocker;
+        config.unlocker = deps.api.addr_validate(&unlocker)?;
     }
     if let Some(contract) = new_config.contract {
-        deps.api.addr_validate(&contract)?;
-        config.contract = contract;
+        config.contract = deps.api.addr_validate(&contract)?;
     }
     if let Some(asset) = new_config.asset {
         config.asset = asset;
@@ -90,8 +87,7 @@ fn execute_lock(
     amount: SignedDecimal256,
 ) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if info.sender != Addr::unchecked(config.locker)
-        && cw_ownable::assert_owner(deps.storage, &info.sender).is_err()
+    if info.sender != config.locker && cw_ownable::assert_owner(deps.storage, &info.sender).is_err()
     {
         return Err(ContractError::Unauthorized {});
     }
@@ -109,7 +105,7 @@ fn execute_lock(
 
 fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
-    if info.sender != Addr::unchecked(config.unlocker)
+    if info.sender != config.unlocker
         && cw_ownable::assert_owner(deps.storage, &info.sender).is_err()
     {
         return Err(ContractError::Unauthorized {});

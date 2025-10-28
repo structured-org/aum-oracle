@@ -1,11 +1,11 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::SignedDecimal256;
+use cosmwasm_std::{Addr, SignedDecimal256};
 
 #[cw_serde]
 pub struct Config {
-    pub locker: String,
-    pub unlocker: String,
-    pub contract: String,
+    pub locker: Addr,
+    pub unlocker: Addr,
+    pub contract: Addr,
     pub asset: String,
 }
 
