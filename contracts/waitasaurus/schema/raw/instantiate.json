@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstantiateMsg",
+  "type": "object",
+  "required": [
+    "config",
+    "owner"
+  ],
+  "properties": {
+    "config": {
+      "$ref": "#/definitions/Config"
+    },
+    "owner": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Config": {
+      "type": "object",
+      "required": [
+        "asset",
+        "contract",
+        "locker",
+        "unlocker"
+      ],
+      "properties": {
+        "asset": {
+          "type": "string"
+        },
+        "contract": {
+          "type": "string"
+        },
+        "locker": {
+          "type": "string"
+        },
+        "unlocker": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
