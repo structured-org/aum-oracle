@@ -28,10 +28,11 @@ type Client struct {
 	client             *cosmosclient.CosmosClient
 	jupiterAumContract string
 	binanceAumContract string
+	twaerContract      string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
+func NewClient(conf cosmosclient.Config, twaerContract string, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
 	client, err := cosmosclient.NewClient(&conf, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate cosmos client: %w", err)
@@ -41,6 +42,7 @@ func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumCo
 		client:             client,
 		jupiterAumContract: jupiterAumContract,
 		binanceAumContract: binanceAumContract,
+		twaerContract:      twaerContract,
 	}, nil
 }
 
@@ -191,6 +193,45 @@ func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (
 		return nil, fmt.Errorf("failed to sign and broadcast transaction: %w", err)
 	}
 	return resp, nil
+}
+
+// RecordER executes the record_er message on a TWAER contract.
+func (c *Client) RecordER(ctx context.Context) error {
+	c.logger.Info("executing record_er on TWAER contract", zap.String("contract", c.twaerContract))
+
+	msg := map[string]any{
+		"record_er": map[string]any{},
+	}
+
+	var resp *cometcoretypes.ResultBroadcastTxCommit
+	var err error
+
+	err = retry.Do(
+		func() error {
+			var innerError error
+			resp, innerError = c.sendExecuteMsg(ctx, c.twaerContract, msg)
+			return innerError
+		},
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			c.logger.Info("Retry record_er attempt", zap.Uint("attempt", n+1))
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to execute record_er: %w", err)
+	}
+
+	c.logger.Info("executed record_er successfully",
+		zap.Uint32("code", resp.TxResult.Code),
+		zap.String("tx_hash", resp.Hash.String()),
+		zap.Int64("height", resp.Height),
+		zap.String("contract", c.twaerContract),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
+	)
+
+	return nil
 }
 
 // GetNextRoundFromEvents parses wasm events to extract next round info.

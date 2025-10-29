@@ -64,6 +64,7 @@ func main() {
 	// real unmockable clients
 	neutronClient, err := neutronclient.NewClient(
 		conf.Clients.Neutron,
+		"",
 		conf.JupiterAumContract,
 		conf.BinanceAumContract,
 		logRegistry.Get(neutronClientContext),
