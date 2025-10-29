@@ -1,9 +1,8 @@
 use cosmwasm_std::{Decimal, Uint128};
 use cw_storage_plus::{Item, Map};
-use twaer_common::types::{Config, OldConfig, TwaAggregator};
+use twaer_common::types::{Config, TwaAggregator};
 
 pub const CONFIG: Item<Config> = Item::new("config");
-pub const OLD_CONFIG: Item<OldConfig> = Item::new("config");
 
 /// The "agreed upon" TWA exchange rate (paired with a timestamp) that is returned by GetTwaer
 /// queries. This value is updated when PublishTwaer is explicitly called by the admin, providing

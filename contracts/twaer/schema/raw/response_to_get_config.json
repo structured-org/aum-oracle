@@ -6,6 +6,7 @@
     "aum_oracles",
     "maxbtc_core_contract",
     "publisher",
+    "recorder",
     "twa_window_seconds",
     "twaer_immutability_seconds"
   ],
@@ -27,6 +28,14 @@
     },
     "publisher": {
       "description": "The address allowed to publish the TWAER.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Addr"
+        }
+      ]
+    },
+    "recorder": {
+      "description": "The address allowed to record the exchange rate.",
       "allOf": [
         {
           "$ref": "#/definitions/Addr"

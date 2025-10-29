@@ -1,18 +1,19 @@
-use crate::contract::{execute, instantiate, query};
+use crate::contract::{execute, instantiate, migrate, query};
 use crate::state::{CONFIG, ER_HISTORY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
-    StdError, SystemResult, Timestamp, Uint128, WasmQuery,
+    StdError, Storage, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 use std::str::FromStr;
 use twaer_common::error::ContractError;
 use twaer_common::msg::{
-    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
 };
 use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
@@ -22,6 +23,7 @@ fn proper_initialization() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
+        recorder: deps.api.addr_make("recorder"),
         publisher: deps.api.addr_make("owner"),
         aum_oracles: vec![deps.api.addr_make("oracle1")],
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
@@ -39,6 +41,28 @@ fn test_instantiate_with_invalid_owner() {
 
     let msg = InstantiateMsg {
         owner: "invalid...address...".to_string(),
+        recorder: deps.api.addr_make("recorder").to_string(),
+        publisher: deps.api.addr_make("owner").to_string(),
+        aum_oracles: vec![oracle1.to_string()],
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 0,
+        mocked_maxbtc_supply: Uint128::zero(),
+        maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+    };
+    let info = message_info(&owner, &[]);
+    let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert!(matches!(err, StdError::GenericErr { .. }));
+}
+
+#[test]
+fn test_instantiate_with_invalid_recorder() {
+    let mut deps = mock_dependencies();
+    let owner = deps.api.addr_make("owner");
+    let oracle1 = deps.api.addr_make("oracle1");
+
+    let msg = InstantiateMsg {
+        owner: owner.to_string(),
+        recorder: "invalid...address...".to_string(),
         publisher: deps.api.addr_make("owner").to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: 86400,
@@ -59,6 +83,7 @@ fn test_instantiate_with_invalid_publisher() {
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        recorder: deps.api.addr_make("recorder").to_string(),
         publisher: "invalid...address...".to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: 86400,
@@ -78,6 +103,7 @@ fn test_instantiate_with_invalid_oracle() {
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        recorder: deps.api.addr_make("recorder").to_string(),
         publisher: owner.to_string(),
         aum_oracles: vec!["invalid...oracle...".to_string()],
         twa_window_seconds: 86400,
@@ -107,6 +133,7 @@ fn test_ownership() {
     // Test empty vector for messengers
     let msg = InstantiateMsg {
         owner: first_owner.to_string(),
+        recorder: deps.api.addr_make("recorder").to_string(),
         publisher: publisher.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: 86400,
@@ -159,9 +186,11 @@ fn update_config_by_owner() {
     let owner = deps.api.addr_make("owner");
     let oracle1 = deps.api.addr_make("oracle1");
     let oracle2 = deps.api.addr_make("oracle2");
+    let new_recorder = deps.api.addr_make("new_recorder");
     let new_publisher = deps.api.addr_make("new_publisher");
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: Some(new_recorder.to_string()),
             publisher: Some(new_publisher.to_string()),
             aum_oracles: Some(vec![oracle1.to_string(), oracle2.to_string()]),
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
@@ -175,6 +204,7 @@ fn update_config_by_owner() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
+        recorder: new_recorder,
         publisher: new_publisher,
         aum_oracles: vec![oracle1, oracle2],
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
@@ -192,6 +222,7 @@ fn update_config_by_unauthorized() {
 
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
@@ -205,6 +236,7 @@ fn update_config_by_unauthorized() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
+        recorder: owner.clone(),
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
@@ -222,6 +254,7 @@ fn update_config_partial() {
 
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
@@ -234,6 +267,7 @@ fn update_config_partial() {
 
     let config = CONFIG.load(&deps.storage).unwrap();
     let expected_config = Config {
+        recorder: owner.clone(),
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
@@ -253,6 +287,7 @@ fn query_config() {
     let config: Config = from_json(bin).unwrap();
 
     let expected_config = Config {
+        recorder: owner.clone(),
         publisher: owner,
         aum_oracles: vec![oracle1],
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
@@ -330,9 +365,33 @@ fn test_record_er() {
 
     let env = test_env_with_time(1000000, 100);
     record_er(&mut deps, env.clone(), &owner).unwrap();
-
     let count = query_data_point_count(&deps).unwrap();
     assert_eq!(count, 1);
+
+    // Update config with a new recorder
+    let recorder = deps.api.addr_make("recorder");
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: Some(recorder.to_string()),
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    let env = test_env_with_time(1000001, 101);
+    record_er(&mut deps, env.clone(), &recorder).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
+    assert_eq!(count, 2);
+
+    // Owner still can record ER
+    let env2 = test_env_with_time(1000002, 102);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+    let count = query_data_point_count(&deps).unwrap();
+    assert_eq!(count, 3);
 }
 
 #[test]
@@ -344,11 +403,8 @@ fn test_record_er_by_stranger() {
         1000000u128,
     ));
 
-    let env = test_env_with_time(1000000, 100);
-    record_er(&mut deps, env.clone(), &stranger).unwrap();
-
-    let count = query_data_point_count(&deps).unwrap();
-    assert_eq!(count, 1);
+    let err = execute_msg(&mut deps, mock_env(), &stranger, ExecuteMsg::RecordEr {}).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
 }
 
 #[test]
@@ -361,6 +417,7 @@ fn test_record_er_with_zero_maxbtc_supply() {
     // Initialize contract with mocked supply
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        recorder: owner.to_string(),
         publisher: owner.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: 86400,
@@ -410,6 +467,7 @@ fn test_query_er_window_info() {
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
             publisher: None,
+            recorder: None,
             aum_oracles: None,
             maxbtc_core_contract: None,
             twa_window_seconds: Some(29),
@@ -694,6 +752,7 @@ fn test_publish_twaer_by_publisher() {
     // Update config to set a different publisher
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: None,
             publisher: Some(publisher.to_string()),
             aum_oracles: None,
             maxbtc_core_contract: None,
@@ -744,6 +803,7 @@ fn test_twaer_immutability() {
     // Set immutability period to 3600 seconds (1 hour)
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_core_contract: None,
@@ -793,6 +853,7 @@ fn test_mock_unmock_maxbtc_supply() {
     // Initialize contract with mocked supply
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        recorder: owner.to_string(),
         publisher: owner.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: 86400,
@@ -936,6 +997,7 @@ fn test_reset_twaer() {
     // Set immutability period to 3600 seconds (1 hour)
     let msg = ExecuteMsg::UpdateConfig {
         new_config: UpdateConfig {
+            recorder: None,
             publisher: None,
             aum_oracles: None,
             maxbtc_core_contract: None,
@@ -1451,6 +1513,59 @@ fn test_twaer_complex_intertwining_expiration() {
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
 }
 
+#[test]
+fn test_migrate() {
+    use cosmwasm_schema::cw_serde;
+    use serde_json;
+
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    #[cw_serde]
+    struct OldConfig {
+        pub publisher: Addr,
+        pub aum_oracles: Vec<Addr>,
+        pub maxbtc_core_contract: Addr,
+        pub twa_window_seconds: u64,
+        pub twaer_immutability_seconds: u64,
+    }
+
+    // simulate pre-migration state
+    let old_config = OldConfig {
+        publisher: deps.api.addr_make("old_publisher"),
+        aum_oracles: vec![deps.api.addr_make("oracle1"), deps.api.addr_make("oracle2")],
+        maxbtc_core_contract: deps.api.addr_make("old_maxbtc_core"),
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 3600,
+    };
+    let old_config_bytes = serde_json::to_vec(&old_config).unwrap();
+    deps.storage.set(b"config", &old_config_bytes);
+
+    // execute migration
+    let recorder_addr = deps.api.addr_make("new_recorder");
+    let migrate_msg = MigrateMsg {
+        recorder: recorder_addr.to_string(),
+    };
+    let result = migrate(deps.as_mut(), env, migrate_msg);
+    assert!(result.is_ok(), "Migration should succeed");
+
+    let new_config = CONFIG.load(&deps.storage).unwrap();
+    // check that all old fields are preserved
+    assert_eq!(new_config.publisher, old_config.publisher);
+    assert_eq!(new_config.aum_oracles, old_config.aum_oracles);
+    assert_eq!(
+        new_config.maxbtc_core_contract,
+        old_config.maxbtc_core_contract
+    );
+    assert_eq!(new_config.twa_window_seconds, old_config.twa_window_seconds);
+    assert_eq!(
+        new_config.twaer_immutability_seconds,
+        old_config.twaer_immutability_seconds
+    );
+    // check that the new recorder field is properly set
+    assert_eq!(new_config.recorder, recorder_addr);
+}
+
 // ============================================================================
 // Test Helper Functions
 // ============================================================================
@@ -1492,6 +1607,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
         } else {
             config.owner
         },
+        recorder: owner.to_string(),
         publisher: owner.to_string(),
         aum_oracles: oracle_addresses,
         twa_window_seconds: config.twa_window_seconds,
@@ -1530,6 +1646,7 @@ fn setup_contract_with_standard_querier_and_config(
         } else {
             config.owner
         },
+        recorder: owner.to_string(),
         publisher: owner.to_string(),
         aum_oracles: oracle_addresses,
         twa_window_seconds: config.twa_window_seconds,
@@ -1582,6 +1699,7 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
+        recorder: owner.to_string(),
         publisher: owner.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: twa_window_seconds.unwrap_or(86400),
@@ -1599,6 +1717,7 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
         ExecuteMsg::UpdateConfig {
             new_config: UpdateConfig {
                 maxbtc_core_contract: Some(maxbtc_core_contract.to_string()),
+                recorder: None,
                 publisher: None,
                 aum_oracles: None,
                 twa_window_seconds: None,
@@ -1698,12 +1817,12 @@ fn test_env_with_time(timestamp: u64, block_height: u64) -> Env {
 fn record_er<T>(
     deps: &mut OwnedDeps<MockStorage, MockApi, T>,
     env: Env,
-    owner: &Addr,
+    sender: &Addr,
 ) -> Result<cosmwasm_std::Response, ContractError>
 where
     T: cosmwasm_std::Querier,
 {
-    execute_msg(deps, env, owner, ExecuteMsg::RecordEr {})
+    execute_msg(deps, env, sender, ExecuteMsg::RecordEr {})
 }
 
 /// Record helper that updates the oracle mock before recording
