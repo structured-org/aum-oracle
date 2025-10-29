@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
@@ -172,6 +173,28 @@ func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRound
 	var response GetRoundResponse
 	if err := json.Unmarshal(resBz, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal get_round_info response: %w", err)
+	}
+	return &response, nil
+}
+
+// QueryERWindowInfo queries er_window_info from TWAER contract
+func (c *Client) QueryERWindowInfo(ctx context.Context) (*GetERWindowInfo, error) {
+	msg := map[string]any{"er_window_info": struct{}{}}
+	resBz, err := c.client.QuerySmartContract(ctx, c.twaerContract, msg)
+	if err != nil {
+		// This means there is no window created yet, so we can safely exit here with zero
+		// TODO: fix the TWAER, so it would not return an error
+		if strings.Contains(err.Error(), "key: [74, 77, 61, 5F, 61, 67, 67, 72, 65, 67, 61, 74, 6F, 72] not found") {
+			return &GetERWindowInfo{
+				WindowStart: 0,
+				WindowEnd:   0,
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
+	}
+	var response GetERWindowInfo
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal get_er_window_info response: %w", err)
 	}
 	return &response, nil
 }

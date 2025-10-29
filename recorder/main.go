@@ -67,9 +67,16 @@ func main() {
 	ticker := time.NewTicker(conf.RecordInterval)
 	defer ticker.Stop()
 
-	// Execute immediately on startup
-	if err := executeRecordER(ctx, neutronClient, logger); err != nil {
-		logger.Error("Failed to execute record_er", zap.Error(err))
+	erWindow, err := neutronClient.QueryERWindowInfo(ctx)
+	if err != nil {
+		logger.Fatal("failed to query er window info", zap.Error(err))
+	}
+
+	// If on startup we see that there is enough time passed since last record, perform record execution
+	if time.Unix(erWindow.WindowEnd, 0).UTC().Add(conf.RecordInterval).Before(time.Now().UTC()) {
+		if err := executeRecordER(ctx, neutronClient, logger); err != nil {
+			logger.Error("Failed to execute record_er", zap.Error(err))
+		}
 	}
 
 	for {
