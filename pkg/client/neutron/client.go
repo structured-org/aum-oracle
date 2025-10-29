@@ -12,7 +12,7 @@ import (
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
+	cosmosclient "github.com/structured-org/aum-messenger/pkg/client/cosmos"
 	"go.uber.org/zap"
 )
 

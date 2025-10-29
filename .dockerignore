@@ -1,0 +1,7 @@
+target
+artifacts
+contracts
+integration_tests
+packages
+scripts
+.github

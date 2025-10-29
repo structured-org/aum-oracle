@@ -13,7 +13,7 @@ import (
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
 )
 
 //go:embed mock_data

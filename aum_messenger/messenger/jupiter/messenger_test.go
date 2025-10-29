@@ -10,9 +10,9 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/golang/mock/gomock"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	msgr "github.com/structured-org/aum-messenger/messenger"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
 	mock_jupiter "github.com/structured-org/aum-messenger/testutil/mocks/jupiter-messenger"
 	"go.uber.org/zap"
 )

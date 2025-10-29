@@ -11,8 +11,8 @@ import (
 	"cosmossdk.io/math"
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
-	solanaclient "github.com/structured-org/aum-messenger/client/solana"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
+	solanaclient "github.com/structured-org/aum-messenger/pkg/client/solana"
 )
 
 // Config is the configuration for a Binance Oracle Messenger.

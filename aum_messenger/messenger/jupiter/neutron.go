@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
 	msgr "github.com/structured-org/aum-messenger/messenger"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
 	"go.uber.org/zap"
 )
 

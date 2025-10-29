@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	solana "github.com/gagliardetto/solana-go"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
 )
 
 type MockJupiterClient struct {
