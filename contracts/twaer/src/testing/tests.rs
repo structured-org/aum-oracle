@@ -1,18 +1,19 @@
-use crate::contract::{execute, instantiate, query};
+use crate::contract::{execute, instantiate, migrate, query};
 use crate::state::{CONFIG, ER_HISTORY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
-    StdError, SystemResult, Timestamp, Uint128, WasmQuery,
+    StdError, Storage, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 use std::str::FromStr;
 use twaer_common::error::ContractError;
 use twaer_common::msg::{
-    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
+    UpdateConfig,
 };
 use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
@@ -1510,6 +1511,59 @@ fn test_twaer_complex_intertwining_expiration() {
 
     // Should have only 1 point (everything else expired)
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
+}
+
+#[test]
+fn test_migrate() {
+    use cosmwasm_schema::cw_serde;
+    use serde_json;
+
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+
+    #[cw_serde]
+    struct OldConfig {
+        pub publisher: Addr,
+        pub aum_oracles: Vec<Addr>,
+        pub maxbtc_core_contract: Addr,
+        pub twa_window_seconds: u64,
+        pub twaer_immutability_seconds: u64,
+    }
+
+    // simulate pre-migration state
+    let old_config = OldConfig {
+        publisher: deps.api.addr_make("old_publisher"),
+        aum_oracles: vec![deps.api.addr_make("oracle1"), deps.api.addr_make("oracle2")],
+        maxbtc_core_contract: deps.api.addr_make("old_maxbtc_core"),
+        twa_window_seconds: 86400,
+        twaer_immutability_seconds: 3600,
+    };
+    let old_config_bytes = serde_json::to_vec(&old_config).unwrap();
+    deps.storage.set(b"config", &old_config_bytes);
+
+    // execute migration
+    let recorder_addr = deps.api.addr_make("new_recorder");
+    let migrate_msg = MigrateMsg {
+        recorder: recorder_addr.to_string(),
+    };
+    let result = migrate(deps.as_mut(), env, migrate_msg);
+    assert!(result.is_ok(), "Migration should succeed");
+
+    let new_config = CONFIG.load(&deps.storage).unwrap();
+    // check that all old fields are preserved
+    assert_eq!(new_config.publisher, old_config.publisher);
+    assert_eq!(new_config.aum_oracles, old_config.aum_oracles);
+    assert_eq!(
+        new_config.maxbtc_core_contract,
+        old_config.maxbtc_core_contract
+    );
+    assert_eq!(new_config.twa_window_seconds, old_config.twa_window_seconds);
+    assert_eq!(
+        new_config.twaer_immutability_seconds,
+        old_config.twaer_immutability_seconds
+    );
+    // check that the new recorder field is properly set
+    assert_eq!(new_config.recorder, recorder_addr);
 }
 
 // ============================================================================
