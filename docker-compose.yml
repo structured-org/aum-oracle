@@ -16,5 +16,5 @@ services:
       dockerfile: Dockerfile.recorder
     container_name: recorder
     volumes:
-      - ./recorder/config.yaml:/root/config.yaml:ro
-    command: ["--config", "/root/config.yaml"]
+      - ./recorder/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml"]
