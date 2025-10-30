@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile.aum_messenger
     container_name: aum-messenger
     volumes:
-      - ./config.yaml:/aum_messenger/config.yaml:ro
-    command: ["--config", "/aum_messenger/config.yaml"]
+      - ./config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml"]
 
   recorder:
     build:
