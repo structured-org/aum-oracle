@@ -74,6 +74,10 @@ type solanaConfig struct {
 }
 
 type binanceConfig struct {
+	// SpotUrl is the spot url for the Binance API.
+	SpotUrl string `yaml:"spot_url"`
+	// PmUrl is the pm url for the Binance API.
+	PmUrl string `yaml:"pm_url"`
 	// BinanceApiKey is the API key for the Binance API.
 	ApiKey string `yaml:"api_key"`
 	// BinanceApiSecret is the API secret for the Binance API.

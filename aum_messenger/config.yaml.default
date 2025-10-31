@@ -38,6 +38,8 @@ clients:
   solana:
     rpc_endpoint: "https://api.mainnet-beta.solana.com"
   binance:
+    spot_url: "https://api.binance.com"
+    pm_url: "https://papi.binance.com"
     api_key: ""
     api_secret: ""
 
