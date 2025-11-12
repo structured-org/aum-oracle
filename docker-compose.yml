@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   aum-messenger:
@@ -18,3 +18,12 @@ services:
     volumes:
       - ./recorder/config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml"]
+
+  safe-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.safe_relay
+    container_name: safe-relay
+    volumes:
+      - ./safe_relay/config.toml:/app/config.toml:ro
+    command: [""]

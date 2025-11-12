@@ -1,0 +1,14 @@
+[safe_relayer]
+mnemonic = ""
+log_level = "trace"
+verify_values_on_vote = true
+interval_cron = "*/3 * * * *" # every 3 minute
+delay_time_seconds = 10
+[safe_relayer.ethereum]
+rpc = "https://ethereum-rpc.publicnode.com"
+safe_address = "0x"
+receiver_address = "0x"
+safe_api_key = ""
+[safe_relayer.neutron]
+rpc = "https://rpc-lb.neutron.org:443/"
+twaer_contract = "neutron..."

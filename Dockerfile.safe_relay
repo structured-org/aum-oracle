@@ -1,0 +1,7 @@
+FROM oven/bun:1.2.1 AS base
+WORKDIR /app
+COPY safe_relay/package.json safe_relay/bun.lock /app
+RUN ls -la
+RUN cd /app && bun install --production
+COPY safe_relay .
+ENTRYPOINT ["bun", "./src/index.ts"]
