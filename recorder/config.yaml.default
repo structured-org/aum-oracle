@@ -1,0 +1,17 @@
+# TWAER contract address where record_er will be executed
+twaer_contract: ""
+
+# Interval between record_er executions (e.g., "30s", "1m", "5m")
+record_interval: 30s
+
+clients:
+  neutron:
+    mnemonic: ""
+    gas_prices: "0.5untrn"
+    gas_adjustment: 1.5
+    chain_id: "test-1"
+    node: "localhost:9090"
+    node_conn_retries: 5
+    node_conn_retry_delay: "3s"
+
+logger_level: info

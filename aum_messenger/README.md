@@ -6,4 +6,4 @@ Oracle Messenger is a Go daemon that serves as part of the Oracle system. Its re
 
 1. Copy `config.yaml.default` as `config.yaml`
 2. Populate `config.yaml` with the respective values
-3. Run `docker compose up`
+3. Run `docker compose up aum_messenger -f ../docker-compose.yml`

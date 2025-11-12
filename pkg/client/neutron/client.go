@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
@@ -12,7 +13,7 @@ import (
 	comettypes "github.com/cometbft/cometbft/abci/types"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
+	cosmosclient "github.com/structured-org/aum-messenger/pkg/client/cosmos"
 	"go.uber.org/zap"
 )
 
@@ -28,10 +29,11 @@ type Client struct {
 	client             *cosmosclient.CosmosClient
 	jupiterAumContract string
 	binanceAumContract string
+	twaerContract      string
 }
 
 // NewClient creates a new Neutron client.
-func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
+func NewClient(conf cosmosclient.Config, twaerContract string, jupiterAumContract string, binanceAumContract string, logger *zap.Logger) (*Client, error) {
 	client, err := cosmosclient.NewClient(&conf, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate cosmos client: %w", err)
@@ -41,6 +43,7 @@ func NewClient(conf cosmosclient.Config, jupiterAumContract string, binanceAumCo
 		client:             client,
 		jupiterAumContract: jupiterAumContract,
 		binanceAumContract: binanceAumContract,
+		twaerContract:      twaerContract,
 	}, nil
 }
 
@@ -174,6 +177,28 @@ func (c *Client) queryRoundInfo(ctx context.Context, contract string) (*GetRound
 	return &response, nil
 }
 
+// QueryERWindowInfo queries er_window_info from TWAER contract
+func (c *Client) QueryERWindowInfo(ctx context.Context) (*GetERWindowInfo, error) {
+	msg := map[string]any{"er_window_info": struct{}{}}
+	resBz, err := c.client.QuerySmartContract(ctx, c.twaerContract, msg)
+	if err != nil {
+		// This means there is no window created yet, so we can safely exit here with zero
+		// TODO: fix the TWAER, so it would not return an error
+		if strings.Contains(err.Error(), "key: [74, 77, 61, 5F, 61, 67, 67, 72, 65, 67, 61, 74, 6F, 72] not found") {
+			return &GetERWindowInfo{
+				WindowStart: 0,
+				WindowEnd:   0,
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
+	}
+	var response GetERWindowInfo
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal get_er_window_info response: %w", err)
+	}
+	return &response, nil
+}
+
 // internal: execute smart contract message
 func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (*cometcoretypes.ResultBroadcastTxCommit, error) {
 	msgBz, err := json.Marshal(msg)
@@ -191,6 +216,45 @@ func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (
 		return nil, fmt.Errorf("failed to sign and broadcast transaction: %w", err)
 	}
 	return resp, nil
+}
+
+// RecordER executes the record_er message on a TWAER contract.
+func (c *Client) RecordER(ctx context.Context) error {
+	c.logger.Info("executing record_er on TWAER contract", zap.String("contract", c.twaerContract))
+
+	msg := map[string]any{
+		"record_er": map[string]any{},
+	}
+
+	var resp *cometcoretypes.ResultBroadcastTxCommit
+	var err error
+
+	err = retry.Do(
+		func() error {
+			var innerError error
+			resp, innerError = c.sendExecuteMsg(ctx, c.twaerContract, msg)
+			return innerError
+		},
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			c.logger.Info("Retry record_er attempt", zap.Uint("attempt", n+1))
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to execute record_er: %w", err)
+	}
+
+	c.logger.Info("executed record_er successfully",
+		zap.Uint32("code", resp.TxResult.Code),
+		zap.String("tx_hash", resp.Hash.String()),
+		zap.Int64("height", resp.Height),
+		zap.String("contract", c.twaerContract),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
+	)
+
+	return nil
 }
 
 // GetNextRoundFromEvents parses wasm events to extract next round info.

@@ -3,7 +3,7 @@
 ## TODO: simplify script, remove lionco related code, prepare to CI
 
 DIR="$(dirname $0)"
-COMMIT_HASH_OR_BRANCH="v6.0.0"
+COMMIT_HASH_OR_BRANCH="v8.1.1"
 cd $DIR
 VERSION=$(cat ../../package.json | jq -r '.version')
 if [[ "$CI" == "true" ]]; then

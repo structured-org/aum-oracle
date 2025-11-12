@@ -9,9 +9,9 @@ import (
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	"github.com/golang/mock/gomock"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
-	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 	msgr "github.com/structured-org/aum-messenger/messenger"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
+	solanaclient "github.com/structured-org/aum-messenger/pkg/client/solana"
 	mock_binance "github.com/structured-org/aum-messenger/testutil/mocks/binance-messenger"
 	"go.uber.org/zap"
 )

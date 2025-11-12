@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 	msgr "github.com/structured-org/aum-messenger/messenger"
+	solanaclient "github.com/structured-org/aum-messenger/pkg/client/solana"
 	"go.uber.org/zap"
 )
 

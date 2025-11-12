@@ -1,0 +1,16 @@
+FROM golang:1.23.6-alpine AS builder
+WORKDIR /app
+COPY . .
+
+WORKDIR /app/recorder
+RUN go mod download
+
+RUN go build -a -o recorder .
+
+FROM alpine:latest
+
+WORKDIR /app
+
+COPY --from=builder /app/recorder/recorder .
+
+ENTRYPOINT ["./recorder"]

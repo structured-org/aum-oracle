@@ -9,7 +9,7 @@ import (
 
 	"cosmossdk.io/math"
 	"github.com/gagliardetto/solana-go"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
 )
 
 // JupiterConfig is the configuration for the Jupiter Oracle Messenger.

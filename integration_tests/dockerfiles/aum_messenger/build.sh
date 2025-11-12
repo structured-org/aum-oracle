@@ -11,4 +11,4 @@ if [[ "$CI" == "true" ]]; then
 else
     VERSION=":$VERSION"
 fi
-docker build -t ${ORG}aum-messenger-test${VERSION} ./../../../aum_messenger
+docker build -t ${ORG}aum-messenger-test${VERSION} -f ./../../../Dockerfile.aum_messenger ./../../../.
