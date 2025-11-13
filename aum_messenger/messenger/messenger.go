@@ -39,6 +39,13 @@ func RunMessenger[T any](ctx context.Context, msgr Messenger[T], cfg Operational
 	var nextRound *NextRound
 	var err error
 	for {
+		select {
+		case <-ctx.Done():
+			msgr.Logger().Info("messenger stopped by context")
+			return
+		default:
+		}
+
 		if nextRound == nil { // case on initialisation or on failure
 			nextRound, err = msgr.GetNextRound(ctx)
 			if err != nil {
