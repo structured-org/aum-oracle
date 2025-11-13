@@ -310,8 +310,6 @@ describe('Mock controller', () => {
 
       it('should verify modified Solana token mint', async () => {
         const updatedTokenMint = await mockController.getSolanaTokenMint();
-        console.log('updatedTokenMint', JSON.stringify(updatedTokenMint));
-        console.log('modifiedData.tokenMint', JSON.stringify(modifiedData.tokenMint));
         expect(updatedTokenMint).toEqual(modifiedData.tokenMint);
       });
 
