@@ -2,7 +2,7 @@
 authors = []
 description = "Spot balance based locks contract"
 edition = "2021"
-name = "waitasaurus"
+name = "waitosaur"
 repository = "https://github.com/structured-org/aum-oracle"
 version = "0.1.1"
 
@@ -22,6 +22,6 @@ serde_json = { workspace = true }
 cw-ownable = { workspace = true }
 cw2 = { workspace = true }
 ed25519-zebra = { workspace = true }
-waitasaurus-common = { path = "../../packages/waitasaurus-common" }
+waitosaur-common = { path = "../../packages/waitosaur-common" }
 consensus = { path = "../../packages/consensus" }
 binance-aum-common = { path = "../../packages/binance-aum-common" }

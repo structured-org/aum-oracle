@@ -1,6 +1,6 @@
 [package]
-name = "waitasaurus-common"
-description = "Shared Waitasaurus contract interface"
+name = "waitosaur-common"
+description = "Shared Waitosaur contract interface"
 version = "0.1.0"
 authors = []
 edition = "2021"

@@ -12,9 +12,9 @@ use cosmwasm_std::{
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 use std::str::FromStr;
-use waitasaurus_common::error::ContractError;
-use waitasaurus_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateConfig};
-use waitasaurus_common::types::{Config, State};
+use waitosaur_common::error::ContractError;
+use waitosaur_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, UpdateConfig};
+use waitosaur_common::types::{Config, State};
 
 #[test]
 fn proper_initialization() {

@@ -9,13 +9,13 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
-use waitasaurus_common::{
+use waitosaur_common::{
     error::{ContractError, ContractResult},
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig},
     types::State,
 };
 
-const CONTRACT_NAME: &str = "crates.io:waitasaurus";
+const CONTRACT_NAME: &str = "crates.io:waitosaur";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[entry_point]
