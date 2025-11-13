@@ -14,7 +14,7 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
 )
 
 //go:embed mock_data

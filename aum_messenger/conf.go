@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	cosmosclient "github.com/structured-org/aum-messenger/client/cosmos"
 	"github.com/structured-org/aum-messenger/messenger"
+	cosmosclient "github.com/structured-org/aum-messenger/pkg/client/cosmos"
 	"gopkg.in/yaml.v3"
 )
 

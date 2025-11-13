@@ -11,16 +11,17 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go"
-	nlogger "github.com/neutron-org/neutron-logger"
-	binanceclient "github.com/structured-org/aum-messenger/client/binance"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
-	solanaclient "github.com/structured-org/aum-messenger/client/solana"
 	msgr "github.com/structured-org/aum-messenger/messenger"
 	binancemsgr "github.com/structured-org/aum-messenger/messenger/binance"
 	jupitermsgr "github.com/structured-org/aum-messenger/messenger/jupiter"
+	binanceclient "github.com/structured-org/aum-messenger/pkg/client/binance"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
+	solanaclient "github.com/structured-org/aum-messenger/pkg/client/solana"
 	clients_mocker "github.com/structured-org/aum-messenger/testutil/clients-mock-controller"
 	"go.uber.org/zap"
+
+	nlogger "github.com/neutron-org/neutron-logger"
 )
 
 const (
@@ -63,6 +64,7 @@ func main() {
 	// real unmockable clients
 	neutronClient, err := neutronclient.NewClient(
 		conf.Clients.Neutron,
+		"",
 		conf.JupiterAumContract,
 		conf.BinanceAumContract,
 		logRegistry.Get(neutronClientContext),

@@ -16,12 +16,15 @@ The AUM Oracle consists of multiple components working together to collect, vali
 ```
 aum-oracle/
 ├── aum_messenger/           # Go daemon for data collection
+├── recorder/                # GO daemon for periodic TWAER records creation in the TWAER contract
+├── pkg/                     # Set of usefule packages that are being used by the daemons
 ├── packages/
 │   ├── consensus/           # Rust consensus mechanism library
 │   └── jupiter-aum-common/  # Common utilities for Jupiter AUM data
 ├── contracts/
 │   ├── binance-aum-receiver/    # CosmWasm contract for Binance data
 │   └── jupiter-aum-receiver/    # CosmWasm contract for Jupiter data
+│   └── twaer/                   # CosmWasm contract for time weighted exchange rate calculations
 ├── integration_tests/       # End-to-end system tests
 ├── scripts/                # Deployment and utility scripts
 ├── Makefile                # Build and test automation
@@ -47,7 +50,22 @@ cp config.yaml.default config.yaml
 docker compose up
 ```
 
-### 2. Consensus Package (`packages/consensus/`)
+### 2. Recorder (`recorder/`)
+
+A Go daemon for periodic TWAER records creation in the TWAER contract
+
+**Responsibilities:**
+- periodically execute '{"record_er": {}}' method in the TWAER contract.
+
+**How to run:**
+```bash
+cd recorder/
+cp config.yaml.default config.yaml
+# Edit config.yaml with your values
+docker compose up recorder -f ../docker-compose.yml
+```
+
+### 3. Consensus Package (`packages/consensus/`)
 
 A robust Rust library providing consensus mechanisms for CosmWasm smart contracts.
 
@@ -69,7 +87,7 @@ A robust Rust library providing consensus mechanisms for CosmWasm smart contract
 cargo test -p consensus
 ```
 
-### 3. Jupiter AUM Common (`packages/jupiter-aum-common/`)
+### 4. Jupiter AUM Common (`packages/jupiter-aum-common/`)
 
 Common utilities and types for Jupiter AUM data processing.
 
@@ -78,7 +96,7 @@ Common utilities and types for Jupiter AUM data processing.
 cargo test -p jupiter-aum-common
 ```
 
-### 4. Binance AUM Receiver Contract (`contracts/binance-aum-receiver/`)
+### 5. Binance AUM Receiver Contract (`contracts/binance-aum-receiver/`)
 
 A CosmWasm contract for processing Binance AUM data through consensus.
 
@@ -100,7 +118,7 @@ A CosmWasm contract for processing Binance AUM data through consensus.
 cargo test -p binance-aum-receiver
 ```
 
-### 5. Jupiter AUM Receiver Contract (`contracts/jupiter-aum-receiver/`)
+### 6. Jupiter AUM Receiver Contract (`contracts/jupiter-aum-receiver/`)
 
 A CosmWasm contract for consensus-based aggregation of Jupiter AUM data.
 
@@ -125,14 +143,18 @@ A CosmWasm contract for consensus-based aggregation of Jupiter AUM data.
 cargo test -p jupiter-aum-receiver
 ```
 
-### 6. Integration Tests (`integration_tests/`)
+### 7. Integration Tests (`integration_tests/`)
 
 End-to-end tests for the entire AUM Oracle system.
 
 See more info in the corresponding [folder](integration_tests/README.md)
 
-### 7. Scripts (`scripts/`)
+### 8. Scripts (`scripts/`)
 
 Utility scripts for deployment and contract interaction:
 - `deploy_contracts.sh`: Deploy contracts to blockchain
 - `query_contract.sh`: Query contract state and data
+
+### 9. Go packages (`pkg/`)
+
+Common helpers, structures and methods that are being used by the daemons.

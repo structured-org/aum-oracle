@@ -12,8 +12,8 @@ import (
 	token "github.com/gagliardetto/solana-go/programs/token"
 	rpc "github.com/gagliardetto/solana-go/rpc"
 	gomock "github.com/golang/mock/gomock"
-	jupiter "github.com/structured-org/aum-messenger/client/jupiter"
-	neutron "github.com/structured-org/aum-messenger/client/neutron"
+	jupiter "github.com/structured-org/aum-messenger/pkg/client/jupiter"
+	neutron "github.com/structured-org/aum-messenger/pkg/client/neutron"
 )
 
 // MockJupiterClient is a mock of JupiterClient interface.

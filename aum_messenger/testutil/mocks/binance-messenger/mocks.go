@@ -11,8 +11,8 @@ import (
 	binance "github.com/adshao/go-binance/v2"
 	portfolio "github.com/adshao/go-binance/v2/portfolio"
 	gomock "github.com/golang/mock/gomock"
-	neutron "github.com/structured-org/aum-messenger/client/neutron"
-	solana "github.com/structured-org/aum-messenger/client/solana"
+	neutron "github.com/structured-org/aum-messenger/pkg/client/neutron"
+	solana "github.com/structured-org/aum-messenger/pkg/client/solana"
 )
 
 // MockBinanceClient is a mock of BinanceClient interface.

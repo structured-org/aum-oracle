@@ -141,3 +141,11 @@ type Round struct {
 	// Start is when the round started (UNIX timestamp in seconds).
 	Start uint64 `json:"start"`
 }
+
+// GetERWindowInfo is the response of TWAER smart contract to the "er_window_info" query
+type GetERWindowInfo struct {
+	// WindowStart start of the TWAER window
+	WindowStart int64 `json:"window_start"`
+	// End of the TWAER window
+	WindowEnd int64 `json:"window_end"`
+}

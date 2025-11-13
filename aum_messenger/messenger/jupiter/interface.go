@@ -6,8 +6,8 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
-	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
-	neutronclient "github.com/structured-org/aum-messenger/client/neutron"
+	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
+	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
 )
 
 // JupiterClient is the definition of the expected Jupiter client.
