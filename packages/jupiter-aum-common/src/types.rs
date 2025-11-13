@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use consensus::consensus::{
     all_items_equal, consensus_on_items, consensus_on_items_dec256, consensus_on_items_u64,
-    ConsensusData,
+    consensus_on_items_u8, consensus_on_items_uint128, ConsensusData,
 };
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
@@ -14,21 +14,81 @@ use std::hash::Hash;
 pub struct Config {
     /// How long (in seconds) do we consider data as valid after publishing (after consensus reached).
     pub consensus_data_valid_period: u64,
-    /// List of custody asset denoms required for consensus
-    pub required_custody_assets: Vec<String>,
     /// How many blocks we consider the last price from oracle as valid
     pub price_data_valid_period: u64,
+    /// List of custody asset denoms required for consensus
+    pub required_custody_assets: Vec<String>,
+    /// List of solana addresses (key) which balances of assets (value) are required for consensus.
+    /// Must contain jlp_token balance tracking for the strategy_address.
+    pub required_solana_balances: HashMap<String, Vec<String>>,
+    /// List of solana tokens which total supply is required for consensus
+    pub required_solana_token_total_supply: Vec<String>,
+    /// The address of the strategy contract used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with jlp_token.
+    pub strategy_address: String,
+    /// The address of the JLP token used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with strategy_address.
+    pub jlp_token: String,
 }
 
 impl Config {
     /// Validates the configuration parameters.
     pub fn validate(&self) -> Result<(), ContractError> {
+        // check validity periods
         if self.consensus_data_valid_period == 0 {
             return Err(ContractError::InvalidConsensusPeriod {});
         }
-
         if self.price_data_valid_period == 0 {
             return Err(ContractError::InvalidPriceDataPeriod {});
+        }
+
+        // check strategy and jlp token addresses
+        if self.strategy_address.is_empty() {
+            return Err(ContractError::InvalidStrategyAddress {});
+        }
+        if self.jlp_token.is_empty() {
+            return Err(ContractError::InvalidJlpToken {});
+        }
+
+        // check required custody assets for duplicates
+        if let Some(duplicate) = find_duplicate(&self.required_custody_assets) {
+            return Err(ContractError::DuplicateCustodyAsset {
+                asset: duplicate.to_string(),
+            });
+        }
+
+        // check required solana balances for duplicates by asset
+        for (address, assets) in self.required_solana_balances.iter() {
+            if let Some(duplicate) = find_duplicate(assets) {
+                return Err(ContractError::DuplicateSolanaBalanceAsset {
+                    address: address.to_string(),
+                    asset: duplicate.to_string(),
+                });
+            }
+        }
+        // check that strategy JLP balance tracking is required
+        if let Some(strategy_address_assets) =
+            self.required_solana_balances.get(&self.strategy_address)
+        {
+            if !strategy_address_assets.contains(&self.jlp_token) {
+                return Err(ContractError::StrategyJlpBalanceNotTracked {});
+            }
+        } else {
+            return Err(ContractError::StrategyJlpBalanceNotTracked {});
+        }
+
+        // check token supply for duplicates
+        if let Some(duplicate) = find_duplicate(&self.required_solana_token_total_supply) {
+            return Err(ContractError::DuplicateSolanaTokenTotalSupply {
+                asset: duplicate.to_string(),
+            });
+        }
+        // check that JLP token supply tracking is required
+        if !self
+            .required_solana_token_total_supply
+            .contains(&self.jlp_token)
+        {
+            return Err(ContractError::JlpTotalSupplyNotTracked {});
         }
 
         Ok(())
@@ -44,30 +104,103 @@ pub struct SolanaData {
     pub custody_assets: Vec<CustodyAsset>,
     /// Jupiter's Assets Under Management value in USD.
     pub aum_usd: Uint128,
-    /// The total supply of JLP (Jupiter Liquidity Provider) tokens.
-    pub total_jlp_supply: Uint128,
-    /// JLP token supply decimal precision
-    pub total_jlp_supply_decimals: u8,
-    /// The balance of JLP tokens held by the strategy.
-    pub strategy_jlp_balance: Uint128,
-    /// JLP token balance decimal precision
-    pub strategy_jlp_balance_decimals: u8,
+    /// Contains information about asset balances on Solana accounts
+    pub solana_balances: Vec<SolanaBalance>,
+    /// Contains information about the total supply of Solana tokens
+    pub solana_token_total_supply: Vec<SolanaTokenTotalSupply>,
+    /// Contains information about token decimals on Solana
+    pub solana_token_decimals: Vec<SolanaTokenDecimals>,
 }
 
 impl ConsensusData<Config> for SolanaData {
     fn prepublish_cleanup(&mut self, config: Config) -> Result<(), ConsensusError> {
+        // CUSTODY ASSETS
+        // retain only custody assets that are defined as required in the config
         self.custody_assets.retain(|c| {
             config
                 .required_custody_assets
                 .contains(&c.denom.to_string())
         });
+        // sort and dedup custody assets by denom
         self.custody_assets
             .sort_by(|c1, c2| c1.denom.cmp(&c2.denom));
         self.custody_assets.dedup_by(|a, b| a.denom.eq(&b.denom));
-
+        // check if only required custody assets are present
         if self.custody_assets.len() != config.required_custody_assets.len() {
             return Err(ConsensusError::PrepublishError {
-                msg: "Solana custody assets have some required custody assets missing".into(),
+                msg: "Provided solana custody assets don't match required ones".into(),
+            });
+        }
+
+        // SOLANA BALANCES
+        // retain only solana balances that are defined as required in the config
+        self.solana_balances.retain(|b| {
+            let required_address_balances = config.required_solana_balances.get(&b.address);
+            if let Some(required_address_balances) = required_address_balances {
+                return required_address_balances.contains(&b.asset);
+            }
+            false
+        });
+        // sort solana balances by address and asset
+        self.solana_balances.sort_by(|a, b| {
+            let a_key = format!("{}{}", a.address, a.asset);
+            let b_key = format!("{}{}", b.address, b.asset);
+            a_key.cmp(&b_key)
+        });
+        // check if only required solana balances are present
+        if self.solana_balances.len()
+            != config
+                .required_solana_balances
+                .values()
+                .flatten()
+                .collect::<Vec<_>>()
+                .len()
+        {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Provided solana balances don't match required ones".into(),
+            });
+        }
+
+        // SOLANA TOKEN TOTAL SUPPLY
+        // retain only solana token total supplies that are defined as required in the config
+        self.solana_token_total_supply
+            .retain(|t| config.required_solana_token_total_supply.contains(&t.asset));
+        // sort solana token total supplies by asset
+        self.solana_token_total_supply
+            .sort_by(|a, b| a.asset.cmp(&b.asset));
+        // check if only required solana token total supplies are present
+        if self.solana_token_total_supply.len() != config.required_solana_token_total_supply.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Provided solana token total supplies don't match required ones".into(),
+            });
+        }
+
+        // SOLANA TOKEN DECIMALS
+        // retain only solana token decimals of assets that are specified in the required config values
+        let required_balance_assets: Vec<String> = config
+            .required_solana_balances
+            .values()
+            .flatten()
+            .map(|s| s.to_string())
+            .collect();
+        let required_total_supply_assets: Vec<String> = config
+            .required_solana_token_total_supply
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let mut required_assets: Vec<String> = required_balance_assets
+            .into_iter()
+            .chain(required_total_supply_assets)
+            .collect();
+        self.solana_token_decimals
+            .retain(|d| required_assets.contains(&d.asset));
+        // sort and dedup required assets
+        required_assets.sort();
+        required_assets.dedup();
+        // check if only required solana token decimals are present
+        if self.solana_token_decimals.len() != required_assets.len() {
+            return Err(ConsensusError::PrepublishError {
+                msg: "Provided solana token decimals don't match required ones".into(),
             });
         }
 
@@ -79,7 +212,7 @@ impl ConsensusData<Config> for SolanaData {
             return None;
         }
 
-        // iterate over custody assets and pick out the majority on decimals
+        // iterate over custody assets and decimals and pick out the majority
         let mut non_matching_indices: HashSet<usize> = HashSet::new();
         let first = data.first()?;
         for (i, _) in first.custody_assets.iter().enumerate() {
@@ -91,16 +224,16 @@ impl ConsensusData<Config> for SolanaData {
                 custody_asset_decimals,
             )?;
         }
-
-        non_matching_indices =
-            find_unequal_indices_mapped(non_matching_indices, data, threshold, |value| {
-                value.total_jlp_supply_decimals
-            })?;
-
-        non_matching_indices =
-            find_unequal_indices_mapped(non_matching_indices, data, threshold, |value| {
-                value.strategy_jlp_balance_decimals
-            })?;
+        for (i, _) in first.solana_token_decimals.iter().enumerate() {
+            let solana_token_decimals =
+                |value: &SolanaData| value.solana_token_decimals[i].decimals;
+            non_matching_indices = find_unequal_indices_mapped(
+                non_matching_indices,
+                data,
+                threshold,
+                solana_token_decimals,
+            )?;
+        }
 
         // remove all non-matching indices
         let data: Vec<SolanaData> = data
@@ -114,20 +247,28 @@ impl ConsensusData<Config> for SolanaData {
         // check top level fields
         let consensus_aum_usd =
             consensus_on_field_u128(&data, |d| d.aum_usd, threshold, delta_ppm)?;
-        let consensus_total_jlp_supply =
-            consensus_on_field_u128(&data, |d| d.total_jlp_supply, threshold, delta_ppm)?;
-        let consensus_strategy_jlp_balance =
-            consensus_on_field_u128(&data, |d| d.strategy_jlp_balance, threshold, delta_ppm)?;
 
-        // check that all custody assets have the same length
+        // Consistency checks on vector lengths
         let custody_assets_lengths = data
             .iter()
             .map(|d| d.custody_assets.len() as u32)
             .collect::<Vec<_>>();
         all_items_equal(&custody_assets_lengths)?;
-
-        let consensus_total_jlp_supply_decimals = data.first()?.total_jlp_supply_decimals;
-        let consensus_strategy_jlp_balance_decimals = data.first()?.strategy_jlp_balance_decimals;
+        let solana_balances_lengths = data
+            .iter()
+            .map(|d| d.solana_balances.len() as u32)
+            .collect::<Vec<_>>();
+        all_items_equal(&solana_balances_lengths)?;
+        let solana_token_total_supply_lengths = data
+            .iter()
+            .map(|d| d.solana_token_total_supply.len() as u32)
+            .collect::<Vec<_>>();
+        all_items_equal(&solana_token_total_supply_lengths)?;
+        let solana_token_decimals_lengths = data
+            .iter()
+            .map(|d| d.solana_token_decimals.len() as u32)
+            .collect::<Vec<_>>();
+        all_items_equal(&solana_token_decimals_lengths)?;
 
         // check and assign custody assets properties
         let mut consensus_custody_assets = Vec::new();
@@ -164,13 +305,66 @@ impl ConsensusData<Config> for SolanaData {
             });
         }
 
+        // check and assign solana balances properties
+        let mut consensus_solana_balances = Vec::new();
+        for (i, _) in data[0].solana_balances.iter().enumerate() {
+            let amount_items = data
+                .iter()
+                .map(|d| d.solana_balances[i].amount)
+                .collect::<Vec<Uint128>>();
+
+            let consensus_amount = consensus_on_items_uint128(&amount_items, threshold, delta_ppm)?;
+            let consensus_address = data.first()?.solana_balances[i].address.to_string();
+            let consensus_asset = data.first()?.solana_balances[i].asset.to_string();
+
+            consensus_solana_balances.push(SolanaBalance {
+                address: consensus_address,
+                asset: consensus_asset,
+                amount: consensus_amount,
+            });
+        }
+
+        // check and assign solana token total supply properties
+        let mut consensus_solana_token_total_supply = Vec::new();
+        for (i, _) in data[0].solana_token_total_supply.iter().enumerate() {
+            let total_supply_items = data
+                .iter()
+                .map(|d| d.solana_token_total_supply[i].total_supply)
+                .collect::<Vec<Uint128>>();
+
+            let consensus_total_supply =
+                consensus_on_items_uint128(&total_supply_items, threshold, delta_ppm)?;
+            let consensus_asset = data.first()?.solana_token_total_supply[i].asset.to_string();
+
+            consensus_solana_token_total_supply.push(SolanaTokenTotalSupply {
+                asset: consensus_asset,
+                total_supply: consensus_total_supply,
+            });
+        }
+
+        // check and assign solana token decimals properties
+        let mut consensus_solana_token_decimals = Vec::new();
+        for (i, _) in data[0].solana_token_decimals.iter().enumerate() {
+            let decimals_items = data
+                .iter()
+                .map(|d| d.solana_token_decimals[i].decimals)
+                .collect::<Vec<u8>>();
+
+            let consensus_decimals = consensus_on_items_u8(&decimals_items, threshold, delta_ppm)?;
+            let consensus_asset = data.first()?.solana_token_decimals[i].asset.to_string();
+
+            consensus_solana_token_decimals.push(SolanaTokenDecimals {
+                asset: consensus_asset,
+                decimals: consensus_decimals,
+            });
+        }
+
         Some(SolanaData {
             custody_assets: consensus_custody_assets,
             aum_usd: consensus_aum_usd,
-            total_jlp_supply_decimals: consensus_total_jlp_supply_decimals,
-            total_jlp_supply: consensus_total_jlp_supply,
-            strategy_jlp_balance: consensus_strategy_jlp_balance,
-            strategy_jlp_balance_decimals: consensus_strategy_jlp_balance_decimals,
+            solana_balances: consensus_solana_balances,
+            solana_token_total_supply: consensus_solana_token_total_supply,
+            solana_token_decimals: consensus_solana_token_decimals,
         })
     }
 }
@@ -281,10 +475,46 @@ pub struct CustodyAsset {
     pub denom: String,
 }
 
+/// Represents a single asset balance on a Solana account.
+#[cw_serde]
+pub struct SolanaBalance {
+    /// Address of the account.
+    pub address: String,
+    /// Asset name.
+    pub asset: String,
+    /// Amount of the asset on the account balance.
+    pub amount: Uint128,
+}
+
+/// Represents the total supply of a token on Solana.
+#[cw_serde]
+pub struct SolanaTokenTotalSupply {
+    /// Asset name.
+    pub asset: String,
+    /// Total supply of the asset.
+    pub total_supply: Uint128,
+}
+
+/// Represents the decimals of a token on Solana.
+#[cw_serde]
+pub struct SolanaTokenDecimals {
+    /// Asset name.
+    pub asset: String,
+    /// Decimals of the asset.
+    pub decimals: u8,
+}
+
 #[cw_serde]
 pub struct AumInWBTC {
     /// Amount of aum in uWBTC
     pub amount: Int256,
     /// Timestamp when aum was calculated
     pub timestamp: u64,
+}
+
+/// Helper function to find duplicates in a vector of strings.
+/// Returns the first duplicate found, or None if no duplicates exist.
+fn find_duplicate(items: &[String]) -> Option<&String> {
+    let mut seen = HashSet::new();
+    items.iter().find(|&item| !seen.insert(item))
 }

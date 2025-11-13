@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	solana "github.com/gagliardetto/solana-go"
+	token "github.com/gagliardetto/solana-go/programs/token"
 	rpc "github.com/gagliardetto/solana-go/rpc"
 	gomock "github.com/golang/mock/gomock"
 	jupiter "github.com/structured-org/aum-messenger/client/jupiter"
@@ -91,6 +92,21 @@ func (m *MockSolanaClient) EXPECT() *MockSolanaClientMockRecorder {
 	return m.recorder
 }
 
+// GetNativeBalance mocks base method.
+func (m *MockSolanaClient) GetNativeBalance(ctx context.Context, account solana.PublicKey) (*rpc.UiTokenAmount, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNativeBalance", ctx, account)
+	ret0, _ := ret[0].(*rpc.UiTokenAmount)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNativeBalance indicates an expected call of GetNativeBalance.
+func (mr *MockSolanaClientMockRecorder) GetNativeBalance(ctx, account interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNativeBalance", reflect.TypeOf((*MockSolanaClient)(nil).GetNativeBalance), ctx, account)
+}
+
 // GetTokenAccountBalance mocks base method.
 func (m *MockSolanaClient) GetTokenAccountBalance(ctx context.Context, token, account solana.PublicKey) (*rpc.UiTokenAmount, error) {
 	m.ctrl.T.Helper()
@@ -106,19 +122,19 @@ func (mr *MockSolanaClientMockRecorder) GetTokenAccountBalance(ctx, token, accou
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenAccountBalance", reflect.TypeOf((*MockSolanaClient)(nil).GetTokenAccountBalance), ctx, token, account)
 }
 
-// GetTokenSupply mocks base method.
-func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, token solana.PublicKey) (*rpc.UiTokenAmount, error) {
+// GetTokenMint mocks base method.
+func (m *MockSolanaClient) GetTokenMint(ctx context.Context, tokenPubKey solana.PublicKey) (*token.Mint, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTokenSupply", ctx, token)
-	ret0, _ := ret[0].(*rpc.UiTokenAmount)
+	ret := m.ctrl.Call(m, "GetTokenMint", ctx, tokenPubKey)
+	ret0, _ := ret[0].(*token.Mint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetTokenSupply indicates an expected call of GetTokenSupply.
-func (mr *MockSolanaClientMockRecorder) GetTokenSupply(ctx, token interface{}) *gomock.Call {
+// GetTokenMint indicates an expected call of GetTokenMint.
+func (mr *MockSolanaClientMockRecorder) GetTokenMint(ctx, tokenPubKey interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenSupply", reflect.TypeOf((*MockSolanaClient)(nil).GetTokenSupply), ctx, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenMint", reflect.TypeOf((*MockSolanaClient)(nil).GetTokenMint), ctx, tokenPubKey)
 }
 
 // MockNeutronAumReceiverClient is a mock of NeutronAumReceiverClient interface.

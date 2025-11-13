@@ -404,6 +404,21 @@ pub fn consensus_on_items_uint128(
     )
 }
 
+pub fn consensus_on_items_u8(items: &[u8], threshold: usize, delta_ppm: u64) -> Option<u8> {
+    let ppm = Decimal::from_ratio(delta_ppm, 1_000_000u64);
+    consensus_on_items(
+        items,
+        threshold,
+        |high, low| {
+            let diff = Uint128::new(high.abs_diff(low) as u128);
+            let decimal_high = Decimal::from_atomics(high, 0).ok()?;
+            let max_dispersion = (decimal_high * ppm).to_uint_floor();
+            Some(diff <= max_dispersion)
+        },
+        2u8,
+    )
+}
+
 // Utility function that returns item only if all items are the same
 pub fn all_items_equal<T: Eq + Clone>(items: &[T]) -> Option<T> {
     let item = items.first()?;

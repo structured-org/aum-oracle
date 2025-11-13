@@ -60,21 +60,27 @@ type JupiterAumData struct {
 	CustodyAssets []JupiterCustodyAsset `json:"custody_assets"`
 	// AumUsd is the total Jupiter protocol AUM in USD.
 	AumUsd math.Uint `json:"aum_usd"`
-	// TotalJlpSupply is the total supply of the JLP token.
-	TotalJlpSupply math.Uint `json:"total_jlp_supply"`
-	// TotalJlpSupplyDecimals is the number of decimals of the JLP token supply.
-	TotalJlpSupplyDecimals uint8 `json:"total_jlp_supply_decimals"`
-	// StrategyJlpBalance is the amount of the JLP token that is held by the Jupiter strategy
-	// address.
-	StrategyJlpBalance math.Uint `json:"strategy_jlp_balance"`
-	// StrategyJlpBalanceDecimals is the number of decimals of the strategy jlp balance
-	StrategyJlpBalanceDecimals uint8 `json:"strategy_jlp_balance_decimals"`
+	// SolanaBalances contains information about asset balances on Solana accounts.
+	SolanaBalances []SolanaBalance `json:"solana_balances"`
+	// SolanaTokenTotalSupply contains information about the total supply of Solana tokens.
+	SolanaTokenTotalSupply []SolanaTokenTotalSupply `json:"solana_token_total_supply"`
+	// SolanaTokenDecimals contains information about token decimals on Solana.
+	SolanaTokenDecimals []SolanaTokenDecimals `json:"solana_token_decimals"`
 }
 
-// SortCustodyAssets sorts the custody assets by their denomination.
-func (s *JupiterAumData) SortCustodyAssets() {
+// Organize orders the underlying data for predictable access.
+func (s *JupiterAumData) Organize() {
 	slices.SortFunc(s.CustodyAssets, func(a, b JupiterCustodyAsset) int {
 		return cmp.Compare(a.Denom, b.Denom)
+	})
+	slices.SortFunc(s.SolanaBalances, func(a, b SolanaBalance) int {
+		return cmp.Compare(a.Address+a.Asset, b.Address+b.Asset)
+	})
+	slices.SortFunc(s.SolanaTokenTotalSupply, func(a, b SolanaTokenTotalSupply) int {
+		return cmp.Compare(a.Asset, b.Asset)
+	})
+	slices.SortFunc(s.SolanaTokenDecimals, func(a, b SolanaTokenDecimals) int {
+		return cmp.Compare(a.Asset, b.Asset)
 	})
 }
 
@@ -90,6 +96,32 @@ type JupiterCustodyAsset struct {
 	Decimals uint8 `json:"decimals"`
 	// Denom is the custody asset denomination.
 	Denom string `json:"denom"`
+}
+
+// SolanaBalance contains information about a single asset balance on a Solana account.
+type SolanaBalance struct {
+	// Address is the address of the account.
+	Address string `json:"address"`
+	// Asset is the asset name.
+	Asset string `json:"asset"`
+	// Amount is the asset amount on the account balance.
+	Amount math.Uint `json:"amount"`
+}
+
+// SolanaTokenTotalSupply contains information about the total supply of a Solana token.
+type SolanaTokenTotalSupply struct {
+	// Asset is the asset name.
+	Asset string `json:"asset"`
+	// TotalSupply is the total supply of the asset.
+	TotalSupply math.Uint `json:"total_supply"`
+}
+
+// SolanaTokenDecimals contains information about the decimals of a Solana token.
+type SolanaTokenDecimals struct {
+	// Asset is the asset name.
+	Asset string `json:"asset"`
+	// Decimals is the number of decimals of the asset.
+	Decimals uint8 `json:"decimals"`
 }
 
 // Smart contract types

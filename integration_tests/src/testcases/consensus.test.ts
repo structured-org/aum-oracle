@@ -14,6 +14,7 @@ import {
   JupiterPerpsCustodyAccount,
   JupiterPoolAccount,
   SolanaUiTokenAmount,
+  SolanaTokenMint,
   MockController,
 } from '../helpers/messenger';
 import { waitFor, waitSeconds } from '../helpers/waitFor';
@@ -38,8 +39,9 @@ type MockData = {
   spotAccountInfo?: BinanceSpotAccountInfo;
   custodyInfos?: JupiterPerpsCustodyAccount[];
   poolInfo?: JupiterPoolAccount;
-  tokenSupply?: SolanaUiTokenAmount;
+  tokenMint?: SolanaTokenMint;
   tokenAccountBalance?: SolanaUiTokenAmount;
+  nativeBalance?: SolanaUiTokenAmount;
 };
 
 export async function fetchMockData(
@@ -65,9 +67,10 @@ export async function fetchMockData(
     spotAccountInfo: await mockController.getBinanceSpotAccountInfo(),
     custodyInfos,
     poolInfo: await mockController.getJupiterPoolInfo(),
-    tokenSupply: await mockController.getSolanaTokenSupply(),
+    tokenMint: await mockController.getSolanaTokenMint(),
     tokenAccountBalance:
       await mockController.getSolanaTokenAccountBalance(sampleTokenPublicKey),
+    nativeBalance: await mockController.getSolanaNativeBalance(),
   };
 }
 

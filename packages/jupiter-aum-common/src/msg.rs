@@ -4,6 +4,7 @@ use consensus::consensus::ConsensusOutcome;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use std::collections::HashMap;
 
 /// InstantiateMsg defines the message used to initialize the contract.
 #[cw_serde]
@@ -20,10 +21,21 @@ pub struct InstantiateMsg {
     pub round_length: u64,
     /// Initial valid period for data in seconds.
     pub consensus_data_valid_period: u64,
-    /// List of custody asset denoms required for consensus
-    pub required_custody_assets: Vec<String>,
     /// How many blocks we consider BTC/USD price from oracle as valid.
     pub price_data_valid_period: u64,
+    /// List of custody asset denoms required for consensus
+    pub required_custody_assets: Vec<String>,
+    /// List of solana addresses (key) which balances of assets (value) are required for consensus.
+    /// Must contain jlp_token balance tracking for the strategy_address.
+    pub required_solana_balances: HashMap<String, Vec<String>>,
+    /// List of solana tokens which total supply is required for consensus
+    pub required_solana_token_total_supply: Vec<String>,
+    /// The address of the strategy contract used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with jlp_token.
+    pub strategy_address: String,
+    /// The address of the JLP token used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with strategy_address.
+    pub jlp_token: String,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -40,17 +52,28 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 pub struct UpdateConfig {
-    /// Contract config updates.
-    ///
+    // Contract config updates.
+    //
     /// New validity period for data in seconds.
     pub consensus_data_valid_period: Option<u64>,
-    /// New required custody asset denoms.
-    pub required_custody_assets: Option<Vec<String>>,
     /// New value for how many blocks we consider BTC/USD price from oracle as valid.
     pub price_data_valid_period: Option<u64>,
+    /// New required custody asset denoms.
+    pub required_custody_assets: Option<Vec<String>>,
+    /// New list of solana addresses (key) which balances of assets (value) are required for consensus.
+    /// Must contain jlp_token balance tracking for the strategy_address.
+    pub required_solana_balances: Option<HashMap<String, Vec<String>>>,
+    /// New list of solana tokens which total supply is required for consensus.
+    pub required_solana_token_total_supply: Option<Vec<String>>,
+    /// New address of the strategy contract used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with jlp_token.
+    pub strategy_address: Option<String>,
+    /// New address of the JLP token used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with strategy_address.
+    pub jlp_token: Option<String>,
 
-    /// Consensus configuration updates
-    ///
+    // Consensus configuration updates
+    //
     /// New list of messengers.
     pub messengers: Option<Vec<String>>,
     /// New threshold needed for consensus.

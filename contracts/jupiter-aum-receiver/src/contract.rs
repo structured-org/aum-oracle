@@ -38,8 +38,12 @@ pub fn instantiate(
 
     let config = Config {
         consensus_data_valid_period: msg.consensus_data_valid_period,
-        required_custody_assets: msg.required_custody_assets,
         price_data_valid_period: msg.price_data_valid_period,
+        required_custody_assets: msg.required_custody_assets,
+        required_solana_balances: msg.required_solana_balances,
+        required_solana_token_total_supply: msg.required_solana_token_total_supply,
+        strategy_address: msg.strategy_address,
+        jlp_token: msg.jlp_token,
     };
     config.validate()?;
 
@@ -97,13 +101,32 @@ fn update_config(
         contract_config.consensus_data_valid_period = new_consensus_data_valid_period;
     }
 
+    if let Some(new_price_data_valid_period) = new_config.price_data_valid_period {
+        contract_config.price_data_valid_period = new_price_data_valid_period;
+    }
+
     if let Some(new_required_custody_assets) = new_config.required_custody_assets {
         contract_config.required_custody_assets = new_required_custody_assets;
     }
 
-    if let Some(new_price_data_valid_period) = new_config.price_data_valid_period {
-        contract_config.price_data_valid_period = new_price_data_valid_period;
+    if let Some(new_required_solana_balances) = new_config.required_solana_balances {
+        contract_config.required_solana_balances = new_required_solana_balances;
     }
+
+    if let Some(new_required_solana_token_total_supply) =
+        new_config.required_solana_token_total_supply
+    {
+        contract_config.required_solana_token_total_supply = new_required_solana_token_total_supply;
+    }
+
+    if let Some(new_strategy_address) = new_config.strategy_address {
+        contract_config.strategy_address = new_strategy_address;
+    }
+
+    if let Some(new_jlp_token_address) = new_config.jlp_token {
+        contract_config.jlp_token = new_jlp_token_address;
+    }
+
     contract_config.validate()?;
 
     CONFIG.save(deps.storage, &contract_config)?;
@@ -280,15 +303,39 @@ fn query_btc_price_in_usd(
 pub fn calculate_aum_in_wbtc(
     data: SolanaData,
     btc_price_in_usd: SignedDecimal256,
+    config: &Config,
 ) -> Result<Int256, ContractError> {
+    let consensus_jlp_total_supply = data
+        .solana_token_total_supply
+        .iter()
+        .find(|t| t.asset == config.jlp_token)
+        .ok_or(ContractError::CrucialConsensusDataMissing {
+            details: "JLP total supply".to_string(),
+        })?
+        .total_supply;
+    let consensus_jlp_decimals = data
+        .solana_token_decimals
+        .iter()
+        .find(|d| d.asset == config.jlp_token)
+        .ok_or(ContractError::CrucialConsensusDataMissing {
+            details: "JLP decimals".to_string(),
+        })?
+        .decimals;
+    let consensus_strategy_jlp_balance = data
+        .solana_balances
+        .iter()
+        .find(|b| b.address == config.strategy_address && b.asset == config.jlp_token)
+        .ok_or(ContractError::CrucialConsensusDataMissing {
+            details: "Strategy JLP balance".to_string(),
+        })?
+        .amount;
+
     let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, 0)?;
-    let total_jlp_supply = SignedDecimal256::from_atomics(
-        data.total_jlp_supply,
-        data.total_jlp_supply_decimals as u32,
-    )?;
+    let total_jlp_supply =
+        SignedDecimal256::from_atomics(consensus_jlp_total_supply, consensus_jlp_decimals as u32)?;
     let strategy_jlp_balance = SignedDecimal256::from_atomics(
-        data.strategy_jlp_balance,
-        data.strategy_jlp_balance_decimals as u32,
+        consensus_strategy_jlp_balance,
+        consensus_jlp_decimals as u32,
     )?;
     let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)?;
     let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
@@ -310,6 +357,6 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
-    let aum_in_btc = calculate_aum_in_wbtc(data, btc_price_in_usd)?;
+    let aum_in_btc = calculate_aum_in_wbtc(data, btc_price_in_usd, &config)?;
     Ok(aum_in_btc)
 }

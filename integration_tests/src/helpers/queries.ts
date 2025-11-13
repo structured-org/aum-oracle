@@ -33,10 +33,9 @@ export class ConsensusOutcome<T> {
 export class SolanaData {
   custody_assets: any;
   aum_usd: string;
-  total_jlp_supply: string;
-  total_jlp_supply_decimals: number;
-  strategy_jlp_balance: string;
-  strategy_jlp_balance_decimals: number;
+  solana_balances: any[];
+  solana_token_total_supply: any[];
+  solana_token_decimals: any[];
 }
 
 export class BinanceData {

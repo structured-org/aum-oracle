@@ -23,6 +23,30 @@ pub enum ContractError {
     #[error("Price data period should be greater than 0")]
     InvalidPriceDataPeriod {},
 
+    #[error("Duplicate custody asset found: {asset}")]
+    DuplicateCustodyAsset { asset: String },
+
+    #[error("Duplicate solana balance asset found for address {address}: {asset}")]
+    DuplicateSolanaBalanceAsset { address: String, asset: String },
+
+    #[error("Duplicate solana token total supply found: {asset}")]
+    DuplicateSolanaTokenTotalSupply { asset: String },
+
+    #[error("Empty strategy address")]
+    InvalidStrategyAddress {},
+
+    #[error("Empty JLP token")]
+    InvalidJlpToken {},
+
+    #[error("Strategy JLP balance tracking is required")]
+    StrategyJlpBalanceNotTracked {},
+
+    #[error("JLP token supply tracking is required")]
+    JlpTotalSupplyNotTracked {},
+
+    #[error("Crucial consensus data is missing: {details}")]
+    CrucialConsensusDataMissing { details: String },
+
     #[error("No data published yet")]
     NoDataPublished {},
 

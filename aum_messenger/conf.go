@@ -35,12 +35,12 @@ type config struct {
 
 	// JupiterCustodies is the token->programId mapping of Jupiter custodies.
 	JupiterCustodies map[string]string `yaml:"jupiter_custodies"`
-	// JupiterJlpToken is the Jupiter JLP token pubkey.
-	JupiterJlpToken string `yaml:"jupiter_jlp_token"`
 	// JupiterPool is the Jupiter pool pubkey.
 	JupiterPool string `yaml:"jupiter_jlp_pool"`
-	// JupiterStrategyAddress is the Jupiter strategy address pubkey.
-	JupiterStrategyAddress string `yaml:"jupiter_strategy_address"`
+	// SolanaBalancesList is the list of address->tokens mappings of Solana balances.
+	SolanaBalancesList map[string][]string `yaml:"solana_balances_list"`
+	// SolanaTokenSupplyList is the list of Solana token addresses to fetch the total supply of.
+	SolanaTokenSupplyList []string `yaml:"solana_token_supply_list"`
 
 	// Clients is the configuration for different clients.
 	Clients clientsConfig `yaml:"clients"`

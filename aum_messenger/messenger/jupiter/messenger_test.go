@@ -8,6 +8,7 @@ import (
 	"cosmossdk.io/math"
 	solanabin "github.com/gagliardetto/binary"
 	solana "github.com/gagliardetto/solana-go"
+	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/golang/mock/gomock"
 	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
@@ -18,11 +19,13 @@ import (
 )
 
 var (
-	testPubKey1 = solana.MustPublicKeyFromBase58("wczmirTBMa3tGisAeecZcGbzvgi6VAG4Gu8uamtHBf3")
-	testPubKey2 = solana.MustPublicKeyFromBase58("3csuXZKah5rgpb8RiwX9XfjrMxcp3u1K9mBdCwL51spj")
-	testPubKey3 = solana.MustPublicKeyFromBase58("F6ZjiBm1WgVXzez5vxHeBDgaVPQRfLyFb7GFwXvyZVxD")
-	testPubKey4 = solana.MustPublicKeyFromBase58("E1bQJ8eMMn3zmeSewW3HQ8zmJr7KR75JonbwAtWx2bux")
-	testPubKey5 = solana.MustPublicKeyFromBase58("92q4Y2xGE39Bm2JgNZLZWuafoBiBR4gCj4igfpwvpgcD")
+	testPubKey1    = solana.MustPublicKeyFromBase58("wczmirTBMa3tGisAeecZcGbzvgi6VAG4Gu8uamtHBf3")
+	testPubKey2    = solana.MustPublicKeyFromBase58("3csuXZKah5rgpb8RiwX9XfjrMxcp3u1K9mBdCwL51spj")
+	testPubKey3    = solana.MustPublicKeyFromBase58("F6ZjiBm1WgVXzez5vxHeBDgaVPQRfLyFb7GFwXvyZVxD")
+	testPubKey4    = solana.MustPublicKeyFromBase58("E1bQJ8eMMn3zmeSewW3HQ8zmJr7KR75JonbwAtWx2bux")
+	testPubKey5    = solana.MustPublicKeyFromBase58("92q4Y2xGE39Bm2JgNZLZWuafoBiBR4gCj4igfpwvpgcD")
+	strategyPubKey = solana.MustPublicKeyFromBase58("8HqpYJ8F8BHdpHbUDbdfbjAPKZxdeN4vMXUkPDhtoy59")
+	jlpTokenPubKey = solana.MustPublicKeyFromBase58("EJmzZhQBX19G8xXLzx2eTUFCgTE9hH8igxNYoas7ekYE")
 
 	msgrOpConfig = msgr.OperationalConfig{
 		FailureDelay:     0 * time.Second,
@@ -52,6 +55,10 @@ func TestMessengerForNeutronRun(t *testing.T) {
 			"ETH":  ethPubKey,
 			"SOL":  solPubKey,
 		},
+		SolanaBalancesList: map[solana.PublicKey][]string{
+			strategyPubKey: {jlpTokenPubKey.String(), "SOL"},
+		},
+		SolanaTokenSupplyList: []solana.PublicKey{jlpTokenPubKey},
 	}
 
 	neutronAumRecv.EXPECT().GetJupiterAumReceiverNextRound(gomock.Any()).Return(&neutronclient.NextRound{
@@ -63,11 +70,14 @@ func TestMessengerForNeutronRun(t *testing.T) {
 			Lo: 5000000 * 1000000,
 		},
 	}, nil)
-	solanaClient.EXPECT().GetTokenSupply(gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
-		Amount: "10000000", Decimals: 6,
+	solanaClient.EXPECT().GetTokenMint(gomock.Any(), gomock.Any()).Return(&solanatoken.Mint{
+		Supply: 10000000, Decimals: 6,
 	}, nil)
 	solanaClient.EXPECT().GetTokenAccountBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
 		Amount: "2000000", Decimals: 6,
+	}, nil)
+	solanaClient.EXPECT().GetNativeBalance(gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
+		Amount: "1000000", Decimals: 9,
 	}, nil)
 	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
 		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 1000000, Locked: 2000000, GuaranteedUsd: 3000000}, Decimals: 6,
@@ -93,13 +103,20 @@ func TestMessengerForNeutronRun(t *testing.T) {
 			{Denom: "ETH", Owned: 100000, Locked: 200000, GuaranteedUsd: 3000000, Decimals: 6},
 			{Denom: "SOL", Owned: 500000, Locked: 700000, GuaranteedUsd: 3000000, Decimals: 6},
 		},
-		AumUsd:                     math.NewUintFromString("5000000"),
-		TotalJlpSupply:             math.NewUintFromString("10000000"),
-		StrategyJlpBalance:         math.NewUintFromString("2000000"),
-		TotalJlpSupplyDecimals:     6,
-		StrategyJlpBalanceDecimals: 6,
+		AumUsd: math.NewUintFromString("5000000"),
+		SolanaBalances: []neutronclient.SolanaBalance{
+			{Address: strategyPubKey.String(), Asset: jlpTokenPubKey.String(), Amount: math.NewUintFromString("2000000")},
+			{Address: strategyPubKey.String(), Asset: "SOL", Amount: math.NewUintFromString("1000000")},
+		},
+		SolanaTokenTotalSupply: []neutronclient.SolanaTokenTotalSupply{
+			{Asset: jlpTokenPubKey.String(), TotalSupply: math.NewUintFromString("10000000")},
+		},
+		SolanaTokenDecimals: []neutronclient.SolanaTokenDecimals{
+			{Asset: jlpTokenPubKey.String(), Decimals: 6},
+			{Asset: "SOL", Decimals: 9},
+		},
 	}
-	expectedData.SortCustodyAssets()
+	expectedData.Organize()
 	neutronAumRecv.EXPECT().SubmitJupiterAumData(gomock.Any(), expectedData).Return(&neutronclient.NextRound{
 		Round: 2, Timestamp: start + 12,
 	}, nil)

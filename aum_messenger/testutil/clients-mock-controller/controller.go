@@ -12,6 +12,7 @@ import (
 	binance "github.com/adshao/go-binance/v2"
 	binanceportfolio "github.com/adshao/go-binance/v2/portfolio"
 	solana "github.com/gagliardetto/solana-go"
+	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	jupiterclient "github.com/structured-org/aum-messenger/client/jupiter"
 )
@@ -63,8 +64,9 @@ func (cm *ClientsMockController) Start(port int) error {
 	http.HandleFunc("/mock/jupiter/custodyinfo", cm.handleJupiterCustodyInfo)
 	http.HandleFunc("/mock/jupiter/poolinfo", cm.handleJupiterPoolInfo)
 
-	http.HandleFunc("/mock/solana/tokensupply", cm.handleSolanaTokenSupply)
+	http.HandleFunc("/mock/solana/tokenmint", cm.handleSolanaTokenMint)
 	http.HandleFunc("/mock/solana/tokenaccountbalance", cm.handleSolanaTokenAccountBalance)
+	http.HandleFunc("/mock/solana/nativebalance", cm.handleSolanaNativeBalance)
 
 	return http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
@@ -225,7 +227,7 @@ func (cm *ClientsMockController) handleJupiterPoolInfo(w http.ResponseWriter, r 
 	}
 }
 
-func (cm *ClientsMockController) handleSolanaTokenSupply(w http.ResponseWriter, r *http.Request) {
+func (cm *ClientsMockController) handleSolanaTokenMint(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		body, err := io.ReadAll(r.Body)
@@ -233,21 +235,22 @@ func (cm *ClientsMockController) handleSolanaTokenSupply(w http.ResponseWriter, 
 			http.Error(w, "Error reading request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		var tokenSupply solanarpc.UiTokenAmount
-		if err := json.Unmarshal(body, &tokenSupply); err != nil {
+		var tokenMint solanatoken.Mint
+		if err := json.Unmarshal(body, &tokenMint); err != nil {
 			http.Error(w, "Error unmarshaling request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		cm.solanaMockClient.SetTokenSupply(&tokenSupply)
+		cm.solanaMockClient.SetTokenMint(&tokenMint)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "Solana Token Supply updated successfully")
+		fmt.Fprint(w, "Solana Token Mint updated successfully")
 	case http.MethodGet:
-		tokenSupply, _ := cm.solanaMockClient.GetTokenSupply(r.Context(), solana.PublicKey{})
-		json.NewEncoder(w).Encode(tokenSupply)
+		tokenMint, _ := cm.solanaMockClient.GetTokenMint(r.Context(), solana.PublicKey{})
+		json.NewEncoder(w).Encode(tokenMint)
 	default:
 		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
 	}
 }
+
 func (cm *ClientsMockController) handleSolanaTokenAccountBalance(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -279,6 +282,30 @@ func (cm *ClientsMockController) handleSolanaTokenAccountBalance(w http.Response
 			solana.PublicKey{},
 		)
 		json.NewEncoder(w).Encode(tokenAccountBalance)
+	default:
+		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (cm *ClientsMockController) handleSolanaNativeBalance(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Error reading request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		var nativeBalance solanarpc.UiTokenAmount
+		if err := json.Unmarshal(body, &nativeBalance); err != nil {
+			http.Error(w, "Error unmarshaling request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		cm.solanaMockClient.SetNativeBalance(&nativeBalance)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Solana Native Balance updated successfully")
+	case http.MethodGet:
+		nativeBalance, _ := cm.solanaMockClient.GetNativeBalance(r.Context(), solana.PublicKey{})
+		json.NewEncoder(w).Encode(nativeBalance)
 	default:
 		http.Error(w, "Only POST and GET methods are allowed", http.StatusMethodNotAllowed)
 	}
