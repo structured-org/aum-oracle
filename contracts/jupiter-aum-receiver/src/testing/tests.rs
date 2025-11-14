@@ -931,3 +931,77 @@ fn publish_till_consensus(
 
     (deps, res)
 }
+
+#[test]
+fn test_migrate() {
+    use crate::contract::migrate;
+    use cosmwasm_schema::cw_serde;
+    use cosmwasm_std::Storage;
+    use jupiter_aum_common::msg::MigrateMsg;
+    use serde_json;
+
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let env = mock_env();
+
+    // simulate pre-migration state
+    #[cw_serde]
+    struct OldConfig {
+        consensus_data_valid_period: u64,
+        required_custody_assets: Vec<String>,
+        price_data_valid_period: u64,
+    }
+    let old_config = OldConfig {
+        consensus_data_valid_period: 650,
+        required_custody_assets: vec![
+            "SOL".to_string(),
+            "USDC".to_string(),
+            "USDT".to_string(),
+            "WBTC".to_string(),
+            "WETH".to_string(),
+        ],
+        price_data_valid_period: 2,
+    };
+    let old_config_bytes = serde_json::to_vec(&old_config).unwrap();
+    deps.storage.set(b"config", &old_config_bytes);
+
+    // execute migration
+    let migrate_msg = MigrateMsg {
+        required_solana_balances: HashMap::from([(
+            "strategy_address".to_string(),
+            vec!["jlp_token".to_string()],
+        )]),
+        required_solana_token_total_supply: vec!["jlp_token".to_string()],
+        strategy_address: "strategy_address".to_string(),
+        jlp_token: "jlp_token".to_string(),
+    };
+    let result = migrate(deps.as_mut(), env, migrate_msg.clone());
+    assert!(result.is_ok(), "Migration should succeed");
+
+    // assert migration succeeds
+    let new_config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(
+        new_config.consensus_data_valid_period,
+        old_config.consensus_data_valid_period
+    );
+    assert_eq!(
+        new_config.required_custody_assets,
+        old_config.required_custody_assets
+    );
+    assert_eq!(
+        new_config.price_data_valid_period,
+        old_config.price_data_valid_period
+    );
+    assert_eq!(
+        new_config.required_solana_balances,
+        HashMap::from([(
+            "strategy_address".to_string(),
+            vec!["jlp_token".to_string()],
+        )])
+    );
+    assert_eq!(
+        new_config.required_solana_token_total_supply,
+        vec!["jlp_token".to_string()]
+    );
+    assert_eq!(new_config.strategy_address, "strategy_address".to_string());
+    assert_eq!(new_config.jlp_token, "jlp_token".to_string());
+}

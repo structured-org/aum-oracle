@@ -135,4 +135,16 @@ pub struct GetDataResponse {
 
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    /// List of solana addresses (key) which balances of assets (value) are required for consensus.
+    /// Must contain jlp_token balance tracking for the strategy_address.
+    pub required_solana_balances: HashMap<String, Vec<String>>,
+    /// List of solana tokens which total supply is required for consensus
+    pub required_solana_token_total_supply: Vec<String>,
+    /// The address of the strategy contract used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with jlp_token.
+    pub strategy_address: String,
+    /// The address of the JLP token used in AUM calculations. Must be specified in the
+    /// required_solana_balances along with strategy_address.
+    pub jlp_token: String,
+}

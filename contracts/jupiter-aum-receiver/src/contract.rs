@@ -348,7 +348,43 @@ pub fn calculate_aum_in_wbtc(
 
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+    use cosmwasm_schema::cw_serde;
+    use cosmwasm_std::StdError;
+    use serde_json;
+
+    // read and deserialize previous version of config
+    #[cw_serde]
+    struct OldConfig {
+        consensus_data_valid_period: u64,
+        required_custody_assets: Vec<String>,
+        price_data_valid_period: u64,
+    }
+    let Some(old_config_bytes) = deps.storage.get(b"config") else {
+        return Err(ContractError::Std(StdError::generic_err(
+            "data not found at key config",
+        )));
+    };
+    let old_config: OldConfig = serde_json::from_slice(&old_config_bytes).map_err(|e| {
+        ContractError::Std(StdError::generic_err(format!(
+            "failed to parse previous version of config: {}",
+            e
+        )))
+    })?;
+
+    // create new config out of the old one and MigrateMsg
+    let config = Config {
+        consensus_data_valid_period: old_config.consensus_data_valid_period,
+        required_custody_assets: old_config.required_custody_assets,
+        price_data_valid_period: old_config.price_data_valid_period,
+        required_solana_balances: msg.required_solana_balances,
+        required_solana_token_total_supply: msg.required_solana_token_total_supply,
+        strategy_address: msg.strategy_address,
+        jlp_token: msg.jlp_token,
+    };
+    config.validate()?;
+    CONFIG.save(deps.storage, &config)?;
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
 }
