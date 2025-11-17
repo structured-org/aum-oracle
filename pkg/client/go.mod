@@ -12,10 +12,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.50.11
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.12.0
-	github.com/golang/mock v1.6.0
-	github.com/neutron-org/neutron-logger v0.0.0-20221027125151-535167f2dd73
 	go.uber.org/zap v1.27.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -108,7 +105,6 @@ require (
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kelseyhightower/envconfig v1.4.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -180,6 +176,7 @@ require (
 	google.golang.org/protobuf v1.36.4 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
