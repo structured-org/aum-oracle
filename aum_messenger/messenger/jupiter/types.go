@@ -159,10 +159,12 @@ func fetchSolanaTokenInfos(
 	errs := make([]error, 0)
 	for token := range uniqueTokens {
 		if token == "SOL" {
+			mu.Lock()
 			decimals = append(decimals, neutronclient.SolanaTokenDecimals{
 				Asset:    token,
 				Decimals: solanaclient.SolanaNativeTokenDecimals,
 			})
+			mu.Unlock()
 			continue
 		}
 
