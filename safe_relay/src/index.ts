@@ -6,11 +6,11 @@ import { mnemonicToAccount, type HDAccount } from 'viem/accounts';
 import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import type { Logger } from "pino";
 import cron from "node-cron";
-import { getLogger } from "./logger";
+import { getLogger } from "./lib/logger.ts";
 import { OperationType, type MetaTransactionData } from "@safe-global/types-kit";
 import Safe from "@safe-global/protocol-kit";
 
-const RECEIVER_ABI = require("./Receiver.abi.json");
+import RECEIVER_ABI from "./generic/Receiver.abi.json";
 
 function toBigIntTimes10Pow(str: string, decimals = 18): BigInt {
   str = str.trim();
