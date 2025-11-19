@@ -9,6 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/structured-org/aum-messenger/messenger"
 	cosmosclient "github.com/structured-org/aum-messenger/pkg/client/cosmos"
+	solanaclient "github.com/structured-org/aum-messenger/pkg/client/solana"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,7 +94,7 @@ func (c *config) Validate() error {
 			return fmt.Errorf("solana_balances_list owner address %s is invalid: %w", address, err)
 		}
 		for _, token := range tokens {
-			if token == "SOL" {
+			if token == solanaclient.SolanaNativeTokenName {
 				continue
 			}
 			if _, err := solana.PublicKeyFromBase58(token); err != nil {

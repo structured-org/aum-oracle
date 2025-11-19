@@ -14,6 +14,8 @@ const (
 	// SolanaNativeTokenDecimals is the number of decimals of SOL. 1 SOL is represented as
 	// 1,000,000,000 lamports which are its smallest units.
 	SolanaNativeTokenDecimals = 9
+	// SolanaNativeTokenName is the name of the native token of Solana.
+	SolanaNativeTokenName = "SOL"
 )
 
 // Client is a client for Solana.

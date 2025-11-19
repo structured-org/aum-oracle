@@ -158,7 +158,7 @@ func fetchSolanaTokenInfos(
 	errsMu := sync.Mutex{}
 	errs := make([]error, 0)
 	for token := range uniqueTokens {
-		if token == "SOL" {
+		if token == solanaclient.SolanaNativeTokenName {
 			mu.Lock()
 			decimals = append(decimals, neutronclient.SolanaTokenDecimals{
 				Asset:    token,
@@ -231,13 +231,14 @@ func fetchSolanaBalances(
 				var balance *solanarpc.UiTokenAmount
 				var outErr error
 				switch token {
-				case "SOL":
+				case solanaclient.SolanaNativeTokenName:
 					nativeBalance, err := solanaClient.GetNativeBalance(ctx, address)
 					if err != nil {
 						outErr = fmt.Errorf("failed to get native balance of %s: %w", address.String(), err)
 						break
 					}
 					balance = nativeBalance
+
 				default:
 					tokenPubKey, err := solana.PublicKeyFromBase58(token)
 					if err != nil {
