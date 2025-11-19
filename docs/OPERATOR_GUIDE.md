@@ -882,7 +882,7 @@ rpc_endpoints:
 # These addresses may change - always use the latest provided by administrator
 jupiter_aum_contract: "neutron1s048a22wjsk3jgzdft5fhsdkdted45ne9hzfwxvg38rxnlq7lutq86fppg"
 binance_aum_contract: "neutron15mxl4juekpr8dk636rxkqvw4efx873sfs59ve97lkl0f02up4vhqr5j8kz"
-twaer_contract: "YOUR_TWAER_CONTRACT_ADDRESS"  # Provided during onboarding
+twaer_contract: "neutron186h0lnmfhf27pn9mrd8tgapjg89qmdr8q8p6vtemyk0hsnu8ty3sssqqy2"
 ```
 
 ---
