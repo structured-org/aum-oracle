@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	stdmath "math"
 	"slices"
 	"sync"
 
@@ -129,7 +128,7 @@ func fetchJlpAum(
 		return math.Uint{}, fmt.Errorf("failed to parse Jupiter pool aumUsd %s: %w", poolInfo.AumUsd.String(), err)
 	}
 	// Jupiter pool returns aumUsd with 6 decimals.
-	return aumUsd.Quo(math.NewUint(uint64(jupiterUsdDecimalsDivisor))), nil
+	return aumUsd.Quo(math.NewUint(jupiterUsdDecimalsDivisor)), nil
 }
 
 // fetchSolanaTokenInfos concurrently fetches total supply and decimals of tokens from the
@@ -281,4 +280,4 @@ func fetchSolanaBalances(
 // jupiterUsdDecimalsDivisor is the divisor for the Jupiter USD values. According to Jupiter
 // team, all USD values in Jupiter are scaled to 6 decimal places (presumably to comply with
 // USDC/USDT as they also have 6 decimals).
-var jupiterUsdDecimalsDivisor = uint64(stdmath.Pow10(6))
+const jupiterUsdDecimalsDivisor uint64 = 1_000_000
