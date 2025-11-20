@@ -1,7 +1,7 @@
 import pino from 'pino';
 import Module from '../modules/index';
 import {Config} from '../lib/config';
-import RelayEthereum from "../modules/relay-ethereum";
+import RelayEthereum from "../modules/relay-neutron-ethereum";
 
 export class ModuleManager {
     private readonly logger: pino.Logger;
