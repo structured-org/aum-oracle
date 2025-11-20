@@ -38,7 +38,7 @@ class Service {
         this.logger.info('Starting coordinator service...');
         this.workHandler = setInterval(
             () => this.performWork(),
-            this.config.serviceConfig.callInterval * 1000,
+            this.config.serviceConfig!.callInterval * 1000,
         );
         this.logger.info('Coordinator service started successfully');
     }

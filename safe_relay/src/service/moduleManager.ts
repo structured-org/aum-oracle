@@ -32,7 +32,7 @@ export class ModuleManager {
             } catch (error) {
                 console.log(error);
                 this.logger.error(
-                    {error: error.toString(), module: module.constructor.name},
+                    {error: error, module: module.constructor.name},
                     'Error running module',
                 );
             }

@@ -108,7 +108,7 @@ export class Config {
         {
             config.neutron = {
                 twaerContract: this.tomlData?.neutron.twaerContract!,
-                rpc: this.tomlData?.ethereum.rpc!,
+                rpc: this.tomlData?.neutron.rpc!,
             };
         }
 
