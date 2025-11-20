@@ -116,22 +116,23 @@ export class Config {
     }
 
     get serviceConfig() {
-        return this.tomlData?.serviceConfig;
+        return this.processedConfig?.serviceConfig;
     }
 
     get ethereum() {
-        return this.tomlData?.ethereum;
+        return this.processedConfig?.ethereum;
     }
 
     get neutron() {
-        return this.tomlData?.neutron;
+        return this.processedConfig?.neutron;
     }
 }
 
 let configInstance: Config | null = null;
-export const getConfig = (logger: Logger): Config => {
+export const getConfig = async (logger: Logger): Promise<Config> => {
     if (!configInstance) {
         configInstance = new Config(logger);
+        await configInstance.init();
     }
     return configInstance;
 };
