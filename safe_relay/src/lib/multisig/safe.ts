@@ -25,7 +25,7 @@ export default class SafeMultisig implements Multisig {
         this.logger = logger;
     }
 
-    async submitProposal(payload: Buffer, timestamp: number): Promise<string> {
+    async submitProposal(payload: Buffer, timestamp: number): Promise<string | null> {
         const er = (payload.readBigInt64BE());
         this.logger.info(`exchangeRate -- ${er}`);
         this.logger.info(`timestamp -- ${timestamp}`);
@@ -59,9 +59,7 @@ export default class SafeMultisig implements Multisig {
             senderAddress: this.config.signer.address,
             senderSignature: senderSignature.data
         });
-        // proposeTransaction calls #api, which returns the arbitrary JSON; I assume it contains the
-        // transaction hash that we need to return in order to call confirmProposal later. TODO
-        return "";
+        return null;
     }
 
     async executeProposal(id: string): Promise<string> {
