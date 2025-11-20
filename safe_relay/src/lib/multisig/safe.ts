@@ -25,9 +25,8 @@ export default class SafeMultisig implements Multisig {
         this.logger = logger;
     }
 
-    async submitProposal(payload: Buffer, timestamp: number): Promise<string | null> {
-        const er = (payload.readBigInt64BE());
-        this.logger.info(`exchangeRate -- ${er}`);
+    async submitProposal(payload: BigInt, timestamp: number): Promise<string | null> {
+        this.logger.info(`exchangeRate -- ${payload}`);
         this.logger.info(`timestamp -- ${timestamp}`);
 
         const safeTransactionData: MetaTransactionData = {
@@ -36,7 +35,7 @@ export default class SafeMultisig implements Multisig {
             data: encodeFunctionData({
                 abi: RECEIVER_ABI,
                 functionName: 'publish',
-                args: [payload.readBigInt64BE(), BigInt(timestamp)],
+                args: [payload, BigInt(timestamp)],
             }),
             operation: OperationType.Call,
         };
@@ -77,7 +76,7 @@ export default class SafeMultisig implements Multisig {
         return await this.config.safeApi.getPendingTransactions(this.multisigAddress, {});
     }
 
-    private async confirmProposal(safeTxHash: string) {
+    async confirmProposal(safeTxHash: string) {
         this.logger.info("Confirming proposal with Safe Tx Hash: %s", safeTxHash);
         const signature = await this.config.safeClient.signHash(safeTxHash);
 

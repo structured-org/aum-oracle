@@ -102,6 +102,7 @@ export class Config {
                 safeAddress: this.tomlData?.ethereum.safeAddress!,
                 safeApiKey: this.envData.SAFE_API_KEY,
                 receiverAddress: this.tomlData?.ethereum.receiverAddress!,
+                verifyValuesOnVote: this.tomlData?.ethereum.verifyValuesOnVote!,
                 rpc: this.tomlData?.ethereum.rpc!,
             };
         }

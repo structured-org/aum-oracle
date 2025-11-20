@@ -6,7 +6,7 @@ export default interface Multisig {
         Safe returns null
         SQUADS returns the transaction hash
     */
-    submitProposal(payload: Buffer, timestamp: number): Promise<string | null>;
+    submitProposal(payload: any, timestamp: number): Promise<string | null>;
 
     /*
         Safe id is a transaction hash (string)

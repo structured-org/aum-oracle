@@ -4,6 +4,7 @@ const safeRelayerEthereum = z.object({
     rpc: z.string(),
     safeAddress: z.string(),
     receiverAddress: z.string(),
+    verifyValuesOnVote: z.boolean(),
 });
 
 const safeRelayerNeutron = z.object({
@@ -13,7 +14,6 @@ const safeRelayerNeutron = z.object({
 
 const safeRelayerServiceConfig = z.object({
     logLevel: z.string(),
-    verifyValuesOnVote: z.boolean(),
     callInterval: z.number(), // Seconds
 })
 
