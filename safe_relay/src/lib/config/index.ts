@@ -119,6 +119,8 @@ export class Config {
             config.solana = {
                 rpc: this.tomlData?.solana.rpc!,
                 enabled: this.tomlData?.solana.enabled!,
+                multisigAddress: this.tomlData?.solana.multisigAddress,
+                vaultPda: this.tomlData?.solana.vaultPda,
                 seed: this.envData.SOLANA_SEED,
             };
         }

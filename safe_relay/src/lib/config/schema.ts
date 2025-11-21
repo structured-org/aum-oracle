@@ -16,6 +16,8 @@ const safeRelayerNeutron = z.object({
 const safeRelayerSolana = z.object({
     rpc: z.string(),
     enabled: z.boolean(),
+    multisigAddress: z.string(),
+    vaultPda: z.string(),
 });
 
 const safeRelayerServiceConfig = z.object({
