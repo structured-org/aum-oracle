@@ -2,6 +2,7 @@ import pino from 'pino';
 import Module from '../modules/index';
 import {Config} from '../lib/config';
 import RelayEthereum from "../modules/relay-neutron-ethereum";
+import RelaySolana from "../modules/relay-neutron-solana";
 
 export class ModuleManager {
     private readonly logger: pino.Logger;
@@ -22,6 +23,16 @@ export class ModuleManager {
             await relayEthereum.init();
             this.modules.push(relayEthereum);
             this.logger.info('RelayEthereum registered');
+        }
+        if (config.solana?.enabled) {
+            const relaySolana = new RelaySolana(
+                this.logger.child({ctx: 'RelaySolana'}),
+                config.solana!,
+                config.neutron!,
+            );
+            await relaySolana.init();
+            this.modules.push(relaySolana);
+            this.logger.info('RelaySolana registered');
         }
         this.logger.info(`Total modules registered: ${this.modules.length}`);
     }

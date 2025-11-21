@@ -31,7 +31,7 @@ export default class RelayEthereum implements Manager {
         /* Neutron */
         this.cosmWasmClient = await CosmWasmClient.connect(this.neutron.rpc);
         /* Ethereum */
-        const account = mnemonicToAccount(this.ethereum.mnemonic);
+        const account = mnemonicToAccount(this.ethereum.mnemonic!);
         this.ethAccount = account;
 
         const pk = account.getHdKey().privateKey;

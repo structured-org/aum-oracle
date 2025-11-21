@@ -89,7 +89,7 @@ export class Config {
                 rpc: this.tomlData?.neutron.rpc!,
             }
         };
-        if (config.ethereum?.enabled) {
+        if (this.tomlData?.ethereum.enabled) {
             if (!this.envData.ETHEREUM_MNEMONIC) {
                 throw new Error(
                     'ETHEREUM_MNEMONIC is required when EthereumClaim module is enabled',
@@ -110,16 +110,16 @@ export class Config {
                 rpc: this.tomlData?.ethereum.rpc!,
             };
         }
-        if (config.solana?.enabled) {
-            if (!this.envData.SOLANA_MNEMONIC) {
+        if (this.tomlData?.solana.enabled) {
+            if (!this.envData.SOLANA_SEED) {
                 throw new Error(
-                    'SOLANA_MNEMONIC is required when EthereumClaim module is enabled',
+                    'SOLANA_SEED is required when SolanaClaim module is enabled',
                 );
             }
             config.solana = {
                 rpc: this.tomlData?.solana.rpc!,
-                enabled: this.tomlData?.ethereum.enabled!,
-                mnemonic: this.envData.SOLANA_MNEMONIC,
+                enabled: this.tomlData?.solana.enabled!,
+                seed: this.envData.SOLANA_SEED,
             };
         }
 
@@ -136,6 +136,10 @@ export class Config {
 
     get neutron() {
         return this.processedConfig?.neutron;
+    }
+
+    get solana() {
+        return this.processedConfig?.solana;
     }
 }
 
