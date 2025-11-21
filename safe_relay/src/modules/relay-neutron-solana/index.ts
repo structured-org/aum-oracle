@@ -3,7 +3,7 @@ import {Logger} from "pino";
 import {NeutronConfig, SolanaConfig} from "../../lib/config";
 import {CosmWasmClient} from "@cosmjs/cosmwasm-stargate";
 import SquadsMultisig, {SquadsMultisigConfig} from "../../lib/multisig/squads";
-import {AnchorProvider, web3} from "@project-serum/anchor";
+import {AnchorProvider, Wallet, web3} from "@project-serum/anchor";
 import * as fs from "node:fs";
 
 type AumData = {
@@ -47,29 +47,27 @@ export default class RelaySolana implements Manager {
         /* Neutron */
         this.cosmWasmClient = await CosmWasmClient.connect(this.neutron.rpc);
         /* Solana */
-        process.env.ANCHOR_WALLET = this.solana.seedPath;
+        const keypair = web3.Keypair.fromSecretKey(Uint8Array.from(
+            JSON.parse(fs.readFileSync(this.solana.seedPath!, 'utf-8')),
+        ));
         const squadsMultisigConfig: SquadsMultisigConfig = {
-            anchorProvider: AnchorProvider.local(this.solana.rpc, {
-                commitment: 'confirmed',
-                skipPreflight: true,
-            }),
+            anchorProvider: new AnchorProvider(new web3.Connection(this.solana.rpc, {
+                    commitment: 'confirmed',
+                }),
+                new Wallet(keypair),
+                {
+                    commitment: 'confirmed',
+                    skipPreflight: true,
+                }
+            ),
             multisigAddress: new web3.PublicKey(this.solana.multisigAddress),
             vaultPda: new web3.PublicKey(this.solana.vaultPda),
-            keypair: web3.Keypair.fromSecretKey(
-                Buffer.from(
-                    JSON.parse(
-                        fs.readFileSync(this.solana.seedPath!, {
-                            encoding: 'utf-8',
-                        }),
-                    ),
-                ),
-            )
-        }
-        process.env.ANCHOR_WALLET = undefined;
+            keypair: keypair
+        };
         this.squadsMultisig = new SquadsMultisig(
             this.logger,
             squadsMultisigConfig
-        )
+        );
     }
 
     async tick(): Promise<void> {
