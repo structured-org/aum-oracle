@@ -7,6 +7,29 @@ import {AnchorProvider, web3} from "@project-serum/anchor";
 import {Keypair} from "@solana/web3.js";
 import * as fs from "node:fs";
 
+type AumData = {
+    last_published_data: {
+        round: number;
+        timestamp: number;
+        data: {
+            unimmr: string;
+            positions: {
+                symbol: string;
+                amount: string;
+                pnl: string;
+            }[];
+            um_balance_usdt: string;
+            spot_balances: {
+                asset: string;
+                amount: string;
+            }[];
+            pm_account_actual_equity: string;
+            withdrawable_usdt: string;
+        };
+    };
+};
+
+
 export default class RelaySolana implements Manager {
     private logger: Logger;
     private solana: SolanaConfig;
@@ -51,6 +74,14 @@ export default class RelaySolana implements Manager {
     }
 
     async tick(): Promise<void> {
-        console.log("tick()");
+        console.log(await this.getAumData());
+    }
+
+    private async getAumData(): Promise<AumData> {
+        const result = await this.cosmWasmClient?.queryContractSmart(this.neutron.binanceAum, {
+            "get_data": {}
+        });
+        this.logger.trace("TWAER Query Result: %o", result);
+        return result as AumData;
     }
 }

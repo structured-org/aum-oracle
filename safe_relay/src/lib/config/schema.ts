@@ -10,7 +10,8 @@ const safeRelayerEthereum = z.object({
 
 const safeRelayerNeutron = z.object({
     rpc: z.string(),
-    twaerContract: z.string()
+    twaerContract: z.string(),
+    binanceAum: z.string()
 });
 
 const safeRelayerSolana = z.object({

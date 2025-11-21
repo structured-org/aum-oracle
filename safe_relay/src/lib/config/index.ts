@@ -86,6 +86,7 @@ export class Config {
             serviceConfig: this.tomlData?.serviceConfig,
             neutron: {
                 twaerContract: this.tomlData?.neutron.twaerContract!,
+                binanceAum: this.tomlData?.neutron.binanceAum!,
                 rpc: this.tomlData?.neutron.rpc!,
             }
         };
