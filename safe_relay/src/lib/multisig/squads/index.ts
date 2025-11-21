@@ -1,6 +1,7 @@
 import type Multisig from "../index";
 import {AnchorProvider, web3} from "@project-serum/anchor";
 import * as multisig from '@sqds/multisig';
+// @ts-ignore
 import {Multisig as SquadsMultisigGenerated} from '@sqds/multisig/lib/generated';
 import {Logger} from "pino";
 import {AddressLookupTableAccount} from "@solana/web3.js";
@@ -14,12 +15,10 @@ export type SquadsMultisigConfig = {
 }
 
 export default class SquadsMultisig implements Multisig {
-    multisigAddress: string;
     private logger: Logger;
     private squadsMultisigApp: SquadsMultisigConfig;
 
-    constructor(multisigAddress: string, logger: Logger, squadsMultisigConfig: SquadsMultisigConfig) {
-        this.multisigAddress = multisigAddress;
+    constructor(logger: Logger, squadsMultisigConfig: SquadsMultisigConfig) {
         this.logger = logger;
         this.squadsMultisigApp = squadsMultisigConfig;
     }

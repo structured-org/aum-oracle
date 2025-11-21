@@ -1,6 +1,4 @@
 export default interface Multisig {
-    multisigAddress: string;
-
     /*
         payload is the arbitrary data we want to submit on the destination chain
         Safe returns null

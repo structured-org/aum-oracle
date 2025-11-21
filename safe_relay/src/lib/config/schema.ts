@@ -35,11 +35,11 @@ export const safeRelayerConfigSchema = z.object({
 export const envSchema = z.object({
     CONFIG_PATH: z.string(),
     ETHEREUM_MNEMONIC: z.string().optional(),
-    SOLANA_SEED: z.string().optional(),
+    SOLANA_SEED_PATH: z.string().optional(),
     SAFE_API_KEY: z.string().optional(),
 });
 
-type CommonConfigProperties = { mnemonic?: string, seed?: string };
+type CommonConfigProperties = { mnemonic?: string, seedPath?: string };
 export type ServiceConfig = z.infer<typeof safeRelayerServiceConfig>;
 export type NeutronConfig = z.infer<typeof safeRelayerNeutron>;
 export type SolanaConfig = z.infer<typeof safeRelayerSolana> & CommonConfigProperties;

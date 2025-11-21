@@ -111,9 +111,9 @@ export class Config {
             };
         }
         if (this.tomlData?.solana.enabled) {
-            if (!this.envData.SOLANA_SEED) {
+            if (!this.envData.SOLANA_SEED_PATH) {
                 throw new Error(
-                    'SOLANA_SEED is required when SolanaClaim module is enabled',
+                    'SOLANA_SEED_PATH is required when SolanaClaim module is enabled',
                 );
             }
             config.solana = {
@@ -121,7 +121,7 @@ export class Config {
                 enabled: this.tomlData?.solana.enabled!,
                 multisigAddress: this.tomlData?.solana.multisigAddress,
                 vaultPda: this.tomlData?.solana.vaultPda,
-                seed: this.envData.SOLANA_SEED,
+                seedPath: this.envData.SOLANA_SEED_PATH,
             };
         }
 
