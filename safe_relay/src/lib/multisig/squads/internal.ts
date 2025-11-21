@@ -13,6 +13,246 @@ import {
 } from '@solana/web3.js';
 import assert from 'assert';
 
+
+export class Ms {
+    createKey?: web3.PublicKey;
+    configAuthority?: web3.PublicKey;
+    threshold?: number; // u16
+    timelock?: number; // u32
+    transactionIndex?: bigint; // u64
+    staleTransactionIndex?: bigint; // u64
+    rentCollector?: null | web3.PublicKey; // Option<web3.PublicKey>
+    bump?: number; // u8
+    members?: Array<{
+        key: web3.PublicKey;
+        permissions: {
+            mask: number; // u8
+        };
+    }>;
+
+    static deserialize(data: Uint8Array): Ms {
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        let offset = 8;
+
+        const createKey = new web3.PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        const configAuthority = new web3.PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        const threshold = view.getUint16(offset, true);
+        offset += 2;
+
+        const timelock = view.getUint32(offset, true);
+        offset += 4;
+
+        const transactionIndex = view.getBigUint64(offset, true);
+        offset += 8;
+
+        const staleTransactionIndex = view.getBigUint64(offset, true);
+        offset += 8;
+
+        // Option<PublicKey>
+        const hasRentCollector = view.getUint8(offset);
+        offset += 1;
+
+        let rentCollector: web3.PublicKey | null = null;
+        if (hasRentCollector) {
+            rentCollector = new web3.PublicKey(data.slice(offset, offset + 32));
+            offset += 32;
+        }
+
+        const bump = view.getUint8(offset);
+        offset += 1;
+
+        // Vec<Member>
+        const membersLength = view.getUint32(offset, true);
+        offset += 4;
+
+        const members: Ms['members'] = [];
+        for (let i = 0; i < membersLength; i++) {
+            const key = new web3.PublicKey(data.slice(offset, offset + 32));
+            offset += 32;
+
+            const mask = view.getUint8(offset);
+            offset += 1;
+
+            members.push({key, permissions: {mask}});
+        }
+
+        return {
+            createKey,
+            configAuthority,
+            threshold,
+            timelock,
+            transactionIndex,
+            staleTransactionIndex,
+            rentCollector,
+            bump,
+            members,
+        };
+    }
+}
+
+export enum ProposalStatus {
+    Draft, // { timestamp: i64 }
+    Active, // { timestamp: i64 }
+    Rejected, // { timestamp: i64 }
+    Approved, // { timestamp: i64 }
+    Executing,
+    Executed, // { timestamp: i64 }
+    Cancelled, // { timestamp: i64 }
+}
+
+export function proposalStatusToString(status: ProposalStatus) {
+    switch (status) {
+        case ProposalStatus.Draft:
+            return 'Draft';
+        case ProposalStatus.Active:
+            return 'Active';
+        case ProposalStatus.Rejected:
+            return 'Rejected';
+        case ProposalStatus.Approved:
+            return 'Approved';
+        case ProposalStatus.Executing:
+            return 'Executing';
+        case ProposalStatus.Executed:
+            return 'Executed';
+        case ProposalStatus.Cancelled:
+            return 'Cancelled';
+    }
+}
+
+export class Proposal {
+    multisig?: web3.PublicKey;
+    transactionIndex?: bigint; // u64
+    status?: ProposalStatus;
+    bump?: number; // u8
+    approved?: Array<web3.PublicKey>;
+    rejected?: Array<web3.PublicKey>;
+    cancelled?: Array<web3.PublicKey>;
+
+    static deserialize(data: Uint8Array): Proposal {
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        let offset = 8;
+
+        // multisig: PublicKey (32 bytes)
+        const multisig = new web3.PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        // transaction_index: u64 (8 bytes)
+        const transactionIndex = view.getBigUint64(offset, true);
+        offset += 8;
+
+        // status: enum u8 (1 byte)
+        const statusByte = view.getUint8(offset);
+        offset += 1;
+        const status = statusByte as ProposalStatus;
+
+        // timestamp: i64 (8 bytes) only for some statuses
+        // Statuses with timestamp: Draft, Active, Rejected, Approved, Executed, Cancelled
+        // Status without timestamp: Executing
+        if (
+            status === ProposalStatus.Draft ||
+            status === ProposalStatus.Active ||
+            status === ProposalStatus.Rejected ||
+            status === ProposalStatus.Approved ||
+            status === ProposalStatus.Executed ||
+            status === ProposalStatus.Cancelled
+        ) {
+            offset += 8;
+        }
+
+        // bump: u8 (1 byte)
+        const bump = view.getUint8(offset);
+        offset += 1;
+
+        // Helper to read Vec<PublicKey> (length-prefixed)
+        function readPubkeyArray(): web3.PublicKey[] {
+            // Vec<u8> length prefix for count of items
+            const length = Number(view.getUint32(offset, true));
+            offset += 4;
+
+            const arr: web3.PublicKey[] = [];
+            for (let i = 0; i < length; i++) {
+                const key = new web3.PublicKey(data.slice(offset, offset + 32));
+                arr.push(key);
+                offset += 32;
+            }
+            return arr;
+        }
+
+        const approved = readPubkeyArray();
+        const rejected = readPubkeyArray();
+        const cancelled = readPubkeyArray();
+
+        return {
+            multisig,
+            transactionIndex,
+            status,
+            bump,
+            approved,
+            rejected,
+            cancelled,
+        };
+    }
+}
+
+export class Batch {
+    multisig?: web3.PublicKey;
+    creator?: web3.PublicKey;
+    index?: bigint; // u64
+    bump?: number; // u8
+    vaultIndex?: number; // u8
+    vaultBump?: number; //u8
+    size?: number; // u32
+    executedTransactionIndex?: number; // u32
+
+    static deserialize(data: Uint8Array): Batch {
+        const dataView = new DataView(
+            data.buffer,
+            data.byteOffset,
+            data.byteLength,
+        );
+        let offset = 8; // skip discriminator
+
+        const multisig = new web3.PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        const creator = new web3.PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+
+        const index = dataView.getBigUint64(offset, true); // little-endian
+        offset += 8;
+
+        const bump = dataView.getUint8(offset);
+        offset += 1;
+
+        const vaultIndex = dataView.getUint8(offset);
+        offset += 1;
+
+        const vaultBump = dataView.getUint8(offset);
+        offset += 1;
+
+        const size = dataView.getUint32(offset, true);
+        offset += 4;
+
+        const executedTransactionIndex = dataView.getUint32(offset, true);
+        offset += 4;
+
+        return {
+            multisig,
+            creator,
+            index,
+            bump,
+            vaultIndex,
+            vaultBump,
+            size,
+            executedTransactionIndex,
+        };
+    }
+}
+
 export type BatchAddTransactionArgs = {
     ephemeralSigners: number;
     transactionMessage: Uint8Array;

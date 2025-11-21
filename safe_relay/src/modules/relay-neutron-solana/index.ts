@@ -4,7 +4,6 @@ import {NeutronConfig, SolanaConfig} from "../../lib/config";
 import {CosmWasmClient} from "@cosmjs/cosmwasm-stargate";
 import SquadsMultisig, {SquadsMultisigConfig} from "../../lib/multisig/squads";
 import {AnchorProvider, web3} from "@project-serum/anchor";
-import {Keypair} from "@solana/web3.js";
 import * as fs from "node:fs";
 
 type AumData = {
