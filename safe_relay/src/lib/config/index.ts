@@ -104,6 +104,7 @@ export class Config {
             config.ethereum = {
                 mnemonic: this.envData.ETHEREUM_MNEMONIC,
                 enabled: this.tomlData?.ethereum.enabled!,
+                proposalDelay: this.tomlData?.ethereum.proposalDelay!,
                 safeAddress: this.tomlData?.ethereum.safeAddress!,
                 safeApiKey: this.envData.SAFE_API_KEY,
                 receiverAddress: this.tomlData?.ethereum.receiverAddress!,
@@ -120,6 +121,7 @@ export class Config {
             config.solana = {
                 rpc: this.tomlData?.solana.rpc!,
                 enabled: this.tomlData?.solana.enabled!,
+                proposalDelay: this.tomlData?.ethereum.proposalDelay!,
                 multisigAddress: this.tomlData?.solana.multisigAddress,
                 vaultPda: this.tomlData?.solana.vaultPda,
                 seedPath: this.envData.SOLANA_SEED_PATH,

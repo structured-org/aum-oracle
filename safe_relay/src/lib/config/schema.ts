@@ -4,6 +4,7 @@ const safeRelayerEthereum = z.object({
     rpc: z.string(),
     enabled: z.boolean(),
     safeAddress: z.string(),
+    proposalDelay: z.number(), // Seconds
     receiverAddress: z.string(),
     verifyValuesOnVote: z.boolean(),
 });
@@ -18,6 +19,7 @@ const safeRelayerSolana = z.object({
     rpc: z.string(),
     enabled: z.boolean(),
     multisigAddress: z.string(),
+    proposalDelay: z.number(), // Seconds
     vaultPda: z.string(),
 });
 

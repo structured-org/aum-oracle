@@ -53,6 +53,8 @@ export default class RelayEthereum implements Manager {
     }
 
     async tick(): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, this.ethereum.proposalDelay));
+
         const neutronData = await this.getTWAERData();
         const ethereumData = await this.getReceverData();
         const pendingProposals = await this.safeMultisig?.getPendingProposals()!;
