@@ -13,14 +13,16 @@ export class ModuleManager {
 
     async registerModules(config: Config): Promise<void> {
         this.logger.info('Registering modules...');
-        const relayEthereum = new RelayEthereum(
-            this.logger.child({ctx: 'RelayEthereum'}),
-            config.ethereum!,
-            config.neutron!,
-        );
-        await relayEthereum.init();
-        this.modules.push(relayEthereum);
-        this.logger.info('RelayEthereum registered');
+        if (config.ethereum?.enabled) {
+            const relayEthereum = new RelayEthereum(
+                this.logger.child({ctx: 'RelayEthereum'}),
+                config.ethereum!,
+                config.neutron!,
+            );
+            await relayEthereum.init();
+            this.modules.push(relayEthereum);
+            this.logger.info('RelayEthereum registered');
+        }
         this.logger.info(`Total modules registered: ${this.modules.length}`);
     }
 

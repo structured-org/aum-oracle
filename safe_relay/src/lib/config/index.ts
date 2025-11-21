@@ -83,10 +83,13 @@ export class Config {
 
     private createProcessedConfig(): ProcessedConfig {
         const config: ProcessedConfig = {
-            serviceConfig: this.tomlData?.serviceConfig
+            serviceConfig: this.tomlData?.serviceConfig,
+            neutron: {
+                twaerContract: this.tomlData?.neutron.twaerContract!,
+                rpc: this.tomlData?.neutron.rpc!,
+            }
         };
-
-        {
+        if (config.ethereum?.enabled) {
             if (!this.envData.ETHEREUM_MNEMONIC) {
                 throw new Error(
                     'ETHEREUM_MNEMONIC is required when EthereumClaim module is enabled',
@@ -99,6 +102,7 @@ export class Config {
             }
             config.ethereum = {
                 mnemonic: this.envData.ETHEREUM_MNEMONIC,
+                enabled: this.tomlData?.ethereum.enabled!,
                 safeAddress: this.tomlData?.ethereum.safeAddress!,
                 safeApiKey: this.envData.SAFE_API_KEY,
                 receiverAddress: this.tomlData?.ethereum.receiverAddress!,
@@ -106,10 +110,16 @@ export class Config {
                 rpc: this.tomlData?.ethereum.rpc!,
             };
         }
-        {
-            config.neutron = {
-                twaerContract: this.tomlData?.neutron.twaerContract!,
-                rpc: this.tomlData?.neutron.rpc!,
+        if (config.solana?.enabled) {
+            if (!this.envData.SOLANA_MNEMONIC) {
+                throw new Error(
+                    'SOLANA_MNEMONIC is required when EthereumClaim module is enabled',
+                );
+            }
+            config.solana = {
+                rpc: this.tomlData?.solana.rpc!,
+                enabled: this.tomlData?.ethereum.enabled!,
+                mnemonic: this.envData.SOLANA_MNEMONIC,
             };
         }
 
