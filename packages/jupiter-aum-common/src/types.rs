@@ -6,6 +6,8 @@ use consensus::consensus::{
 use consensus::error::ConsensusError;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Decimal, Int256, SignedDecimal256, Uint128};
+use neutron_std::types::neutron::util::precdec::PrecDec;
+use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
@@ -29,6 +31,8 @@ pub struct Config {
     /// The address of the JLP token used in AUM calculations. Must be specified in the
     /// required_solana_balances along with strategy_address.
     pub jlp_token: String,
+    /// Map of Solana asset names to Slinky oracle asset names for price lookups
+    pub solana_slinky_map: HashMap<String, String>,
 }
 
 impl Config {
@@ -89,6 +93,20 @@ impl Config {
             .contains(&self.jlp_token)
         {
             return Err(ContractError::JlpTotalSupplyNotTracked {});
+        }
+
+        // check that all assets from required_solana_balances except jlp_token are represented in solana_slinky_map
+        for asset in self.required_solana_balances.values().flatten() {
+            if asset != &self.jlp_token && !self.solana_slinky_map.contains_key(asset) {
+                return Err(ContractError::AssetNotInSlinkyMap {
+                    asset: asset.clone(),
+                });
+            }
+        }
+
+        // check that jlp_token is not present in solana_slinky_map
+        if self.solana_slinky_map.contains_key(&self.jlp_token) {
+            return Err(ContractError::JlpTokenInSlinkyMap {});
         }
 
         Ok(())
@@ -517,4 +535,27 @@ pub struct AumInWBTC {
 fn find_duplicate(items: &[String]) -> Option<&String> {
     let mut seen = HashSet::new();
     items.iter().find(|&item| !seen.insert(item))
+}
+
+#[cw_serde]
+pub enum QueryMsg {
+    GetPrices {
+        token_a: TokenData,
+        token_b: TokenData,
+    },
+}
+
+#[cw_serde]
+pub struct TokenData {
+    pub denom: String,
+    pub decimals: u8,
+    pub pair: CurrencyPair,
+    pub max_blocks_old: u64,
+}
+
+#[cw_serde]
+pub struct CombinedPriceResponse {
+    pub token_0_price: PrecDec,
+    pub token_1_price: PrecDec,
+    pub price_0_to_1: PrecDec,
 }

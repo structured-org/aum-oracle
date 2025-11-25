@@ -91,16 +91,43 @@
       },
       "additionalProperties": false
     },
+    "SolanaBalance": {
+      "description": "Represents a single asset balance on a Solana account.",
+      "type": "object",
+      "required": [
+        "address",
+        "amount",
+        "asset"
+      ],
+      "properties": {
+        "address": {
+          "description": "Address of the account.",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Amount of the asset on the account balance.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "SolanaData": {
       "description": "SolanaData represents the off-chain data pulled from the Solana blockchain specifically for Jupiter AUM (Assets Under Management) calculation.",
       "type": "object",
       "required": [
         "aum_usd",
         "custody_assets",
-        "strategy_jlp_balance",
-        "strategy_jlp_balance_decimals",
-        "total_jlp_supply",
-        "total_jlp_supply_decimals"
+        "solana_balances",
+        "solana_token_decimals",
+        "solana_token_total_supply"
       ],
       "properties": {
         "aum_usd": {
@@ -118,33 +145,70 @@
             "$ref": "#/definitions/CustodyAsset"
           }
         },
-        "strategy_jlp_balance": {
-          "description": "The balance of JLP tokens held by the strategy.",
+        "solana_balances": {
+          "description": "Contains information about asset balances on Solana accounts",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaBalance"
+          }
+        },
+        "solana_token_decimals": {
+          "description": "Contains information about token decimals on Solana",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaTokenDecimals"
+          }
+        },
+        "solana_token_total_supply": {
+          "description": "Contains information about the total supply of Solana tokens",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaTokenTotalSupply"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SolanaTokenDecimals": {
+      "description": "Represents the decimals of a token on Solana.",
+      "type": "object",
+      "required": [
+        "asset",
+        "decimals"
+      ],
+      "properties": {
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        },
+        "decimals": {
+          "description": "Decimals of the asset.",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SolanaTokenTotalSupply": {
+      "description": "Represents the total supply of a token on Solana.",
+      "type": "object",
+      "required": [
+        "asset",
+        "total_supply"
+      ],
+      "properties": {
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        },
+        "total_supply": {
+          "description": "Total supply of the asset.",
           "allOf": [
             {
               "$ref": "#/definitions/Uint128"
             }
           ]
-        },
-        "strategy_jlp_balance_decimals": {
-          "description": "JLP token balance decimal precision",
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0.0
-        },
-        "total_jlp_supply": {
-          "description": "The total supply of JLP (Jupiter Liquidity Provider) tokens.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Uint128"
-            }
-          ]
-        },
-        "total_jlp_supply_decimals": {
-          "description": "JLP token supply decimal precision",
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0.0
         }
       },
       "additionalProperties": false

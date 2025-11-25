@@ -36,6 +36,8 @@ pub struct InstantiateMsg {
     /// The address of the JLP token used in AUM calculations. Must be specified in the
     /// required_solana_balances along with strategy_address.
     pub jlp_token: String,
+    /// Map of Solana asset names to Slinky oracle asset names for price lookups
+    pub solana_slinky_map: HashMap<String, String>,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -71,6 +73,8 @@ pub struct UpdateConfig {
     /// New address of the JLP token used in AUM calculations. Must be specified in the
     /// required_solana_balances along with strategy_address.
     pub jlp_token: Option<String>,
+    /// New map of Solana asset names to Slinky oracle asset names for price lookups
+    pub solana_slinky_map: Option<HashMap<String, String>>,
 
     // Consensus configuration updates
     //
@@ -147,4 +151,6 @@ pub struct MigrateMsg {
     /// The address of the JLP token used in AUM calculations. Must be specified in the
     /// required_solana_balances along with strategy_address.
     pub jlp_token: String,
+    /// Map of Solana asset names to Slinky oracle asset names for price lookups
+    pub solana_slinky_map: HashMap<String, String>,
 }

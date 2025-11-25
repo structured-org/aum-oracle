@@ -44,6 +44,12 @@ pub enum ContractError {
     #[error("JLP token supply tracking is required")]
     JlpTotalSupplyNotTracked {},
 
+    #[error("Asset {asset} from required_solana_balances is not present in solana_slinky_map")]
+    AssetNotInSlinkyMap { asset: String },
+
+    #[error("JLP token should not be present in solana_slinky_map")]
+    JlpTokenInSlinkyMap {},
+
     #[error("Crucial consensus data is missing: {details}")]
     CrucialConsensusDataMissing { details: String },
 
@@ -59,14 +65,18 @@ pub enum ContractError {
     #[error("Overflow: {error}")]
     DecimalError { error: String },
 
-    #[error("Slinky BTC/USD price is missing")]
-    SlinkyBTCPriceMissing {},
+    #[error("Slinky {asset}/USD price is missing")]
+    SlinkyAssetPriceMissing { asset: String },
 
-    #[error("Slinky BTC/USD price ({price}) is invalid: {error}")]
-    SlinkyBTCPriceIncorrect { price: String, error: String },
+    #[error("Slinky {asset}/USD price ({price}) is invalid: {error}")]
+    SlinkyAssetPriceIncorrect {
+        asset: String,
+        price: String,
+        error: String,
+    },
 
-    #[error("Slinky BTC/USD price is too old: {price_height}")]
-    SlinkyBTCPriceTooOld { price_height: u64 },
+    #[error("Slinky {asset}/USD price is too old: {price_height}")]
+    SlinkyAssetPriceTooOld { asset: String, price_height: u64 },
 
     #[error("Decimal range exceeded")]
     DecimalRangeError(cosmwasm_std::SignedDecimal256RangeExceeded),

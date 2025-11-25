@@ -821,6 +821,7 @@ dependencies = [
  "cosmwasm-std",
  "cw-ownable",
  "ed25519-zebra",
+ "neutron-std",
  "serde",
  "thiserror",
 ]

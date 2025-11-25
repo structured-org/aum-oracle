@@ -4,11 +4,12 @@ use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse, RoundI
 use consensus::consensus::Config as ConsensusConfig;
 use consensus::consensus::PublishResult;
 use cosmwasm_std::{
-    attr, entry_point, to_json_binary, Binary, Deps, DepsMut, Env, Int256, MessageInfo, Response,
-    SignedDecimal256, StdResult, Uint128,
+    attr, entry_point, to_json_binary, Addr, Binary, Deps, DepsMut, Env, Int256, MessageInfo,
+    Response, SignedDecimal256, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
+use cw_storage_plus::Map;
 use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig,
@@ -16,6 +17,7 @@ use jupiter_aum_common::msg::{
 use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
+use std::collections::HashMap;
 use std::str::FromStr;
 
 const CONTRACT_NAME: &str = "crates.io:jupiter-aum-receiver";
@@ -44,6 +46,7 @@ pub fn instantiate(
         required_solana_token_total_supply: msg.required_solana_token_total_supply,
         strategy_address: msg.strategy_address,
         jlp_token: msg.jlp_token,
+        solana_slinky_map: msg.solana_slinky_map,
     };
     config.validate()?;
 
@@ -125,6 +128,10 @@ fn update_config(
 
     if let Some(new_jlp_token_address) = new_config.jlp_token {
         contract_config.jlp_token = new_jlp_token_address;
+    }
+
+    if let Some(new_solana_slinky_map) = new_config.solana_slinky_map {
+        contract_config.solana_slinky_map = new_solana_slinky_map;
     }
 
     contract_config.validate()?;
@@ -261,91 +268,6 @@ fn query_round_info(deps: Deps, _env: Env) -> Result<RoundInfoResponse, Contract
     })
 }
 
-/// Fetches the BTC/USD price from the slinky oracle and ensures freshness.
-fn query_btc_price_in_usd(
-    deps: Deps,
-    env: Env,
-    config: &Config,
-) -> Result<SignedDecimal256, ContractError> {
-    let querier = OracleQuerier::new(&deps.querier);
-    let response = querier.get_price(Some(CurrencyPair {
-        base: BTC_DENOM.to_string(),
-        quote: USD_DENOM.to_string(),
-    }))?;
-
-    let quote = response
-        .price
-        .ok_or(ContractError::SlinkyBTCPriceMissing {})?;
-
-    if quote.block_height + config.price_data_valid_period < env.block.height {
-        return Err(ContractError::SlinkyBTCPriceTooOld {
-            price_height: quote.block_height,
-        });
-    }
-
-    let btc_price_in_usd =
-        Uint128::from_str(&quote.price).map_err(|e| ContractError::SlinkyBTCPriceIncorrect {
-            price: quote.price,
-            error: e.to_string(),
-        })?;
-
-    let btc_price_in_usd =
-        SignedDecimal256::from_atomics(btc_price_in_usd, response.decimals as u32).map_err(
-            |e| ContractError::DecimalError {
-                error: e.to_string(),
-            },
-        )?;
-
-    Ok(btc_price_in_usd)
-}
-
-/// Computes the AUM in wBTC units using Solana data and BTC/USD price.
-pub fn calculate_aum_in_wbtc(
-    data: SolanaData,
-    btc_price_in_usd: SignedDecimal256,
-    config: &Config,
-) -> Result<Int256, ContractError> {
-    let consensus_jlp_total_supply = data
-        .solana_token_total_supply
-        .iter()
-        .find(|t| t.asset == config.jlp_token)
-        .ok_or(ContractError::CrucialConsensusDataMissing {
-            details: "JLP total supply".to_string(),
-        })?
-        .total_supply;
-    let consensus_jlp_decimals = data
-        .solana_token_decimals
-        .iter()
-        .find(|d| d.asset == config.jlp_token)
-        .ok_or(ContractError::CrucialConsensusDataMissing {
-            details: "JLP decimals".to_string(),
-        })?
-        .decimals;
-    let consensus_strategy_jlp_balance = data
-        .solana_balances
-        .iter()
-        .find(|b| b.address == config.strategy_address && b.asset == config.jlp_token)
-        .ok_or(ContractError::CrucialConsensusDataMissing {
-            details: "Strategy JLP balance".to_string(),
-        })?
-        .amount;
-
-    let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, 0)?;
-    let total_jlp_supply =
-        SignedDecimal256::from_atomics(consensus_jlp_total_supply, consensus_jlp_decimals as u32)?;
-    let strategy_jlp_balance = SignedDecimal256::from_atomics(
-        consensus_strategy_jlp_balance,
-        consensus_jlp_decimals as u32,
-    )?;
-    let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)?;
-    let jlp_balance_in_usd = jlp_virtual_price.checked_mul(strategy_jlp_balance)?;
-    let aum_in_btc = jlp_balance_in_usd.checked_div(btc_price_in_usd)?;
-    let aum_in_wbtc = aum_in_btc.atomics()
-        / Int256::from_i128(10i128.pow(aum_in_btc.decimal_places() - WBTC_DECIMALS));
-
-    Ok(aum_in_wbtc)
-}
-
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
@@ -381,18 +303,148 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
         required_solana_token_total_supply: msg.required_solana_token_total_supply,
         strategy_address: msg.strategy_address,
         jlp_token: msg.jlp_token,
+        solana_slinky_map: msg.solana_slinky_map,
     };
     config.validate()?;
     CONFIG.save(deps.storage, &config)?;
+
+    // If the state already contains pending data, consensus cannot be reached \
+    // because that data does not meet the new SolanaData requirements and therefore cannot be processed.
+    let pending_data: Map<Addr, SolanaData> = Map::new("consensus__pending_data");
+    pending_data.clear(deps.storage);
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
 }
 
 /// Calculates and returns the current AUM value in wBTC.
-fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
+pub fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let btc_price_in_usd = query_btc_price_in_usd(deps, env, &config)?;
-    let aum_in_btc = calculate_aum_in_wbtc(data, btc_price_in_usd, &config)?;
+    let btc_price_in_usd = get_asset_price_in_usd(deps, &env, &config, BTC_DENOM.to_string())?;
+    let mut prices = config
+        .solana_slinky_map
+        .iter()
+        .try_fold::<_, _, Result<_, ContractError>>(
+            HashMap::new(),
+            |mut acc, (solana_asset, slinky_asset)| {
+                let price = get_asset_price_in_usd(deps, &env, &config, slinky_asset.clone())?;
+
+                acc.insert(solana_asset.clone(), price.checked_div(btc_price_in_usd)?);
+                Ok(acc)
+            },
+        )?;
+    let jlp_btc_price = get_jlp_price_in_usd(&data, &config)?.checked_div(btc_price_in_usd)?;
+    prices.insert(config.jlp_token, jlp_btc_price);
+    let aum_in_btc = calculate_aum_in_wbtc(prices, data)?;
     Ok(aum_in_btc)
+}
+
+/// Fetches the Asset/USD price from the slinky oracle and ensures freshness.
+pub fn get_asset_price_in_usd(
+    deps: Deps,
+    env: &Env,
+    config: &Config,
+    base: String,
+) -> Result<SignedDecimal256, ContractError> {
+    let querier = OracleQuerier::new(&deps.querier);
+    let response = querier.get_price(Some(CurrencyPair {
+        base: base.clone(),
+        quote: USD_DENOM.to_string(),
+    }))?;
+
+    let quote = response
+        .price
+        .ok_or(ContractError::SlinkyAssetPriceMissing {
+            asset: base.clone(),
+        })?;
+
+    if quote.block_height + config.price_data_valid_period < env.block.height {
+        return Err(ContractError::SlinkyAssetPriceTooOld {
+            asset: base.clone(),
+            price_height: quote.block_height,
+        });
+    }
+
+    let asset_price_in_usd =
+        Uint128::from_str(&quote.price).map_err(|e| ContractError::SlinkyAssetPriceIncorrect {
+            asset: base,
+            price: quote.price,
+            error: e.to_string(),
+        })?;
+
+    let asset_price_in_usd =
+        SignedDecimal256::from_atomics(asset_price_in_usd, response.decimals as u32).map_err(
+            |e| ContractError::DecimalError {
+                error: e.to_string(),
+            },
+        )?;
+
+    Ok(asset_price_in_usd)
+}
+
+/// Computes the AUM in wBTC units using Solana data and BTC/USD price.
+pub fn calculate_aum_in_wbtc(
+    prices_in_btc: HashMap<String, SignedDecimal256>,
+    data: SolanaData,
+) -> Result<Int256, ContractError> {
+    let decimals = data
+        .solana_token_decimals
+        .iter()
+        .fold(HashMap::new(), |mut acc, dec| {
+            acc.insert(&dec.asset, dec.decimals);
+            acc
+        });
+    let res = data
+        .solana_balances
+        .iter()
+        .try_fold::<_, _, Result<Int256, ContractError>>(Int256::zero(), |acc, sb| {
+            let token_price = *prices_in_btc.get(&sb.asset).ok_or(
+                ContractError::CrucialConsensusDataMissing {
+                    details: format!("{} price", sb.asset),
+                },
+            )?;
+            let dec =
+                *decimals
+                    .get(&sb.asset)
+                    .ok_or(ContractError::CrucialConsensusDataMissing {
+                        details: format!("{} decimals", sb.asset).to_string(),
+                    })? as u32;
+            Ok(acc
+                + token_price
+                    .checked_mul(SignedDecimal256::from_atomics(sb.amount, dec)?)?
+                    .atomics()
+                    / Int256::from_i128(
+                        10i128.pow(SignedDecimal256::DECIMAL_PLACES - WBTC_DECIMALS),
+                    ))
+        })?;
+    Ok(res)
+}
+
+pub fn get_jlp_price_in_usd(
+    data: &SolanaData,
+    config: &Config,
+) -> Result<SignedDecimal256, ContractError> {
+    let consensus_jlp_total_supply = data
+        .solana_token_total_supply
+        .iter()
+        .find(|t| t.asset == config.jlp_token)
+        .ok_or(ContractError::CrucialConsensusDataMissing {
+            details: "JLP total supply".to_string(),
+        })?
+        .total_supply;
+    let consensus_jlp_decimals = data
+        .solana_token_decimals
+        .iter()
+        .find(|d| d.asset == config.jlp_token)
+        .ok_or(ContractError::CrucialConsensusDataMissing {
+            details: "JLP decimals".to_string(),
+        })?
+        .decimals;
+
+    let aum_usd = SignedDecimal256::from_atomics(data.aum_usd, 0)?;
+    let total_jlp_supply =
+        SignedDecimal256::from_atomics(consensus_jlp_total_supply, consensus_jlp_decimals as u32)?;
+
+    let jlp_virtual_price = aum_usd.checked_div(total_jlp_supply)?;
+    Ok(jlp_virtual_price)
 }
