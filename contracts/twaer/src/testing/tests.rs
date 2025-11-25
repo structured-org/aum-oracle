@@ -2032,20 +2032,27 @@ fn test_twaer_diff_check_blocks_large_change() {
     let env1 = test_env_with_time(1000000, 100);
     record_er(&mut deps, env1.clone(), &owner).unwrap();
 
-    // First publish - should succeed
+    // First publish - should succeed, TWAER = 2.0
     execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
+    let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
+    assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128));
 
-    // Record ER with rate = 2.5 (25% increase)
+    // Record ER with rate = 2.5 (25% increase) at t+1000 seconds
     deps.querier.update_wasm(mock_oracle_response(
         deps.api.addr_make("maxbtc_core_contract").to_string(),
         2500000u128,
     ));
-    let env2 = test_env_with_time(1000001, 101);
+    let env2 = test_env_with_time(1001000, 101);
     record_er(&mut deps, env2.clone(), &owner).unwrap();
 
-    // Second publish - should fail (25% > 1% limit)
+    // Publish much later so the rate 2.5 dominates the TWA
+    // At t=2000000: rate 2.0 was active for 1000s (1000000-1001000)
+    // rate 2.5 was active for 999000s (1001000-2000000)
+    // TWA = (2.0*1000 + 2.5*999000) / 1000000 ≈ 2.4995
+    // Diff from 2.0 to ~2.5 is ~25%, which exceeds 1% limit
+    let env3 = test_env_with_time(2000000, 102);
     let err =
-        execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
+        execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
     assert!(matches!(err, ContractError::TwaerDiffTooLarge { .. }));
 }
 
