@@ -1,9 +1,9 @@
 use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
+use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
-use cosmwasm_schema::serde::{Deserialize, Deserializer};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -148,7 +148,6 @@ pub struct MigrateMsg {
     // The address capable of recording the exchange rate after the migration.
     pub recorder: String,
 }
-
 
 /// Custom deserializer for Option<Option<u64>> to distinguish between missing field and null.
 /// - Missing field: None
