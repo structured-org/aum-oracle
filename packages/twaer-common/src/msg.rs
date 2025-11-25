@@ -3,6 +3,7 @@ use aum_receiver_common::types::GetAumResponse;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
+use cosmwasm_schema::serde::{Deserialize, Deserializer};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -84,7 +85,10 @@ pub struct UpdateConfig {
     pub twaer_immutability_seconds: Option<u64>,
     /// New maximum allowed difference between newly calculated TWAER and the previous one,
     /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
-    /// Use Some(Some(value)) to set a new value, Some(None) to disable the check.
+    /// - Missing field: None -> no change
+    /// - Explicit null: Some(None) -> set to None ("twaer_diff_ppm": null)
+    /// - String value: Some(Some(Addr)) -> set to String ("twaer_diff_ppm": 10000)
+    #[serde(default, deserialize_with = "deserialize_nested_option")]
     pub twaer_diff_ppm: Option<Option<u64>>,
 }
 
@@ -143,4 +147,16 @@ pub struct ErWindowInfoResponse {
 pub struct MigrateMsg {
     // The address capable of recording the exchange rate after the migration.
     pub recorder: String,
+}
+
+
+/// Custom deserializer for Option<Option<u64>> to distinguish between missing field and null.
+/// - Missing field: None
+/// - Explicit null: Some(None)
+/// - u64 value: Some(Some(u64))
+fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<u64>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
 }

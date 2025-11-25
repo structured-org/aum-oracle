@@ -311,7 +311,8 @@
           "minimum": 0.0
         },
         "twaer_diff_ppm": {
-          "description": "New maximum allowed difference between newly calculated TWAER and the previous one, expressed in parts per million (PPM). For example, 10000 PPM = 1%. Use Some(Some(value)) to set a new value, Some(None) to disable the check.",
+          "description": "New maximum allowed difference between newly calculated TWAER and the previous one, expressed in parts per million (PPM). For example, 10000 PPM = 1%. - Missing field: None -> no change - Explicit null: Some(None) -> set to None (\"twaer_diff_ppm\": null) - String value: Some(Some(Addr)) -> set to String (\"twaer_diff_ppm\": 10000)",
+          "default": null,
           "type": [
             "integer",
             "null"
