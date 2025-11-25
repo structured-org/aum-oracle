@@ -15,6 +15,10 @@ pub struct Config {
     pub twa_window_seconds: u64,
     /// The minimal number of seconds required to pass between sequential TWAER publications.
     pub twaer_immutability_seconds: u64,
+    /// Maximum allowed difference between newly calculated TWAER and the previous one,
+    /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
+    /// If set to None, the check is disabled.
+    pub twaer_diff_ppm: Option<u64>,
 }
 
 #[cw_serde]

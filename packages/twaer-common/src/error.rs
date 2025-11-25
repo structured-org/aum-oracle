@@ -44,6 +44,14 @@ pub enum ContractError {
 
     #[error("Conversion error: {msg}")]
     ConversionError { msg: String },
+
+    #[error("TWAER difference too large: new={new_twaer}, previous={prev_twaer}, diff_ppm={diff_ppm}, max_allowed_ppm={max_allowed_ppm}")]
+    TwaerDiffTooLarge {
+        new_twaer: String,
+        prev_twaer: String,
+        diff_ppm: u64,
+        max_allowed_ppm: u64,
+    },
 }
 
 impl From<cosmwasm_std::OverflowError> for ContractError {
