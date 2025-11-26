@@ -101,6 +101,9 @@ fn execute_lock(
     {
         return Err(ContractError::Unauthorized {});
     }
+    if amount <= SignedDecimal256::zero() {
+        return Err(ContractError::LockAmountMustBePositive {});
+    }
     let current_state = STATE.load(deps.storage)?;
     if let State::Locked { .. } = current_state {
         return Err(ContractError::AlreadyLocked {});

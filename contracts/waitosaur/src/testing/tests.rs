@@ -319,6 +319,18 @@ fn lock_unauthorized() {
 }
 
 #[test]
+fn lock_zero_amount() {
+    let mut deps = setup_contract();
+    let stranger = deps.api.addr_make("locker");
+
+    let lock_msg = ExecuteMsg::Lock {
+        amount: SignedDecimal256::from_str("0").unwrap(),
+    };
+    let err = execute_msg(&mut deps, mock_env(), &stranger, lock_msg).unwrap_err();
+    assert_eq!(err, ContractError::LockAmountMustBePositive {});
+}
+
+#[test]
 fn unlock_not_locked() {
     let mut deps = setup_contract();
     let stranger = deps.api.addr_make("unlocker");

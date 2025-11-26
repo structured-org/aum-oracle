@@ -35,4 +35,7 @@ pub enum ContractError {
 
     #[error("AUM data is stale")]
     AumDataStale {},
+
+    #[error("Lock amount must be positive")]
+    LockAmountMustBePositive {},
 }
