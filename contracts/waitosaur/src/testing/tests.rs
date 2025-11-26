@@ -26,6 +26,7 @@ fn proper_initialization() {
         locker: deps.api.addr_make("locker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
+        aum_stale_period: 100u64,
     };
     let owner = deps.api.addr_make("owner");
     cw_ownable::assert_owner(&deps.storage, &owner).unwrap();
@@ -44,11 +45,15 @@ fn test_instantiate_with_invalid_owner() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert!(matches!(err, StdError::GenericErr { .. }));
+    assert!(matches!(
+        err,
+        ContractError::Std(StdError::GenericErr { .. })
+    ));
 }
 
 #[test]
@@ -63,11 +68,15 @@ fn test_instantiate_with_invalid_locker() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert!(matches!(err, StdError::GenericErr { .. }));
+    assert!(matches!(
+        err,
+        ContractError::Std(StdError::GenericErr { .. })
+    ));
 }
 
 #[test]
@@ -82,11 +91,15 @@ fn test_instantiate_with_invalid_unlocker() {
             unlocker: Addr::unchecked("invalid...address..."),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert!(matches!(err, StdError::GenericErr { .. }));
+    assert!(matches!(
+        err,
+        ContractError::Std(StdError::GenericErr { .. })
+    ));
 }
 
 #[test]
@@ -101,11 +114,15 @@ fn test_instantiate_with_invalid_contract() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: Addr::unchecked("invalid...address..."),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-    assert!(matches!(err, StdError::GenericErr { .. }));
+    assert!(matches!(
+        err,
+        ContractError::Std(StdError::GenericErr { .. })
+    ));
 }
 
 #[test]
@@ -128,6 +145,7 @@ fn test_ownership() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
@@ -179,6 +197,7 @@ fn update_config_by_owner() {
             unlocker: Some(deps.api.addr_make("new_unlocker").to_string()),
             contract: Some(deps.api.addr_make("new_contract").to_string()),
             asset: Some("new_asset".to_string()),
+            aum_stale_period: Some(200u64),
         },
     };
 
@@ -191,6 +210,7 @@ fn update_config_by_owner() {
         unlocker: deps.api.addr_make("new_unlocker"),
         contract: deps.api.addr_make("new_contract"),
         asset: "new_asset".to_string(),
+        aum_stale_period: 200u64,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -206,6 +226,7 @@ fn update_config_by_unauthorized() {
             unlocker: Some(deps.api.addr_make("new_unlocker").to_string()),
             contract: Some(deps.api.addr_make("new_contract").to_string()),
             asset: Some("new_asset".to_string()),
+            aum_stale_period: Some(200u64),
         },
     };
 
@@ -218,6 +239,7 @@ fn update_config_by_unauthorized() {
         unlocker: deps.api.addr_make("unlocker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
+        aum_stale_period: 100u64,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -233,6 +255,7 @@ fn query_config() {
         unlocker: deps.api.addr_make("unlocker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
+        aum_stale_period: 100u64,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -326,6 +349,7 @@ fn unlock_success() {
         deps.api.addr_make("receiver_contract").to_string(),
         "asset".to_string(),
         Some(SignedDecimal256::from_str("200.75").unwrap()),
+        Some(mock_env().block.time.seconds()),
     ));
 
     let lock_msg = ExecuteMsg::Lock {
@@ -354,6 +378,7 @@ fn unlock_wrong_asset() {
         deps.api.addr_make("receiver_contract").to_string(),
         "wrong_asset".to_string(),
         Some(SignedDecimal256::from_str("200.75").unwrap()),
+        Some(mock_env().block.time.seconds()),
     ));
 
     let lock_msg = ExecuteMsg::Lock {
@@ -389,6 +414,51 @@ fn unlock_wrong_asset() {
 }
 
 #[test]
+fn unlock_stale_aum() {
+    let mut deps = setup_contract_with_standard_querier_and_config();
+    let locker = deps.api.addr_make("locker");
+    let unlocker = deps.api.addr_make("unlocker");
+
+    deps.querier.update_wasm(mock_receiver_response(
+        deps.api.addr_make("receiver_contract").to_string(),
+        "asset".to_string(),
+        Some(SignedDecimal256::from_str("200.75").unwrap()),
+        Some(mock_env().block.time.seconds() - 200u64),
+    ));
+
+    let lock_msg = ExecuteMsg::Lock {
+        amount: SignedDecimal256::from_str("100.50").unwrap(),
+    };
+    let res = execute_msg(&mut deps, mock_env(), &locker, lock_msg).unwrap();
+    assert_eq!(0, res.messages.len());
+
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetState {}).unwrap();
+    let res: State = from_json(bin).unwrap();
+    assert_eq!(
+        res,
+        State::Locked {
+            amount: SignedDecimal256::from_str("100.50").unwrap(),
+            at_timestamp: mock_env().block.time.nanos(),
+        }
+    );
+
+    let unlock_msg = ExecuteMsg::Unlock {};
+    let res = execute_msg(&mut deps, mock_env(), &unlocker, unlock_msg).unwrap_err();
+    assert_eq!("AUM data is stale", res.to_string());
+
+    let bin = query_msg(&deps, mock_env(), QueryMsg::GetState {}).unwrap();
+    let res: State = from_json(bin).unwrap();
+
+    assert_eq!(
+        res,
+        State::Locked {
+            amount: SignedDecimal256::from_str("100.50").unwrap(),
+            at_timestamp: mock_env().block.time.nanos(),
+        }
+    );
+}
+
+#[test]
 fn unlock_no_data() {
     let mut deps = setup_contract_with_standard_querier_and_config();
     let locker = deps.api.addr_make("locker");
@@ -397,6 +467,7 @@ fn unlock_no_data() {
     deps.querier.update_wasm(mock_receiver_response(
         deps.api.addr_make("receiver_contract").to_string(),
         "asset".to_string(),
+        None,
         None,
     ));
 
@@ -442,6 +513,7 @@ fn unlock_little_amount() {
         deps.api.addr_make("receiver_contract").to_string(),
         "asset".to_string(),
         Some(SignedDecimal256::from_str("50.25").unwrap()),
+        Some(mock_env().block.time.seconds()),
     ));
 
     let lock_msg = ExecuteMsg::Lock {
@@ -493,6 +565,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
@@ -518,6 +591,7 @@ fn setup_contract_with_standard_querier_and_config() -> OwnedDeps<MockStorage, M
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
+            aum_stale_period: 100u64,
         },
     };
     let info = message_info(&owner, &[]);
@@ -531,6 +605,7 @@ fn mock_receiver_response(
     receiver_contract: String,
     asset: String,
     amount: Option<SignedDecimal256>,
+    timestamp: Option<u64>,
 ) -> impl Fn(&WasmQuery) -> SystemResult<ContractResult<cosmwasm_std::Binary>> {
     move |query| match query {
         WasmQuery::Smart {
@@ -541,7 +616,7 @@ fn mock_receiver_response(
                 let res = GetDataResponse {
                     last_published_data: amount.map(|amount| ConsensusOutcome {
                         round: 1,
-                        timestamp: 2,
+                        timestamp: timestamp.unwrap_or(0u64),
                         data: BinanceData {
                             unimmr: SignedDecimal256::zero(),
                             positions: vec![],

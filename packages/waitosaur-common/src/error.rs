@@ -21,6 +21,9 @@ pub enum ContractError {
     #[error("Already Unlocked")]
     AlreadyUnlocked {},
 
+    #[error("Stale period must be positive")]
+    StalePeriodMustBePositive {},
+
     #[error("No data available in the target contract")]
     NoDataInContract {},
 
@@ -29,4 +32,7 @@ pub enum ContractError {
 
     #[error("Insufficient asset amount to unlock")]
     InsufficientAssetAmount {},
+
+    #[error("AUM data is stale")]
+    AumDataStale {},
 }

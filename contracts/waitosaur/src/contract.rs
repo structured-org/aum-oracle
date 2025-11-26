@@ -5,7 +5,7 @@ use binance_aum_common::msg::QueryMsg as BinanceAumQueryMsg;
 
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    SignedDecimal256, StdResult,
+    SignedDecimal256,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
@@ -24,9 +24,12 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> ContractResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(msg.owner.as_str()))?;
+    if msg.config.aum_stale_period < 1 {
+        return Err(ContractError::StalePeriodMustBePositive {});
+    }
     deps.api.addr_validate(msg.config.locker.as_ref())?;
     deps.api.addr_validate(msg.config.unlocker.as_ref())?;
     deps.api.addr_validate(msg.config.contract.as_ref())?;
@@ -75,6 +78,12 @@ fn execute_update_config(
     if let Some(asset) = new_config.asset {
         config.asset = asset;
     }
+    if let Some(aum_stale_period) = new_config.aum_stale_period {
+        if aum_stale_period < 1 {
+            return Err(ContractError::StalePeriodMustBePositive {});
+        }
+        config.aum_stale_period = aum_stale_period;
+    }
 
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new().add_attribute("action", "update_config"))
@@ -103,7 +112,7 @@ fn execute_lock(
     Ok(Response::new().add_attribute("action", "lock"))
 }
 
-fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
+fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.unlocker
         && cw_ownable::assert_owner(deps.storage, &info.sender).is_err()
@@ -122,6 +131,9 @@ fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult
             let contract_data = response
                 .last_published_data
                 .ok_or(ContractError::NoDataInContract {})?;
+            if env.block.time.seconds() - contract_data.timestamp > config.aum_stale_period {
+                return Err(ContractError::AumDataStale {});
+            }
             let position = contract_data
                 .data
                 .spot_balances

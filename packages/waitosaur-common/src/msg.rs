@@ -23,6 +23,7 @@ pub struct UpdateConfig {
     pub unlocker: Option<String>,
     pub contract: Option<String>,
     pub asset: Option<String>,
+    pub aum_stale_period: Option<u64>,
 }
 
 #[cw_ownable_query]

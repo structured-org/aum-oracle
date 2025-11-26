@@ -7,6 +7,8 @@ pub struct Config {
     pub unlocker: Addr,
     pub contract: Addr,
     pub asset: String,
+    // period after which AUM is considered stale (in seconds)
+    pub aum_stale_period: u64,
 }
 
 #[cw_serde]
