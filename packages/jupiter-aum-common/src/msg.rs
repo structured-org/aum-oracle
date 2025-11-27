@@ -1,4 +1,4 @@
-use crate::types::SolanaData;
+use crate::types::{PriceTicker, SolanaData};
 use aum_receiver_common::types::{GetAumResponse, RoundInfoResponse};
 use consensus::consensus::ConsensusOutcome;
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -30,14 +30,8 @@ pub struct InstantiateMsg {
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
-    /// The address of the strategy contract used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with jlp_token.
-    pub strategy_address: String,
-    /// The address of the JLP token used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with strategy_address.
-    pub jlp_token: String,
-    /// Map of Solana asset names to Slinky oracle asset names for price lookups
-    pub solana_slinky_map: HashMap<String, String>,
+    /// Map of Solana asset names to PriceTicker for price lookups
+    pub solana_slinky_map: HashMap<String, PriceTicker>,
 }
 
 /// ExecuteMsg defines the messages that can be executed on the contract.
@@ -67,14 +61,8 @@ pub struct UpdateConfig {
     pub required_solana_balances: Option<HashMap<String, Vec<String>>>,
     /// New list of solana tokens which total supply is required for consensus.
     pub required_solana_token_total_supply: Option<Vec<String>>,
-    /// New address of the strategy contract used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with jlp_token.
-    pub strategy_address: Option<String>,
-    /// New address of the JLP token used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with strategy_address.
-    pub jlp_token: Option<String>,
-    /// New map of Solana asset names to Slinky oracle asset names for price lookups
-    pub solana_slinky_map: Option<HashMap<String, String>>,
+    /// New map of Solana asset names to PriceTicker for price lookups
+    pub solana_slinky_map: Option<HashMap<String, PriceTicker>>,
 
     // Consensus configuration updates
     //
@@ -145,12 +133,6 @@ pub struct MigrateMsg {
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
-    /// The address of the strategy contract used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with jlp_token.
-    pub strategy_address: String,
-    /// The address of the JLP token used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with strategy_address.
-    pub jlp_token: String,
-    /// Map of Solana asset names to Slinky oracle asset names for price lookups
-    pub solana_slinky_map: HashMap<String, String>,
+    /// Map of Solana asset names to PriceTicker for price lookups
+    pub solana_slinky_map: HashMap<String, PriceTicker>,
 }

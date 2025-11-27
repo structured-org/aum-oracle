@@ -17,7 +17,8 @@ use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
 use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use jupiter_aum_common::types::{
-    Config, CustodyAsset, SolanaBalance, SolanaData, SolanaTokenDecimals, SolanaTokenTotalSupply,
+    Config, CustodyAsset, PriceTicker, SolanaBalance, SolanaData, SolanaTokenDecimals,
+    SolanaTokenTotalSupply,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -42,9 +43,7 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     }
 }
 
@@ -199,9 +198,10 @@ fn test_update_config() {
             vec!["new_jlp_token".to_string()],
         )])),
         required_solana_token_total_supply: Some(vec!["new_jlp_token".to_string()]),
-        strategy_address: Some("new_strategy".to_string()),
-        jlp_token: Some("new_jlp_token".to_string()),
-        solana_slinky_map: Some(HashMap::new()),
+        solana_slinky_map: Some(HashMap::from([(
+            "new_jlp_token".to_string(),
+            PriceTicker::Jlp,
+        )])),
     };
 
     let update_msg = UpdateConfig {
@@ -238,8 +238,10 @@ fn test_update_config() {
         config.required_solana_token_total_supply,
         vec!["new_jlp_token".to_string()]
     );
-    assert_eq!(config.strategy_address, "new_strategy".to_string());
-    assert_eq!(config.jlp_token, "new_jlp_token".to_string());
+    assert_eq!(
+        config.solana_slinky_map,
+        HashMap::from([("new_jlp_token".to_string(), PriceTicker::Jlp,)])
+    );
 
     // Pending config also updated
     let consensus = CONSENSUS_STATE.pending_config.load(&deps.storage).unwrap();
@@ -268,8 +270,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
@@ -293,8 +293,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
@@ -318,8 +316,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
@@ -352,8 +348,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
@@ -377,8 +371,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
@@ -402,8 +394,6 @@ fn test_update_config_validation() {
         round_length: None,
         required_solana_balances: None,
         required_solana_token_total_supply: None,
-        strategy_address: None,
-        jlp_token: None,
         solana_slinky_map: None,
     };
     let update_msg = UpdateConfig { new_config: update };
@@ -426,9 +416,7 @@ fn test_calculate_aum_in_wbtc() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
 
     // Test case 1: Standard calculation
@@ -453,7 +441,7 @@ fn test_calculate_aum_in_wbtc() {
                                                                             // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
                                                                             // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
                                                                             // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
-    let jlp_virtual_price = get_jlp_price_in_usd(&data1, &config).unwrap();
+    let jlp_virtual_price = get_jlp_price_in_usd(&data1, &"jlp_token".to_string()).unwrap();
     assert_eq!(
         jlp_virtual_price,
         SignedDecimal256::from_str("500").unwrap(),
@@ -494,7 +482,7 @@ fn test_calculate_aum_in_wbtc() {
                                                                             // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
                                                                             // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
                                                                             // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
-    let jlp_virtual_price2 = get_jlp_price_in_usd(&data2, &config).unwrap();
+    let jlp_virtual_price2 = get_jlp_price_in_usd(&data2, &"jlp_token".to_string()).unwrap();
     assert_eq!(
         jlp_virtual_price2,
         SignedDecimal256::from_str("20000").unwrap(),
@@ -530,7 +518,7 @@ fn test_calculate_aum_in_wbtc() {
             decimals: 6,
         }],
     };
-    let err3 = get_jlp_price_in_usd(&data3, &config).unwrap_err();
+    let err3 = get_jlp_price_in_usd(&data3, &"jlp_token".to_string()).unwrap_err();
     assert!(
         matches!(&err3, ContractError::CheckedDiv(_)),
         "Test Case 3 Failed: {:?}",
@@ -590,9 +578,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
 
     let data = SolanaData {
@@ -613,7 +599,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
         }],
     };
     assert_eq!(
-        get_jlp_price_in_usd(&data, &config).unwrap_err(),
+        get_jlp_price_in_usd(&data, &"jlp_token".to_string()).unwrap_err(),
         ContractError::CrucialConsensusDataMissing {
             details: "JLP total supply".to_string()
         }
@@ -631,9 +617,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
 
     let data = SolanaData {
@@ -654,7 +638,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
         }],
     };
     assert_eq!(
-        get_jlp_price_in_usd(&data, &config).unwrap_err(),
+        get_jlp_price_in_usd(&data, &"jlp_token".to_string()).unwrap_err(),
         ContractError::CrucialConsensusDataMissing {
             details: "JLP decimals".to_string()
         }
@@ -1027,11 +1011,20 @@ fn test_calculate_aum_multiple_addresses_and_tokens_success() {
             "token_a".to_string(),
             "token_b".to_string(),
         ],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
         solana_slinky_map: HashMap::from([
-            ("token_a".to_string(), "TOKEN_A".to_string()),
-            ("token_b".to_string(), "TOKEN_B".to_string()),
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "token_a".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_A".to_string(),
+                },
+            ),
+            (
+                "token_b".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_B".to_string(),
+                },
+            ),
         ]),
     };
     config.validate().unwrap();
@@ -1138,9 +1131,15 @@ fn test_calculate_aum_multiple_addresses_and_tokens_missing_price() {
             vec!["jlp_token".to_string(), "token_a".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string(), "token_a".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("token_a".to_string(), "TOKEN_A".to_string())]),
+        solana_slinky_map: HashMap::from([
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "token_a".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_A".to_string(),
+                },
+            ),
+        ]),
     };
     config.validate().unwrap();
     CONFIG.save(deps.as_mut().storage, &config).unwrap();
@@ -1245,9 +1244,7 @@ fn test_migrate() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy_address".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = migrate(deps.as_mut(), env, migrate_msg.clone());
     assert!(result.is_ok(), "Migration should succeed");
@@ -1277,6 +1274,8 @@ fn test_migrate() {
         new_config.required_solana_token_total_supply,
         vec!["jlp_token".to_string()]
     );
-    assert_eq!(new_config.strategy_address, "strategy_address".to_string());
-    assert_eq!(new_config.jlp_token, "jlp_token".to_string());
+    assert_eq!(
+        new_config.solana_slinky_map,
+        HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp,)])
+    );
 }

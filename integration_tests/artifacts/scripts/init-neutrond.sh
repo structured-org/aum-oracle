@@ -744,9 +744,10 @@ JUPITER_AUM_RECEIVER_INIT_MSG='{
     "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf": ["27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4","7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"]
   },
   "required_solana_token_total_supply": ["27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"],
-  "strategy_address": "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf",
-  "jlp_token": "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4",
-  "solana_slinky_map":{"7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs":"ETH"}
+  "solana_slinky_map": {
+    "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {"slinky":{"asset": "ETH"}}, 
+    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4": "jlp"
+  }
 }'
 
 echo "Instantiate contracts"

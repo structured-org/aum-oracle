@@ -1,10 +1,12 @@
 use crate::error::ContractError;
+use crate::msg::InstantiateMsg;
 use crate::types::{
-    Config, CustodyAsset, SolanaBalance, SolanaData, SolanaTokenDecimals, SolanaTokenTotalSupply,
+    Config, CustodyAsset, PriceTicker, SolanaBalance, SolanaData, SolanaTokenDecimals,
+    SolanaTokenTotalSupply,
 };
 use consensus::consensus::ConsensusData;
 use consensus::error::ConsensusError;
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Uint128, from_json};
 use std::collections::HashMap;
 
 #[test]
@@ -225,9 +227,28 @@ fn test_config_valid() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::new(),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
+    };
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_config_valid_nojlp_nototal_supply() {
+    let config = Config {
+        consensus_data_valid_period: 100,
+        price_data_valid_period: 100,
+        required_custody_assets: vec!["btc".to_string()],
+        required_solana_balances: HashMap::from([(
+            "strategy".to_string(),
+            vec!["some_token".to_string()],
+        )]),
+        required_solana_token_total_supply: vec![],
+        solana_slinky_map: HashMap::from([(
+            "some_token".to_string(),
+            PriceTicker::Slinky {
+                asset: "SOME".to_string(),
+            },
+        )]),
     };
     assert!(config.validate().is_ok());
 }
@@ -243,9 +264,7 @@ fn test_config_invalid_consensus_period() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = config.validate();
     assert!(result.is_err());
@@ -266,38 +285,13 @@ fn test_config_invalid_price_data_period() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = config.validate();
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
         ContractError::InvalidPriceDataPeriod { .. }
-    ));
-}
-
-#[test]
-fn test_config_invalid_strategy_address() {
-    let config = Config {
-        consensus_data_valid_period: 100,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["btc".to_string()],
-        required_solana_balances: HashMap::from([(
-            "strategy".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
-    };
-    let result = config.validate();
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        ContractError::InvalidStrategyAddress { .. }
     ));
 }
 
@@ -311,16 +305,17 @@ fn test_config_invalid_jlp_token_address() {
             "strategy".to_string(),
             vec!["jlp_token".to_string()],
         )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        required_solana_token_total_supply: vec![
+            "jlp_token".to_string(),
+            "invalid_jlp_token".to_string(),
+        ],
+        solana_slinky_map: HashMap::from([("invalid_jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = config.validate();
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
-        ContractError::InvalidJlpToken { .. }
+        ContractError::AssetNotInSlinkyMap { .. }
     ));
 }
 
@@ -340,9 +335,7 @@ fn test_config_duplicate_custody_assets() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = config.validate();
     assert!(result.is_err());
@@ -376,12 +369,20 @@ fn test_config_duplicate_solana_balance_assets() {
             ),
         ]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
         solana_slinky_map: HashMap::from([
-            ("some_token".to_string(), "SOME".to_string()),
-            ("jlp_token".to_string(), "JLP".to_string()),
-            ("another_token".to_string(), "ANOTHER".to_string()),
+            (
+                "some_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "SOME".to_string(),
+                },
+            ),
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "another_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "ANOTHER".to_string(),
+                },
+            ),
         ]),
     };
     let result = config.validate();
@@ -393,54 +394,6 @@ fn test_config_duplicate_solana_balance_assets() {
             asset: "jlp_token".to_string()
         }
     );
-}
-
-#[test]
-fn test_config_strategy_jlp_balance_not_tracked() {
-    // no strategy tracking at all
-    let config = Config {
-        consensus_data_valid_period: 100,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["btc".to_string()],
-        required_solana_balances: HashMap::from([(
-            "some_address".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
-    };
-    let result = config.validate();
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        ContractError::StrategyJlpBalanceNotTracked { .. }
-    ));
-
-    // strategy balance is tracked but no JLP balance tracking for the strategy address
-    let config = Config {
-        consensus_data_valid_period: 100,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["btc".to_string()],
-        required_solana_balances: HashMap::from([
-            ("some_address".to_string(), vec!["jlp_token".to_string()]),
-            ("strategy".to_string(), vec!["some_token".to_string()]),
-        ]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string(), "some_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([
-            ("jlp_token".to_string(), "JLP".to_string()),
-            ("some_token".to_string(), "SOME".to_string()),
-        ]),
-    };
-    let result = config.validate();
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        ContractError::StrategyJlpBalanceNotTracked { .. }
-    ));
 }
 
 #[test]
@@ -459,9 +412,21 @@ fn test_config_duplicate_solana_token_total_supply() {
             "another_token".to_string(),
             "jlp_token".to_string(),
         ],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([
+            (
+                "some_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "SOME".to_string(),
+                },
+            ),
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "another_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "ANOTHER".to_string(),
+                },
+            ),
+        ]),
     };
     let result = config.validate();
     assert!(result.is_err());
@@ -484,9 +449,15 @@ fn test_config_jlp_total_supply_not_tracked() {
             vec!["jlp_token".to_string()],
         )]),
         required_solana_token_total_supply: vec!["some_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([
+            (
+                "some_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "SOME".to_string(),
+                },
+            ),
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+        ]),
     };
     let result = config.validate();
     assert!(result.is_err());
@@ -507,9 +478,7 @@ fn test_config_asset_not_in_slinky_map() {
             ("some_address".to_string(), vec!["some_token".to_string()]),
         ]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     };
     let result = config.validate();
     assert!(result.is_err());
@@ -519,29 +488,6 @@ fn test_config_asset_not_in_slinky_map() {
             asset: "some_token".to_string()
         }
     );
-}
-
-#[test]
-fn test_config_jlp_token_in_slinky_map() {
-    let config = Config {
-        consensus_data_valid_period: 100,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["btc".to_string()],
-        required_solana_balances: HashMap::from([(
-            "strategy".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), "JLP".to_string())]),
-    };
-    let result = config.validate();
-    assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        ContractError::JlpTokenInSlinkyMap { .. }
-    ));
 }
 
 #[test]
@@ -741,10 +687,14 @@ fn sample_config() -> Config {
             ("some_address".to_string(), vec!["some_token".to_string()]),
         ]),
         required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        strategy_address: "strategy".to_string(),
-        jlp_token: "jlp_token".to_string(),
         solana_slinky_map: HashMap::from([
-            ("some_token".to_string(), "SMT".to_string()),
+            (
+                "some_token".to_string(),
+                PriceTicker::Slinky {
+                    asset: "SOME".to_string(),
+                },
+            ),
+            ("jlp_token".to_string(), PriceTicker::Jlp),
         ]),
     };
     config.validate().unwrap();

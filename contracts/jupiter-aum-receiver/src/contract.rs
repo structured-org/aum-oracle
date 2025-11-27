@@ -14,7 +14,7 @@ use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg::{
     ConfigResponse, ExecuteMsg, GetDataResponse, InstantiateMsg, MigrateMsg, QueryMsg, UpdateConfig,
 };
-use jupiter_aum_common::types::{AumInWBTC, Config, SolanaData};
+use jupiter_aum_common::types::{AumInWBTC, Config, PriceTicker, SolanaData};
 use neutron_std::types::slinky::oracle::v1::OracleQuerier;
 use neutron_std::types::slinky::types::v1::CurrencyPair;
 use std::collections::HashMap;
@@ -44,8 +44,6 @@ pub fn instantiate(
         required_custody_assets: msg.required_custody_assets,
         required_solana_balances: msg.required_solana_balances,
         required_solana_token_total_supply: msg.required_solana_token_total_supply,
-        strategy_address: msg.strategy_address,
-        jlp_token: msg.jlp_token,
         solana_slinky_map: msg.solana_slinky_map,
     };
     config.validate()?;
@@ -120,14 +118,6 @@ fn update_config(
         new_config.required_solana_token_total_supply
     {
         contract_config.required_solana_token_total_supply = new_required_solana_token_total_supply;
-    }
-
-    if let Some(new_strategy_address) = new_config.strategy_address {
-        contract_config.strategy_address = new_strategy_address;
-    }
-
-    if let Some(new_jlp_token_address) = new_config.jlp_token {
-        contract_config.jlp_token = new_jlp_token_address;
     }
 
     if let Some(new_solana_slinky_map) = new_config.solana_slinky_map {
@@ -301,8 +291,6 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
         price_data_valid_period: old_config.price_data_valid_period,
         required_solana_balances: msg.required_solana_balances,
         required_solana_token_total_supply: msg.required_solana_token_total_supply,
-        strategy_address: msg.strategy_address,
-        jlp_token: msg.jlp_token,
         solana_slinky_map: msg.solana_slinky_map,
     };
     config.validate()?;
@@ -321,20 +309,24 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
 pub fn calculate_aum(deps: Deps, env: Env, data: SolanaData) -> Result<Int256, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let btc_price_in_usd = get_asset_price_in_usd(deps, &env, &config, BTC_DENOM.to_string())?;
-    let mut prices = config
+    let prices = config
         .solana_slinky_map
         .iter()
         .try_fold::<_, _, Result<_, ContractError>>(
             HashMap::new(),
-            |mut acc, (solana_asset, slinky_asset)| {
-                let price = get_asset_price_in_usd(deps, &env, &config, slinky_asset.clone())?;
+            |mut acc, (solana_asset, price_ticker)| {
+                let price = match price_ticker {
+                    PriceTicker::Slinky { asset } => {
+                        get_asset_price_in_usd(deps, &env, &config, asset.clone())?
+                    }
+                    PriceTicker::Jlp => get_jlp_price_in_usd(&data, &solana_asset.clone())?,
+                };
 
                 acc.insert(solana_asset.clone(), price.checked_div(btc_price_in_usd)?);
                 Ok(acc)
             },
         )?;
-    let jlp_btc_price = get_jlp_price_in_usd(&data, &config)?.checked_div(btc_price_in_usd)?;
-    prices.insert(config.jlp_token, jlp_btc_price);
+
     let aum_in_btc = calculate_aum_in_wbtc(prices, data)?;
     Ok(aum_in_btc)
 }
@@ -422,12 +414,12 @@ pub fn calculate_aum_in_wbtc(
 
 pub fn get_jlp_price_in_usd(
     data: &SolanaData,
-    config: &Config,
+    jlp_token: &String,
 ) -> Result<SignedDecimal256, ContractError> {
     let consensus_jlp_total_supply = data
         .solana_token_total_supply
         .iter()
-        .find(|t| t.asset == config.jlp_token)
+        .find(|t| t.asset == jlp_token.clone())
         .ok_or(ContractError::CrucialConsensusDataMissing {
             details: "JLP total supply".to_string(),
         })?
@@ -435,7 +427,7 @@ pub fn get_jlp_price_in_usd(
     let consensus_jlp_decimals = data
         .solana_token_decimals
         .iter()
-        .find(|d| d.asset == config.jlp_token)
+        .find(|d| d.asset == jlp_token.clone())
         .ok_or(ContractError::CrucialConsensusDataMissing {
             details: "JLP decimals".to_string(),
         })?

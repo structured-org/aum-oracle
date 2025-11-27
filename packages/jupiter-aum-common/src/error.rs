@@ -32,8 +32,8 @@ pub enum ContractError {
     #[error("Duplicate solana token total supply found: {asset}")]
     DuplicateSolanaTokenTotalSupply { asset: String },
 
-    #[error("Empty strategy address")]
-    InvalidStrategyAddress {},
+    #[error("Duplicate PriceTicker found: {ticker}")]
+    DuplicatePriceTicker { ticker: String },
 
     #[error("Empty JLP token")]
     InvalidJlpToken {},

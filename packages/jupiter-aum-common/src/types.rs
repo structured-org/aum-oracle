@@ -25,14 +25,15 @@ pub struct Config {
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
-    /// The address of the strategy contract used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with jlp_token.
-    pub strategy_address: String,
-    /// The address of the JLP token used in AUM calculations. Must be specified in the
-    /// required_solana_balances along with strategy_address.
-    pub jlp_token: String,
-    /// Map of Solana asset names to Slinky oracle asset names for price lookups
-    pub solana_slinky_map: HashMap<String, String>,
+    /// Map of Solana asset names to PriceTicker for price lookups
+    pub solana_slinky_map: HashMap<String, PriceTicker>,
+}
+
+#[cw_serde]
+#[derive(Eq, Hash)]
+pub enum PriceTicker {
+    Jlp,
+    Slinky { asset: String },
 }
 
 impl Config {
@@ -46,16 +47,8 @@ impl Config {
             return Err(ContractError::InvalidPriceDataPeriod {});
         }
 
-        // check strategy and jlp token addresses
-        if self.strategy_address.is_empty() {
-            return Err(ContractError::InvalidStrategyAddress {});
-        }
-        if self.jlp_token.is_empty() {
-            return Err(ContractError::InvalidJlpToken {});
-        }
-
         // check required custody assets for duplicates
-        if let Some(duplicate) = find_duplicate(&self.required_custody_assets) {
+        if let Some(duplicate) = find_duplicate(self.required_custody_assets.iter()) {
             return Err(ContractError::DuplicateCustodyAsset {
                 asset: duplicate.to_string(),
             });
@@ -63,50 +56,44 @@ impl Config {
 
         // check required solana balances for duplicates by asset
         for (address, assets) in self.required_solana_balances.iter() {
-            if let Some(duplicate) = find_duplicate(assets) {
+            if let Some(duplicate) = find_duplicate(assets.iter()) {
                 return Err(ContractError::DuplicateSolanaBalanceAsset {
                     address: address.to_string(),
                     asset: duplicate.to_string(),
                 });
             }
         }
-        // check that strategy JLP balance tracking is required
-        if let Some(strategy_address_assets) =
-            self.required_solana_balances.get(&self.strategy_address)
-        {
-            if !strategy_address_assets.contains(&self.jlp_token) {
-                return Err(ContractError::StrategyJlpBalanceNotTracked {});
-            }
-        } else {
-            return Err(ContractError::StrategyJlpBalanceNotTracked {});
-        }
 
         // check token supply for duplicates
-        if let Some(duplicate) = find_duplicate(&self.required_solana_token_total_supply) {
+        if let Some(duplicate) = find_duplicate(self.required_solana_token_total_supply.iter()) {
             return Err(ContractError::DuplicateSolanaTokenTotalSupply {
                 asset: duplicate.to_string(),
             });
         }
-        // check that JLP token supply tracking is required
-        if !self
-            .required_solana_token_total_supply
-            .contains(&self.jlp_token)
-        {
-            return Err(ContractError::JlpTotalSupplyNotTracked {});
+
+        // check for duplicate PriceTickers
+        if let Some(duplicate) = find_duplicate(self.solana_slinky_map.values()) {
+            return Err(ContractError::DuplicatePriceTicker {
+                ticker: format!("{:?}", duplicate),
+            });
         }
 
-        // check that all assets from required_solana_balances except jlp_token are represented in solana_slinky_map
+        // check that JLP token is present in required_solana_token_total_supply if it is present in solana_slinky_map
+        if let Some(jlp_token) = self.solana_slinky_map.iter()
+        .find(|(_, v)| **v == PriceTicker::Jlp)
+        .map(|(k, _)| k) {
+            if !self.required_solana_token_total_supply.contains(&jlp_token.to_string()) {
+                return Err(ContractError::JlpTotalSupplyNotTracked {});
+            }
+        }
+
+        // check that all assets from required_solana_balances are represented in solana_slinky_map
         for asset in self.required_solana_balances.values().flatten() {
-            if asset != &self.jlp_token && !self.solana_slinky_map.contains_key(asset) {
+            if !self.solana_slinky_map.contains_key(asset) {
                 return Err(ContractError::AssetNotInSlinkyMap {
                     asset: asset.clone(),
                 });
             }
-        }
-
-        // check that jlp_token is not present in solana_slinky_map
-        if self.solana_slinky_map.contains_key(&self.jlp_token) {
-            return Err(ContractError::JlpTokenInSlinkyMap {});
         }
 
         Ok(())
@@ -530,11 +517,11 @@ pub struct AumInWBTC {
     pub timestamp: u64,
 }
 
-/// Helper function to find duplicates in a vector of strings.
+/// Helper function to find duplicates in a vector of items.
 /// Returns the first duplicate found, or None if no duplicates exist.
-fn find_duplicate(items: &[String]) -> Option<&String> {
+fn find_duplicate<'a, T: Eq + Hash>( mut items: impl Iterator<Item = &'a T>) -> Option<&'a T> {
     let mut seen = HashSet::new();
-    items.iter().find(|&item| !seen.insert(item))
+    items.find(|&item| !seen.insert(item))
 }
 
 #[cw_serde]
