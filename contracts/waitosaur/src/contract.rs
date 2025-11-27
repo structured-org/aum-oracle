@@ -108,6 +108,16 @@ fn execute_lock(
     if let State::Locked { .. } = current_state {
         return Err(ContractError::AlreadyLocked {});
     }
+    let (position_amount, _) = get_spot_position(
+        deps.as_ref(),
+        config.contract.to_string(),
+        config.asset.to_string(),
+    )?;
+
+    if !position_amount.is_zero() {
+        return Err(ContractError::SpotBalanceNotZero {});
+    }
+
     let state = State::Locked {
         amount,
         at_timestamp: Uint64::from(env.block.time.nanos()),
@@ -127,7 +137,7 @@ fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<
     match current_state {
         State::Locked {
             amount,
-            at_timestamp: _,
+            at_timestamp,
         } => {
             let response: GetDataResponse = deps
                 .querier
@@ -138,13 +148,15 @@ fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<
             if env.block.time.seconds() - contract_data.timestamp > config.aum_stale_period.u64() {
                 return Err(ContractError::AumDataStale {});
             }
-            let position = contract_data
-                .data
-                .spot_balances
-                .iter()
-                .find(|pos| pos.asset == config.asset)
-                .ok_or(ContractError::NoAssetFound {})?;
-            if position.amount < amount {
+            let (position_amount, position_ts) = get_spot_position(
+                deps.as_ref(),
+                config.contract.to_string(),
+                config.asset.to_string(),
+            )?;
+            if position_ts * 1_000_000_000 < at_timestamp.u64() {
+                return Err(ContractError::PositionTimestampEarlierThanLock {});
+            }
+            if position_amount < amount {
                 return Err(ContractError::InsufficientAssetAmount {});
             }
             let state = State::Unlocked {};
@@ -153,6 +165,27 @@ fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<
         }
         State::Unlocked {} => Err(ContractError::AlreadyUnlocked {}),
     }
+}
+
+fn get_spot_position(
+    deps: Deps,
+    contract: String,
+    asset: String,
+) -> ContractResult<(SignedDecimal256, u64)> {
+    let response: GetDataResponse = deps
+        .querier
+        .query_wasm_smart(contract, &BinanceAumQueryMsg::GetData {})?;
+    let contract_data = response
+        .last_published_data
+        .as_ref()
+        .ok_or(ContractError::NoDataInContract {})?;
+    let position = contract_data
+        .data
+        .spot_balances
+        .iter()
+        .find(|pos| pos.asset == asset)
+        .ok_or(ContractError::NoAssetFound {})?;
+    Ok((position.amount, contract_data.timestamp))
 }
 
 #[entry_point]
