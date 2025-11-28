@@ -26,13 +26,19 @@ pub struct Config {
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
     /// Map of Solana asset names to PriceTicker for price lookups
+    /// Must contain every token listed in required_solana_balances
     pub solana_slinky_map: HashMap<String, PriceTicker>,
 }
 
+/// PriceTicker defines the price lookup type for a Solana asset.
 #[cw_serde]
 #[derive(Eq, Hash)]
 pub enum PriceTicker {
+    /// JLP token price, computed as aum_usd divided by the JLP token total_supply
+    /// and converted to BTC with slinky oracle price for BTC/USD
     Jlp,
+    /// Prices fetched for the pair `asset`/USD and BTC/USD from the Slinky oracle
+    /// to convert `asset` to BTC
     Slinky { asset: String },
 }
 

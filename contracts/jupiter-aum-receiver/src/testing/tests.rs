@@ -407,18 +407,6 @@ fn test_update_config_validation() {
 
 #[test]
 fn test_calculate_aum_in_wbtc() {
-    let config = Config {
-        consensus_data_valid_period: 1_000,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["USDC".to_string()],
-        required_solana_balances: HashMap::from([(
-            "strategy".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
-    };
-
     // Test case 1: Standard calculation
     let data1 = SolanaData {
         custody_assets: vec![],
@@ -524,63 +512,10 @@ fn test_calculate_aum_in_wbtc() {
         "Test Case 3 Failed: {:?}",
         err3
     );
-
-    // // Test case 4: Division by zero for btc_price_in_usd
-    // let data4 = SolanaData {
-    //     custody_assets: vec![],
-    //     aum_usd: Uint128::new(100),
-    //     solana_balances: vec![SolanaBalance {
-    //         address: "strategy".to_string(),
-    //         asset: "jlp_token".to_string(),
-    //         amount: Uint128::new(5),
-    //     }],
-    //     solana_token_total_supply: vec![SolanaTokenTotalSupply {
-    //         asset: "jlp_token".to_string(),
-    //         total_supply: Uint128::new(10),
-    //     }],
-    //     solana_token_decimals: vec![SolanaTokenDecimals {
-    //         asset: "jlp_token".to_string(),
-    //         decimals: 6,
-    //     }],
-    // };
-    // let btc_price_in_usd4 = SignedDecimal256::from_str("0.0").unwrap(); // Zero BTC price
-    // let jlp_virtual_price4 = get_jlp_price_in_usd(&data4, &config).unwrap();
-    // assert_eq!(
-    //     jlp_virtual_price4,
-    //     SignedDecimal256::from_str("20000").unwrap(),
-    //     "Test Case 4 Failed"
-    // );
-    // let mut prices4: HashMap<String, SignedDecimal256>;
-    // prices2.insert("jlp_token".to_string(), jlp_virtual_price2);
-    // let err4 = calculate_aum_in_wbtc(
-    //     deps.as_ref(),
-    //     env.clone(),
-    //     data4,
-    //     btc_price_in_usd4,
-    //     &config,
-    // )
-    // .unwrap_err();
-    // assert!(
-    //     matches!(&err4, ContractError::CheckedDiv(_)),
-    //     "Test Case 4 Failed: {:?}",
-    //     err4
-    // );
 }
 
 #[test]
 fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
-    let config = Config {
-        consensus_data_valid_period: 1_000,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["USDC".to_string()],
-        required_solana_balances: HashMap::from([(
-            "strategy".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
-    };
-
     let data = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(500_000),
@@ -608,18 +543,6 @@ fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
 
 #[test]
 fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
-    let config = Config {
-        consensus_data_valid_period: 1_000,
-        price_data_valid_period: 100,
-        required_custody_assets: vec!["USDC".to_string()],
-        required_solana_balances: HashMap::from([(
-            "strategy".to_string(),
-            vec!["jlp_token".to_string()],
-        )]),
-        required_solana_token_total_supply: vec!["jlp_token".to_string()],
-        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
-    };
-
     let data = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(500_000),
@@ -644,43 +567,6 @@ fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
         }
     );
 }
-
-// TODO: Do we still need this test and error?
-// With the updated calculation logic, this error should no longer occur.
-
-// #[test]
-// fn test_calculate_aum_in_wbtc_missing_strategy_jlp_balance() {
-//     let mut deps = mock_dependencies();
-//     let env = mock_env();
-//     let owner_info = message_info(&deps.api.addr_make("owner"), &[]);
-//     let msg = default_init_msg(&deps.api);
-//     instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg.clone()).unwrap();
-//     let config = CONFIG.load(&deps.storage).unwrap();
-
-//     let data = SolanaData {
-//         custody_assets: vec![],
-//         aum_usd: Uint128::new(500_000),
-//         solana_balances: vec![SolanaBalance {
-//             address: "some_address".to_string(), // missing Strategy JLP balance
-//             asset: "jlp_token".to_string(),
-//             amount: Uint128::new(10_000_000_000),
-//         }],
-//         solana_token_total_supply: vec![SolanaTokenTotalSupply {
-//             asset: "jlp_token".to_string(),
-//             total_supply: Uint128::new(1_000_000_000),
-//         }],
-//         solana_token_decimals: vec![SolanaTokenDecimals {
-//             asset: "jlp_token".to_string(),
-//             decimals: 6,
-//         }],
-//     };
-//     assert_eq!(
-//         get_jlp_price_in_usd(&data, &config).unwrap_err(),
-//         ContractError::CrucialConsensusDataMissing {
-//             details: "Strategy JLP balance".to_string()
-//         }
-//     );
-// }
 
 /// Comprehensive test suite for the `query_get_aum` query message.
 #[test]

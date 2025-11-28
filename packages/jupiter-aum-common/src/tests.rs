@@ -1,12 +1,11 @@
 use crate::error::ContractError;
-use crate::msg::InstantiateMsg;
 use crate::types::{
     Config, CustodyAsset, PriceTicker, SolanaBalance, SolanaData, SolanaTokenDecimals,
     SolanaTokenTotalSupply,
 };
 use consensus::consensus::ConsensusData;
 use consensus::error::ConsensusError;
-use cosmwasm_std::{Uint128, from_json};
+use cosmwasm_std::Uint128;
 use std::collections::HashMap;
 
 #[test]
