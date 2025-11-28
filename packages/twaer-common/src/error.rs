@@ -49,8 +49,8 @@ pub enum ContractError {
     TwaerDiffTooLarge {
         new_twaer: String,
         prev_twaer: String,
-        diff_ppm: u64,
-        max_allowed_ppm: u64,
+        diff_ppm: u128,
+        max_allowed_ppm: u128,
     },
 }
 

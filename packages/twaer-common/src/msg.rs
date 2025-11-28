@@ -30,7 +30,7 @@ pub struct InstantiateMsg {
     /// Maximum allowed difference between newly calculated TWAER and the previous one,
     /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
     /// If set to None, the check is disabled.
-    pub twaer_diff_ppm: Option<u64>,
+    pub twaer_diff_ppm: Option<u128>,
 }
 
 #[cw_ownable_execute]
@@ -89,7 +89,7 @@ pub struct UpdateConfig {
     /// - Explicit null: Some(None) -> set to None ("twaer_diff_ppm": null)
     /// - String value: Some(Some(Addr)) -> set to String ("twaer_diff_ppm": 10000)
     #[serde(default, deserialize_with = "deserialize_nested_option")]
-    pub twaer_diff_ppm: Option<Option<u64>>,
+    pub twaer_diff_ppm: Option<Option<u128>>,
 }
 
 #[cw_ownable_query]
@@ -149,11 +149,11 @@ pub struct MigrateMsg {
     pub recorder: String,
 }
 
-/// Custom deserializer for Option<Option<u64>> to distinguish between missing field and null.
+/// Custom deserializer for Option<Option<u128>> to distinguish between missing field and null.
 /// - Missing field: None
 /// - Explicit null: Some(None)
-/// - u64 value: Some(Some(u64))
-fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<u64>>, D::Error>
+/// - u128 value: Some(Some(u128))
+fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<u128>>, D::Error>
 where
     D: Deserializer<'de>,
 {

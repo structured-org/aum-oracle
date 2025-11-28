@@ -54,7 +54,7 @@
         "integer",
         "null"
       ],
-      "format": "uint64",
+      "format": "uint128",
       "minimum": 0.0
     },
     "twaer_immutability_seconds": {

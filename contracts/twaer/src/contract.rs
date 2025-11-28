@@ -162,7 +162,7 @@ fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> Contract
 
     // Check if the new TWAER differs from the previous one by more than the configured max
     if let (Some(max_diff_ppm), Some((prev_twaer, _))) = (config.twaer_diff_ppm, prev_twaer_data) {
-        let diff_ppm = calculate_diff_ppm(prev_twaer, twaer);
+        let diff_ppm = calculate_diff_ppm(prev_twaer, twaer)?;
         if diff_ppm > max_diff_ppm {
             return Err(ContractError::TwaerDiffTooLarge {
                 new_twaer: twaer.to_string(),
@@ -184,34 +184,31 @@ fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> Contract
 /// Calculates the difference between two Decimals in parts per million (PPM).
 /// Returns the absolute difference as PPM relative to the previous value.
 /// For example, if prev=1.0 and new=1.01, the diff is 1% = 10000 PPM.
-fn calculate_diff_ppm(prev: Decimal, new: Decimal) -> u64 {
+fn calculate_diff_ppm(prev: Decimal, new: Decimal) -> ContractResult<u128> {
     if prev.is_zero() {
         // If previous is zero, any non-zero new value is considered infinite change
-        // Return max u64 to indicate the maximum possible difference
+        // Return max u128 to indicate the maximum possible difference
         if new.is_zero() {
-            return 0;
+            return Ok(0);
         }
-        return u64::MAX;
+        return Ok(u128::MAX);
     }
 
-    // Calculate |new - prev| / prev * 1_000_000
+    // Calculate diff thirst |new - prev|
     let diff = if new > prev {
-        new.checked_sub(prev).unwrap_or_default()
+        new.checked_sub(prev)?
     } else {
-        prev.checked_sub(new).unwrap_or_default()
+        prev.checked_sub(new)?
     };
 
-    // diff / prev * 1_000_000 = diff * 1_000_000 / prev
-    let diff_scaled = diff
-        .checked_mul(Decimal::from_ratio(1_000_000u64, 1u64))
-        .unwrap_or(Decimal::MAX);
+    // Then calculate ratio: diff / prev
+    let ratio = diff.checked_div(prev)?;
 
-    let ppm = diff_scaled
-        .checked_div(prev)
-        .unwrap_or(Decimal::from_ratio(u64::MAX, 1u64));
+    // Scale to PPM: ratio * 1_000_000
+    let ppm = ratio.checked_mul(Decimal::from_ratio(1_000_000u64, 1u64))?;
 
-    // Convert to u64, capping at u64::MAX
-    ppm.to_uint_floor().u128().try_into().unwrap_or(u64::MAX)
+    // Convert to u128
+    Ok(ppm.to_uint_floor().u128())
 }
 
 fn execute_reset_twaer_to(

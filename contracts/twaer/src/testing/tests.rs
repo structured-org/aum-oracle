@@ -2053,7 +2053,15 @@ fn test_twaer_diff_check_blocks_large_change() {
     let env3 = test_env_with_time(2000000, 102);
     let err =
         execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
-    assert!(matches!(err, ContractError::TwaerDiffTooLarge { .. }));
+    assert_eq!(
+        err,
+        ContractError::TwaerDiffTooLarge {
+            new_twaer: "2.4995".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 249750,
+            max_allowed_ppm: 10000,
+        }
+    );
 }
 
 #[test]
@@ -2076,7 +2084,7 @@ fn test_twaer_diff_check_disabled_by_none() {
     // First publish
     execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
 
-    // Record ER with rate = 10.0 (400% increase - huge change)
+    // Record ER with rate = 10.0 (400% increase - huge change) at t+1
     deps.querier.update_wasm(mock_oracle_response(
         deps.api.addr_make("maxbtc_core_contract").to_string(),
         10000000u128,
@@ -2084,8 +2092,14 @@ fn test_twaer_diff_check_disabled_by_none() {
     let env2 = test_env_with_time(1000001, 101);
     record_er(&mut deps, env2.clone(), &owner).unwrap();
 
-    // Second publish - should succeed because check is disabled
-    let res = execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    // Publish at t+1001 (1000 seconds after recording the 10.0 rate)
+    // This ensures the 10.0 rate has time to affect the TWA calculation
+    // At t=1001001: rate 2.0 was active for 1s, rate 10.0 was active for 1000s
+    // TWA = (2.0*1 + 10.0*1000) / 1001 ≈ 9.98
+    // This is a huge change from 2.0, so with the check enabled it would fail
+    // But with the check disabled (None), it should succeed
+    let env3 = test_env_with_time(1001001, 102);
+    let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
     assert!(res.is_ok());
 }
 

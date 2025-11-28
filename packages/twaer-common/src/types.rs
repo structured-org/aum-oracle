@@ -18,7 +18,7 @@ pub struct Config {
     /// Maximum allowed difference between newly calculated TWAER and the previous one,
     /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
     /// If set to None, the check is disabled.
-    pub twaer_diff_ppm: Option<u64>,
+    pub twaer_diff_ppm: Option<u128>,
 }
 
 #[cw_serde]
