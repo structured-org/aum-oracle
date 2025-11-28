@@ -588,7 +588,6 @@ fn test_query_get_aum_behavior() {
         "10000".to_string(),
         current_height,
     );
-    println!("{:?}", exec_res);
     assert!(exec_res.is_ok());
 
     // 2. error: data published, but too old (time-based expiration)
