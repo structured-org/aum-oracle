@@ -85,10 +85,16 @@ impl Config {
         }
 
         // check that JLP token is present in required_solana_token_total_supply if it is present in solana_slinky_map
-        if let Some(jlp_token) = self.solana_slinky_map.iter()
-        .find(|(_, v)| **v == PriceTicker::Jlp)
-        .map(|(k, _)| k) {
-            if !self.required_solana_token_total_supply.contains(&jlp_token.to_string()) {
+        if let Some(jlp_token) = self
+            .solana_slinky_map
+            .iter()
+            .find(|(_, v)| **v == PriceTicker::Jlp)
+            .map(|(k, _)| k)
+        {
+            if !self
+                .required_solana_token_total_supply
+                .contains(&jlp_token.to_string())
+            {
                 return Err(ContractError::JlpTotalSupplyNotTracked {});
             }
         }
@@ -525,7 +531,7 @@ pub struct AumInWBTC {
 
 /// Helper function to find duplicates in a vector of items.
 /// Returns the first duplicate found, or None if no duplicates exist.
-fn find_duplicate<'a, T: Eq + Hash>( mut items: impl Iterator<Item = &'a T>) -> Option<&'a T> {
+fn find_duplicate<'a, T: Eq + Hash>(mut items: impl Iterator<Item = &'a T>) -> Option<&'a T> {
     let mut seen = HashSet::new();
     items.find(|&item| !seen.insert(item))
 }

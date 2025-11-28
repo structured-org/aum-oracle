@@ -429,7 +429,7 @@ fn test_calculate_aum_in_wbtc() {
                                                                             // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
                                                                             // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
                                                                             // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
-    let jlp_virtual_price = get_jlp_price_in_usd(&data1, &"jlp_token".to_string()).unwrap();
+    let jlp_virtual_price = get_jlp_price_in_usd(&data1, "jlp_token").unwrap();
     assert_eq!(
         jlp_virtual_price,
         SignedDecimal256::from_str("500").unwrap(),
@@ -470,7 +470,7 @@ fn test_calculate_aum_in_wbtc() {
                                                                             // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
                                                                             // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
                                                                             // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
-    let jlp_virtual_price2 = get_jlp_price_in_usd(&data2, &"jlp_token".to_string()).unwrap();
+    let jlp_virtual_price2 = get_jlp_price_in_usd(&data2, "jlp_token").unwrap();
     assert_eq!(
         jlp_virtual_price2,
         SignedDecimal256::from_str("20000").unwrap(),
@@ -506,7 +506,7 @@ fn test_calculate_aum_in_wbtc() {
             decimals: 6,
         }],
     };
-    let err3 = get_jlp_price_in_usd(&data3, &"jlp_token".to_string()).unwrap_err();
+    let err3 = get_jlp_price_in_usd(&data3, "jlp_token").unwrap_err();
     assert!(
         matches!(&err3, ContractError::CheckedDiv(_)),
         "Test Case 3 Failed: {:?}",
@@ -534,7 +534,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
         }],
     };
     assert_eq!(
-        get_jlp_price_in_usd(&data, &"jlp_token".to_string()).unwrap_err(),
+        get_jlp_price_in_usd(&data, "jlp_token").unwrap_err(),
         ContractError::CrucialConsensusDataMissing {
             details: "JLP total supply".to_string()
         }
@@ -561,7 +561,7 @@ fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
         }],
     };
     assert_eq!(
-        get_jlp_price_in_usd(&data, &"jlp_token".to_string()).unwrap_err(),
+        get_jlp_price_in_usd(&data, "jlp_token").unwrap_err(),
         ContractError::CrucialConsensusDataMissing {
             details: "JLP decimals".to_string()
         }

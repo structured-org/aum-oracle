@@ -414,12 +414,12 @@ pub fn calculate_aum_in_wbtc(
 
 pub fn get_jlp_price_in_usd(
     data: &SolanaData,
-    jlp_token: &String,
+    jlp_token: &str,
 ) -> Result<SignedDecimal256, ContractError> {
     let consensus_jlp_total_supply = data
         .solana_token_total_supply
         .iter()
-        .find(|t| t.asset == jlp_token.clone())
+        .find(|t| t.asset == jlp_token)
         .ok_or(ContractError::CrucialConsensusDataMissing {
             details: "JLP total supply".to_string(),
         })?
@@ -427,7 +427,7 @@ pub fn get_jlp_price_in_usd(
     let consensus_jlp_decimals = data
         .solana_token_decimals
         .iter()
-        .find(|d| d.asset == jlp_token.clone())
+        .find(|d| d.asset == jlp_token)
         .ok_or(ContractError::CrucialConsensusDataMissing {
             details: "JLP decimals".to_string(),
         })?
