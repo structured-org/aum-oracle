@@ -1,5 +1,5 @@
 use crate::contract::{execute, instantiate, query};
-use crate::state::CONFIG;
+use crate::state::{CONFIG, STATE};
 use crate::testing::mock_querier::mock_dependencies;
 use binance_aum_common::msg::GetDataResponse;
 use binance_aum_common::types::{BinanceData, SpotBalance};
@@ -211,6 +211,84 @@ fn update_config_by_owner() {
         contract: deps.api.addr_make("new_contract"),
         asset: "new_asset".to_string(),
         aum_stale_period: Uint64::from(200u64),
+    };
+    assert_config_equals(&config, &expected_config);
+}
+
+#[test]
+fn update_config_contract_when_locked() {
+    let mut deps = setup_contract();
+    let owner = deps.api.addr_make("owner");
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            locker: None,
+            unlocker: None,
+            contract: Some(deps.api.addr_make("new_contract").to_string()),
+            asset: None,
+            aum_stale_period: None,
+        },
+    };
+    STATE
+        .save(
+            deps.as_mut().storage,
+            &State::Locked {
+                amount: SignedDecimal256::one(),
+                at_timestamp: Uint64::from(1u64),
+            },
+        )
+        .unwrap();
+    let res = execute_msg(&mut deps, mock_env(), &owner, msg).unwrap_err();
+    assert_eq!(
+        res,
+        ContractError::CannotUpdateContractOrAssetWhileLocked {}
+    );
+
+    let config = CONFIG.load(&deps.storage).unwrap();
+    let expected_config = Config {
+        locker: deps.api.addr_make("locker"),
+        unlocker: deps.api.addr_make("unlocker"),
+        contract: deps.api.addr_make("contract"),
+        asset: "asset".to_string(),
+        aum_stale_period: Uint64::from(100u64),
+    };
+    assert_config_equals(&config, &expected_config);
+}
+
+#[test]
+fn update_config_asset_when_locked() {
+    let mut deps = setup_contract();
+    let owner = deps.api.addr_make("owner");
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            locker: None,
+            unlocker: None,
+            contract: None,
+            asset: Some("new_asset".to_string()),
+            aum_stale_period: None,
+        },
+    };
+    STATE
+        .save(
+            deps.as_mut().storage,
+            &State::Locked {
+                amount: SignedDecimal256::one(),
+                at_timestamp: Uint64::from(1u64),
+            },
+        )
+        .unwrap();
+    let res = execute_msg(&mut deps, mock_env(), &owner, msg).unwrap_err();
+    assert_eq!(
+        res,
+        ContractError::CannotUpdateContractOrAssetWhileLocked {}
+    );
+
+    let config = CONFIG.load(&deps.storage).unwrap();
+    let expected_config = Config {
+        locker: deps.api.addr_make("locker"),
+        unlocker: deps.api.addr_make("unlocker"),
+        contract: deps.api.addr_make("contract"),
+        asset: "asset".to_string(),
+        aum_stale_period: Uint64::from(100u64),
     };
     assert_config_equals(&config, &expected_config);
 }

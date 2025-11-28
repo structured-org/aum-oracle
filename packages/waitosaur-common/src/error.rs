@@ -44,4 +44,7 @@ pub enum ContractError {
 
     #[error("Position timestamp is earlier than lock timestamp")]
     PositionTimestampEarlierThanLock {},
+
+    #[error("Cannot update contract address or asset while in locked state")]
+    CannotUpdateContractOrAssetWhileLocked {},
 }
