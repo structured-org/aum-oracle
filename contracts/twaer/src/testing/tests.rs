@@ -2110,12 +2110,15 @@ fn test_twaer_diff_check_disabled_by_none() {
     // This is a huge change from 2.0, so with the check enabled it fails
     let env3 = test_env_with_time(1001001, 102);
     let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
-    assert_eq!(res.err().unwrap(), TwaerDiffTooLarge {
-        new_twaer: "9.992007992007992007".to_string(),
-        prev_twaer: "2".to_string(),
-        diff_ppm: 3996003,
-        max_allowed_ppm: 10000,
-    });
+    assert_eq!(
+        res.err().unwrap(),
+        TwaerDiffTooLarge {
+            new_twaer: "9.992007992007992007".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 3996003,
+            max_allowed_ppm: 10000,
+        }
+    );
 
     // Set twaer_diff_ppm to None
     let msg = ExecuteMsg::UpdateConfig {
@@ -2126,7 +2129,7 @@ fn test_twaer_diff_check_disabled_by_none() {
             maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
-            twaer_diff_ppm: Some(None)
+            twaer_diff_ppm: Some(None),
         },
     };
     execute_msg(&mut deps, env3.clone(), &owner, msg).unwrap();
