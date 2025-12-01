@@ -194,20 +194,14 @@ fn calculate_diff_ppm(prev: Decimal, new: Decimal) -> ContractResult<u128> {
         return Ok(u128::MAX);
     }
 
-    // Calculate diff thirst |new - prev|
     let diff = if new > prev {
         new.checked_sub(prev)?
     } else {
         prev.checked_sub(new)?
     };
-
-    // Then calculate ratio: diff / prev
     let ratio = diff.checked_div(prev)?;
-
-    // Scale to PPM: ratio * 1_000_000
     let ppm = ratio.checked_mul(Decimal::from_ratio(1_000_000u64, 1u64))?;
 
-    // Convert to u128
     Ok(ppm.to_uint_floor().u128())
 }
 

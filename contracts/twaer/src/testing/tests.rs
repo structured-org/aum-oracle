@@ -11,6 +11,7 @@ use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 use std::str::FromStr;
 use twaer_common::error::ContractError;
+use twaer_common::error::ContractError::TwaerDiffTooLarge;
 use twaer_common::msg::{
     ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
     UpdateConfig,
@@ -2069,9 +2070,19 @@ fn test_twaer_diff_check_disabled_by_none() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
 
-    // Ensure twaer_diff_ppm is None (disabled)
-    let config = CONFIG.load(&deps.storage).unwrap();
-    assert!(config.twaer_diff_ppm.is_none());
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
 
     // Record initial ER with rate = 2.0
     deps.querier.update_wasm(mock_oracle_response(
@@ -2096,11 +2107,33 @@ fn test_twaer_diff_check_disabled_by_none() {
     // This ensures the 10.0 rate has time to affect the TWA calculation
     // At t=1001001: rate 2.0 was active for 1s, rate 10.0 was active for 1000s
     // TWA = (2.0*1 + 10.0*1000) / 1001 ≈ 9.98
-    // This is a huge change from 2.0, so with the check enabled it would fail
-    // But with the check disabled (None), it should succeed
+    // This is a huge change from 2.0, so with the check enabled it fails
     let env3 = test_env_with_time(1001001, 102);
     let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
-    assert!(res.is_ok());
+    assert_eq!(res.err().unwrap(), TwaerDiffTooLarge {
+        new_twaer: "9.992007992007992007".to_string(),
+        prev_twaer: "2".to_string(),
+        diff_ppm: 3996003,
+        max_allowed_ppm: 10000,
+    });
+
+    // Set twaer_diff_ppm to None
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(None)
+        },
+    };
+    execute_msg(&mut deps, env3.clone(), &owner, msg).unwrap();
+
+    // With twaer_diff_ppm disabled new twaer works
+    let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok())
 }
 
 #[test]
