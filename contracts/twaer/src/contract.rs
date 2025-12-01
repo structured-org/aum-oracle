@@ -147,7 +147,10 @@ fn execute_record_er(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResu
 fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
 
-    if !cw_ownable::is_owner(deps.storage, &info.sender)? && info.sender != config.publisher {
+    if !cw_ownable::is_owner(deps.storage, &info.sender)?
+        && info.sender != config.publisher
+        && info.sender != config.recorder
+    {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -163,7 +166,7 @@ fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> Contract
     // Check if the new TWAER differs from the previous one by more than the configured max
     if let (Some(max_diff_ppm), Some((prev_twaer, _))) = (config.twaer_diff_ppm, prev_twaer_data) {
         let diff_ppm = calculate_diff_ppm(prev_twaer, twaer)?;
-        if diff_ppm > max_diff_ppm {
+        if diff_ppm > max_diff_ppm && info.sender == config.recorder {
             return Err(ContractError::TwaerDiffTooLarge {
                 new_twaer: twaer.to_string(),
                 prev_twaer: prev_twaer.to_string(),

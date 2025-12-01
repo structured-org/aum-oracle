@@ -1717,13 +1717,15 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
     };
 
     let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+    let publisher = deps.api.addr_make("publisher");
     let oracle1 = deps.api.addr_make("oracle1");
     let maxbtc_core_contract = deps.api.addr_make("maxbtc_core_contract");
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
-        recorder: owner.to_string(),
-        publisher: owner.to_string(),
+        recorder: recorder.to_string(),
+        publisher: publisher.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: twa_window_seconds.unwrap_or(86400),
         twaer_immutability_seconds: 0,
@@ -2010,6 +2012,7 @@ fn test_twaer_diff_check_allows_small_change() {
 fn test_twaer_diff_check_blocks_large_change() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
 
     // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
     let msg = ExecuteMsg::UpdateConfig {
@@ -2031,10 +2034,16 @@ fn test_twaer_diff_check_blocks_large_change() {
         2000000u128,
     ));
     let env1 = test_env_with_time(1000000, 100);
-    record_er(&mut deps, env1.clone(), &owner).unwrap();
+    record_er(&mut deps, env1.clone(), &recorder).unwrap();
 
     // First publish - should succeed, TWAER = 2.0
-    execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
+    execute_msg(
+        &mut deps,
+        env1.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
     let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
     assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128));
 
@@ -2044,7 +2053,7 @@ fn test_twaer_diff_check_blocks_large_change() {
         2500000u128,
     ));
     let env2 = test_env_with_time(1001000, 101);
-    record_er(&mut deps, env2.clone(), &owner).unwrap();
+    record_er(&mut deps, env2.clone(), &recorder).unwrap();
 
     // Publish much later so the rate 2.5 dominates the TWA
     // At t=2000000: rate 2.0 was active for 1000s (1000000-1001000)
@@ -2052,11 +2061,16 @@ fn test_twaer_diff_check_blocks_large_change() {
     // TWA = (2.0*1000 + 2.5*999000) / 1000000 ≈ 2.4995
     // Diff from 2.0 to ~2.5 is ~25%, which exceeds 1% limit
     let env3 = test_env_with_time(2000000, 102);
-    let err =
-        execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap_err();
+    let err = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap_err();
     assert_eq!(
         err,
-        ContractError::TwaerDiffTooLarge {
+        TwaerDiffTooLarge {
             new_twaer: "2.4995".to_string(),
             prev_twaer: "2".to_string(),
             diff_ppm: 249750,
@@ -2066,9 +2080,91 @@ fn test_twaer_diff_check_blocks_large_change() {
 }
 
 #[test]
+fn test_twaer_with_large_diff_still_can_be_published_by_publisher() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+    let publisher = deps.api.addr_make("publisher");
+
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record initial ER with rate = 2.0
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &recorder).unwrap();
+
+    // First publish - should succeed, TWAER = 2.0
+    execute_msg(
+        &mut deps,
+        env1.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
+    let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
+    assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128));
+
+    // Record ER with rate = 2.5 (25% increase) at t+1000 seconds
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2500000u128,
+    ));
+    let env2 = test_env_with_time(1001000, 101);
+    record_er(&mut deps, env2.clone(), &recorder).unwrap();
+
+    // Publish much later so the rate 2.5 dominates the TWA
+    // At t=2000000: rate 2.0 was active for 1000s (1000000-1001000)
+    // rate 2.5 was active for 999000s (1001000-2000000)
+    // TWA = (2.0*1000 + 2.5*999000) / 1000000 ≈ 2.4995
+    // Diff from 2.0 to ~2.5 is ~25%, which exceeds 1% limit
+    let env3 = test_env_with_time(2000000, 102);
+    let err = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        TwaerDiffTooLarge {
+            new_twaer: "2.4995".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 249750,
+            max_allowed_ppm: 10000,
+        }
+    );
+
+    // publisher still can publish TWAER even with a huge diff
+    execute_msg(
+        &mut deps,
+        env3.clone(),
+        &publisher,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
+}
+
+#[test]
 fn test_twaer_diff_check_disabled_by_none() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
 
     // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
     let msg = ExecuteMsg::UpdateConfig {
@@ -2109,7 +2205,12 @@ fn test_twaer_diff_check_disabled_by_none() {
     // TWA = (2.0*1 + 10.0*1000) / 1001 ≈ 9.98
     // This is a huge change from 2.0, so with the check enabled it fails
     let env3 = test_env_with_time(1001001, 102);
-    let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    let res = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    );
     assert_eq!(
         res.err().unwrap(),
         TwaerDiffTooLarge {
@@ -2135,7 +2236,12 @@ fn test_twaer_diff_check_disabled_by_none() {
     execute_msg(&mut deps, env3.clone(), &owner, msg).unwrap();
 
     // With twaer_diff_ppm disabled new twaer works
-    let res = execute_msg(&mut deps, env3.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    let res = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    );
     assert!(res.is_ok())
 }
 
