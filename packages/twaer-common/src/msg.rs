@@ -50,7 +50,9 @@ pub enum ExecuteMsg {
     /// Calculates and publishes the official Time-Weighted Average Exchange Rate that is exposed
     /// via GetTwaExchangeRate queries. The calculation uses the exchange rate history populated
     /// by RecordEr calls to compute the TWA over the configured time window.
-    /// Only callable by the owner or publisher.
+    /// Only callable by the owner, publisher or recorder.
+    /// Recorder can publish a new TWAER only if the new TWAER does not differ from the previous TWAER
+    /// by more than the configured max (twaer_diff_ppm in the contract's config)
     PublishTwaer {},
 
     /// Resets the historical and aggregator values and sets the TWAER to a specific value.
