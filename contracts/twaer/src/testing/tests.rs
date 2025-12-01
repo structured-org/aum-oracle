@@ -2080,7 +2080,7 @@ fn test_twaer_diff_check_blocks_large_change() {
 }
 
 #[test]
-fn test_twaer_diff_check_blocks_large_change_publish_by_recorder() {
+fn test_twaer_with_large_diff_still_can_be_published_by_publisher() {
     let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
     let owner = deps.api.addr_make("owner");
     let recorder = deps.api.addr_make("recorder");
