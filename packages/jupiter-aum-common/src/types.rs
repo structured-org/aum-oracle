@@ -21,7 +21,6 @@ pub struct Config {
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// List of solana addresses (key) which balances of assets (value) are required for consensus.
-    /// Must contain jlp_token balance tracking for the strategy_address.
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,

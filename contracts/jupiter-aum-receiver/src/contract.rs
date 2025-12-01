@@ -374,7 +374,8 @@ pub fn get_asset_price_in_usd(
     Ok(asset_price_in_usd)
 }
 
-/// Computes the AUM in wBTC units using Solana data and BTC/USD price.
+/// Computes the AUM in wBTC units using Solana data and a list of prices measured in BTC for each
+/// asset involved in the data.
 pub fn calculate_aum_in_wbtc(
     prices_in_btc: HashMap<String, SignedDecimal256>,
     data: SolanaData,
@@ -399,7 +400,7 @@ pub fn calculate_aum_in_wbtc(
                 *decimals
                     .get(&sb.asset)
                     .ok_or(ContractError::CrucialConsensusDataMissing {
-                        details: format!("{} decimals", sb.asset).to_string(),
+                        details: format!("{} decimals", sb.asset),
                     })? as u32;
             Ok(acc
                 + token_price

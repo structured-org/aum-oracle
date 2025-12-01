@@ -26,11 +26,11 @@ pub struct InstantiateMsg {
     /// List of custody asset denoms required for consensus
     pub required_custody_assets: Vec<String>,
     /// List of solana addresses (key) which balances of assets (value) are required for consensus.
-    /// Must contain jlp_token balance tracking for the strategy_address.
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
-    /// Map of Solana asset names to PriceTicker for price lookups
+    /// Map of Solana asset names to PriceTicker for price lookups. Must contain every token listed
+    /// in required_solana_balances.
     pub solana_slinky_map: HashMap<String, PriceTicker>,
 }
 
@@ -57,11 +57,11 @@ pub struct UpdateConfig {
     /// New required custody asset denoms.
     pub required_custody_assets: Option<Vec<String>>,
     /// New list of solana addresses (key) which balances of assets (value) are required for consensus.
-    /// Must contain jlp_token balance tracking for the strategy_address.
     pub required_solana_balances: Option<HashMap<String, Vec<String>>>,
     /// New list of solana tokens which total supply is required for consensus.
     pub required_solana_token_total_supply: Option<Vec<String>>,
-    /// New map of Solana asset names to PriceTicker for price lookups
+    /// New map of Solana asset names to PriceTicker for price lookups. Must contain every token listed
+    /// in required_solana_balances.
     pub solana_slinky_map: Option<HashMap<String, PriceTicker>>,
 
     // Consensus configuration updates
@@ -129,10 +129,10 @@ pub struct GetDataResponse {
 #[cw_serde]
 pub struct MigrateMsg {
     /// List of solana addresses (key) which balances of assets (value) are required for consensus.
-    /// Must contain jlp_token balance tracking for the strategy_address.
     pub required_solana_balances: HashMap<String, Vec<String>>,
     /// List of solana tokens which total supply is required for consensus
     pub required_solana_token_total_supply: Vec<String>,
-    /// Map of Solana asset names to PriceTicker for price lookups
+    /// Map of Solana asset names to PriceTicker for price lookups. Must contain every token listed
+    /// in required_solana_balances.
     pub solana_slinky_map: HashMap<String, PriceTicker>,
 }

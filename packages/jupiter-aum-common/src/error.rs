@@ -35,12 +35,6 @@ pub enum ContractError {
     #[error("Duplicate PriceTicker found: {ticker}")]
     DuplicatePriceTicker { ticker: String },
 
-    #[error("Empty JLP token")]
-    InvalidJlpToken {},
-
-    #[error("Strategy JLP balance tracking is required")]
-    StrategyJlpBalanceNotTracked {},
-
     #[error("JLP token supply tracking is required")]
     JlpTotalSupplyNotTracked {},
 
