@@ -34,6 +34,9 @@ type config struct {
 	// RecordInterval is the interval between record_er executions (e.g., "30s", "1m", "5m")
 	RecordInterval time.Duration `yaml:"record_interval"`
 
+	// PublishInterval is the interval between publish_twaer executions (e.g., "30s", "1m", "5m")
+	PublishInterval time.Duration `yaml:"publish_interval"`
+
 	// Clients is the configuration for different clients
 	Clients clientsConfig `yaml:"clients"`
 
