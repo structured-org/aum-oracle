@@ -271,7 +271,7 @@ func (c *Client) RecordER(ctx context.Context) error {
 	return nil
 }
 
-// RecordER executes the record_er message on a TWAER contract.
+// PublishTwaer executes the publish_twaer message on a TWAER contract.
 func (c *Client) PublishTwaer(ctx context.Context) error {
 	c.logger.Info("executing publish_twaer on TWAER contract", zap.String("contract", c.twaerContract))
 

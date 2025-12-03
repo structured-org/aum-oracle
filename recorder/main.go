@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -31,14 +29,13 @@ func init() {
 
 // NewAlignedTicker returns a channel that ticks every 'n' duration,
 // aligned to 'lastTickTime'.
-func NewAlignedTicker(lastTickTime time.Time, n time.Duration) (<-chan time.Time, func()) {
+func NewAlignedTicker(ctx context.Context, lastTickTime time.Time, n time.Duration) <-chan time.Time {
 	tickChan := make(chan time.Time)
-	done := make(chan bool)
 
 	go func() {
 		defer close(tickChan)
 
-		now := time.Now()
+		now := time.Now().UTC()
 		elapsed := now.Sub(lastTickTime)
 
 		// 1. Check if we are already "late" (Immediate Execution)
@@ -49,7 +46,7 @@ func NewAlignedTicker(lastTickTime time.Time, n time.Duration) (<-chan time.Time
 				// This ensures the NEXT tick waits for the full 'n' duration,
 				// rather than firing again instantly to catch up to a grid.
 				lastTickTime = now
-			case <-done:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -69,34 +66,29 @@ func NewAlignedTicker(lastTickTime time.Time, n time.Duration) (<-chan time.Time
 			// Fire the first aligned tick
 			select {
 			case tickChan <- t:
-			case <-done:
+			case <-ctx.Done():
 				timer.Stop()
 				return
 			}
-		case <-done:
+		case <-ctx.Done():
 			timer.Stop()
 			return
 		}
 
 		// 3. Switch to standard Ticker for long-term repeating
 		ticker := time.NewTicker(n)
-		defer ticker.Stop()
 
 		for {
 			select {
 			case t := <-ticker.C:
 				tickChan <- t
-			case <-done:
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
 
-	cancel := func() {
-		close(done)
-	}
-
-	return tickChan, cancel
+	return tickChan
 }
 
 func main() {
@@ -116,18 +108,7 @@ func main() {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Handle graceful shutdown
-	go func() {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-		s := <-sigs
-		logger.Info("Received termination signal, gracefully shutting down...",
-			zap.String("signal", s.String()))
-		cancel()
-	}()
+	ctx := context.Background()
 
 	logger.Info("Starting recorder service",
 		zap.String("contract", conf.TwaerContract),
@@ -144,11 +125,8 @@ func main() {
 	}
 
 	// Main loop
-	recordErTicker, recordErTickerStop := NewAlignedTicker(time.Unix(erWindow.WindowEnd, 0).UTC(), conf.RecordInterval)
-	defer recordErTickerStop()
-
-	publishTicker, publishTickerStop := NewAlignedTicker(time.Unix(twaerInfo.PublishedAt, 0).UTC(), conf.PublishInterval)
-	defer publishTickerStop()
+	recordErTicker := NewAlignedTicker(ctx, time.Unix(erWindow.WindowEnd, 0).UTC(), conf.RecordInterval)
+	publishTicker := NewAlignedTicker(ctx, time.Unix(twaerInfo.PublishedAt, 0).UTC(), conf.PublishInterval)
 
 	for {
 		select {
