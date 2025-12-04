@@ -1,9 +1,8 @@
 use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
-use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
-    Order, Response, StdError, StdResult, Storage, Uint128,
+    Order, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
@@ -43,6 +42,7 @@ pub fn instantiate(
         maxbtc_core_contract: deps.api.addr_validate(&msg.maxbtc_core_contract)?,
         twa_window_seconds: msg.twa_window_seconds,
         twaer_immutability_seconds: msg.twaer_immutability_seconds,
+        twaer_diff_ppm: msg.twaer_diff_ppm,
     };
     CONFIG.save(deps.storage, &config)?;
     MOCKED_MAXBTC_SUPPLY.save(deps.storage, &msg.mocked_maxbtc_supply)?;
@@ -119,6 +119,9 @@ fn execute_update_config(
     if let Some(twaer_immutability_seconds) = new_config.twaer_immutability_seconds {
         config.twaer_immutability_seconds = twaer_immutability_seconds;
     }
+    if let Some(twaer_diff_ppm) = new_config.twaer_diff_ppm {
+        config.twaer_diff_ppm = twaer_diff_ppm;
+    }
 
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new().add_attribute("action", "update_config"))
@@ -143,23 +146,65 @@ fn execute_record_er(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResu
 fn execute_publish_twaer(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
 
-    if !cw_ownable::is_owner(deps.storage, &info.sender)? && info.sender != config.publisher {
+    if !cw_ownable::is_owner(deps.storage, &info.sender)?
+        && info.sender != config.publisher
+        && info.sender != config.recorder
+    {
         return Err(ContractError::Unauthorized {});
     }
 
-    let prev_pub_time = TWAER.load(deps.storage).unwrap_or_default().1;
+    let prev_twaer_data = TWAER.may_load(deps.storage)?;
+    let prev_pub_time = prev_twaer_data.map(|(_, t)| t).unwrap_or_default();
     let next_pub_time = prev_pub_time + config.twaer_immutability_seconds;
     if env.block.time.seconds() < next_pub_time {
         return Err(ContractError::PublicationToSoon { next_pub_time });
     }
 
     let twaer = calculate_twaer(deps.as_ref(), env.clone())?;
+
+    // Check if the new TWAER differs from the previous one by more than the configured max
+    if let (Some(max_diff_ppm), Some((prev_twaer, _))) = (config.twaer_diff_ppm, prev_twaer_data) {
+        let diff_ppm = calculate_diff_ppm(prev_twaer, twaer)?;
+        if diff_ppm > max_diff_ppm && info.sender == config.recorder {
+            return Err(ContractError::TwaerDiffTooLarge {
+                new_twaer: twaer.to_string(),
+                prev_twaer: prev_twaer.to_string(),
+                diff_ppm,
+                max_allowed_ppm: max_diff_ppm,
+            });
+        }
+    }
+
     TWAER.save(deps.storage, &(twaer, env.block.time.seconds()))?;
 
     Ok(
         Response::new()
             .add_attributes([("action", "publish_twaer"), ("twaer", &twaer.to_string())]),
     )
+}
+
+/// Calculates the difference between two Decimals in parts per million (PPM).
+/// Returns the absolute difference as PPM relative to the previous value.
+/// For example, if prev=1.0 and new=1.01, the diff is 1% = 10000 PPM.
+fn calculate_diff_ppm(prev: Decimal, new: Decimal) -> ContractResult<u128> {
+    if prev.is_zero() {
+        // If previous is zero, any non-zero new value is considered infinite change
+        // Return max u128 to indicate the maximum possible difference
+        if new.is_zero() {
+            return Ok(0);
+        }
+        return Ok(u128::MAX);
+    }
+
+    let diff = if new > prev {
+        new.checked_sub(prev)?
+    } else {
+        prev.checked_sub(new)?
+    };
+    let ratio = diff.checked_div(prev)?;
+    let ppm = ratio.checked_mul(Decimal::from_ratio(1_000_000u64, 1u64))?;
+
+    Ok(ppm.to_uint_floor().u128())
 }
 
 fn execute_reset_twaer_to(
@@ -498,38 +543,8 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, _: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    #[cw_serde]
-    struct OldConfig {
-        pub publisher: Addr,
-        pub aum_oracles: Vec<Addr>,
-        pub maxbtc_core_contract: Addr,
-        pub twa_window_seconds: u64,
-        pub twaer_immutability_seconds: u64,
-    }
-    let Some(old_config_bytes) = deps.storage.get(b"config") else {
-        return Err(ContractError::Std(StdError::generic_err(
-            "data not found at key config",
-        )));
-    };
-    let old_config: OldConfig = serde_json::from_slice(&old_config_bytes).map_err(|e| {
-        ContractError::Std(StdError::generic_err(format!(
-            "failed to parse old config: {}",
-            e
-        )))
-    })?;
-
-    let new_config = Config {
-        recorder: deps.api.addr_validate(&msg.recorder)?,
-        publisher: old_config.publisher,
-        aum_oracles: old_config.aum_oracles,
-        maxbtc_core_contract: old_config.maxbtc_core_contract,
-        twa_window_seconds: old_config.twa_window_seconds,
-        twaer_immutability_seconds: old_config.twaer_immutability_seconds,
-    };
-    CONFIG.save(deps.storage, &new_config)?;
 
     Ok(Response::default())
 }

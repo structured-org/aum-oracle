@@ -1,5 +1,6 @@
 use crate::types::Config;
 use aum_receiver_common::types::GetAumResponse;
+use cosmwasm_schema::serde::{Deserialize, Deserializer};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Decimal, Uint128};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
@@ -25,6 +26,11 @@ pub struct InstantiateMsg {
     /// turn the real token supply usage on, the owner must set the maxbtc_denom in the config.
     /// If the supply is zero, instant exchange rate calculations return Decimal::one().
     pub mocked_maxbtc_supply: Uint128,
+
+    /// Maximum allowed difference between newly calculated TWAER and the previous one,
+    /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
+    /// If set to None, the check is disabled.
+    pub twaer_diff_ppm: Option<u128>,
 }
 
 #[cw_ownable_execute]
@@ -44,7 +50,9 @@ pub enum ExecuteMsg {
     /// Calculates and publishes the official Time-Weighted Average Exchange Rate that is exposed
     /// via GetTwaExchangeRate queries. The calculation uses the exchange rate history populated
     /// by RecordEr calls to compute the TWA over the configured time window.
-    /// Only callable by the owner or publisher.
+    /// Only callable by the owner, publisher or recorder.
+    /// Recorder can publish a new TWAER only if the new TWAER does not differ from the previous TWAER
+    /// by more than the configured max (twaer_diff_ppm in the contract's config)
     PublishTwaer {},
 
     /// Resets the historical and aggregator values and sets the TWAER to a specific value.
@@ -77,6 +85,13 @@ pub struct UpdateConfig {
     pub twa_window_seconds: Option<u64>,
     /// New minimal number of seconds required to pass between sequential TWAER publications.
     pub twaer_immutability_seconds: Option<u64>,
+    /// New maximum allowed difference between newly calculated TWAER and the previous one,
+    /// expressed in parts per million (PPM). For example, 10000 PPM = 1%.
+    /// - Missing field: None -> no change
+    /// - Explicit null: Some(None) -> set to None ("twaer_diff_ppm": null)
+    /// - String value: Some(Some(Addr)) -> set to String ("twaer_diff_ppm": 10000)
+    #[serde(default, deserialize_with = "deserialize_nested_option")]
+    pub twaer_diff_ppm: Option<Option<u128>>,
 }
 
 #[cw_ownable_query]
@@ -131,7 +146,15 @@ pub struct ErWindowInfoResponse {
 
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
-pub struct MigrateMsg {
-    // The address capable of recording the exchange rate after the migration.
-    pub recorder: String,
+pub struct MigrateMsg {}
+
+/// Custom deserializer for Option<Option<u128>> to distinguish between missing field and null.
+/// - Missing field: None
+/// - Explicit null: Some(None)
+/// - u128 value: Some(Some(u128))
+fn deserialize_nested_option<'de, D>(deserializer: D) -> Result<Option<Option<u128>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
 }

@@ -50,6 +50,15 @@
       "format": "uint64",
       "minimum": 0.0
     },
+    "twaer_diff_ppm": {
+      "description": "Maximum allowed difference between newly calculated TWAER and the previous one, expressed in parts per million (PPM). For example, 10000 PPM = 1%. If set to None, the check is disabled.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint128",
+      "minimum": 0.0
+    },
     "twaer_immutability_seconds": {
       "description": "The minimal number of seconds required to pass between sequential TWAER publications.",
       "type": "integer",

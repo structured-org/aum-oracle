@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -29,6 +27,52 @@ func init() {
 	config.Seal()
 }
 
+// NewAlignedTicker returns a channel that ticks every 'n' duration,
+// aligned to 'lastTickTime'.
+func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan struct{} {
+	tickChan := make(chan struct{})
+
+	go func() {
+		defer close(tickChan)
+
+		now := time.Now().UTC()
+		elapsed := now.Sub(lastTickTime)
+
+		// 1. Check if we are already "late" (Immediate Execution)
+		if elapsed >= n {
+			tickChan <- struct{}{}
+			// If we fired immediately, we reset the anchor to NOW.
+			// This ensures the NEXT tick waits for the full 'n' duration,
+			// rather than firing again instantly to catch up to a grid.
+			lastTickTime = now
+		}
+
+		// 2. Calculate alignment for the next tick
+		// We recalculate elapsed in case we just updated lastTickTime above.
+		elapsed = time.Since(lastTickTime)
+
+		// If we just fired immediately, elapsed is ~0, so wait = n.
+		// If we didn't fire, this calculates the remainder of the interval.
+		wait := n - (elapsed % n)
+
+		timer := time.NewTimer(wait)
+
+		<-timer.C
+		// Fire the first aligned tick
+		tickChan <- struct{}{}
+
+		// 3. Switch to standard Ticker for long-term repeating
+		ticker := time.NewTicker(n)
+
+		for {
+			<-ticker.C
+			tickChan <- struct{}{}
+		}
+	}()
+
+	return tickChan
+}
+
 func main() {
 	conf := readConfig()
 	logRegistry := initLogRegistry(conf.LoggerLevel)
@@ -46,62 +90,41 @@ func main() {
 		logger.Fatal("failed to create neutron client", zap.Error(err))
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Handle graceful shutdown
-	go func() {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-		s := <-sigs
-		logger.Info("Received termination signal, gracefully shutting down...",
-			zap.String("signal", s.String()))
-		cancel()
-	}()
+	ctx := context.Background()
 
 	logger.Info("Starting recorder service",
 		zap.String("contract", conf.TwaerContract),
 		zap.Duration("interval", conf.RecordInterval))
-
-	// Main loop
-	ticker := time.NewTicker(conf.RecordInterval)
-	defer ticker.Stop()
 
 	erWindow, err := neutronClient.QueryERWindowInfo(ctx)
 	if err != nil {
 		logger.Fatal("failed to query er window info", zap.Error(err))
 	}
 
-	// If on startup we see that there is enough time passed since last record, perform record execution
-	if time.Unix(erWindow.WindowEnd, 0).UTC().Add(conf.RecordInterval).Before(time.Now().UTC()) {
-		if err := executeRecordER(ctx, neutronClient, logger); err != nil {
-			logger.Error("Failed to execute record_er", zap.Error(err))
-		}
+	twaerInfo, err := neutronClient.QueryTwaerInfo(ctx)
+	if err != nil {
+		logger.Fatal("failed to query twaer info", zap.Error(err))
 	}
+
+	// Main loop
+	recordErTicker := NewAlignedTicker(time.Unix(erWindow.WindowEnd, 0).UTC(), conf.RecordInterval)
+	publishTicker := NewAlignedTicker(time.Unix(twaerInfo.PublishedAt, 0).UTC(), conf.PublishInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Recorder service stopped")
 			return
-		case <-ticker.C:
-			if err := executeRecordER(ctx, neutronClient, logger); err != nil {
+		case <-recordErTicker:
+			if err := neutronClient.RecordER(ctx); err != nil {
 				logger.Error("Failed to execute record_er", zap.Error(err))
+			}
+		case <-publishTicker:
+			if err := neutronClient.PublishTwaer(ctx); err != nil {
+				logger.Error("Failed to execute publish_twaer", zap.Error(err))
 			}
 		}
 	}
-}
-
-// executeRecordER executes the record_er message on the TWAER contract
-func executeRecordER(ctx context.Context, client *neutronclient.Client, logger *zap.Logger) error {
-	logger.Info("Executing record_er")
-
-	if err := client.RecordER(ctx); err != nil {
-		return err
-	}
-
-	logger.Info("Successfully executed record_er")
-	return nil
 }
 
 // initLogRegistry initializes loggers registry.

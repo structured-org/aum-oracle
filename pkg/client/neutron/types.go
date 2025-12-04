@@ -117,3 +117,9 @@ type GetERWindowInfo struct {
 	// End of the TWAER window
 	WindowEnd int64 `json:"window_end"`
 }
+
+// GetTwaerInfo is the response of GetTWAER smart contract to the "get_twaer" query
+type GetTwaerInfo struct {
+	// When the last TWAER was published
+	PublishedAt int64 `json:"published_at"`
+}

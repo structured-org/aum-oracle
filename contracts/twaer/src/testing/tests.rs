@@ -1,19 +1,19 @@
-use crate::contract::{execute, instantiate, migrate, query};
+use crate::contract::{execute, instantiate, query};
 use crate::state::{CONFIG, ER_HISTORY, TWA_AGGREGATOR};
 use crate::testing::mock_querier::mock_dependencies;
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
-    StdError, Storage, SystemResult, Timestamp, Uint128, WasmQuery,
+    StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
 use std::str::FromStr;
 use twaer_common::error::ContractError;
+use twaer_common::error::ContractError::TwaerDiffTooLarge;
 use twaer_common::msg::{
-    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, MigrateMsg, QueryMsg,
-    UpdateConfig,
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
 use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
@@ -29,6 +29,7 @@ fn proper_initialization() {
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
+        twaer_diff_ppm: None,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -48,6 +49,7 @@ fn test_instantiate_with_invalid_owner() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -69,6 +71,7 @@ fn test_instantiate_with_invalid_recorder() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -90,6 +93,7 @@ fn test_instantiate_with_invalid_publisher() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -110,6 +114,7 @@ fn test_instantiate_with_invalid_oracle() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -140,6 +145,7 @@ fn test_ownership() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
     assert!(result.is_ok());
@@ -196,6 +202,7 @@ fn update_config_by_owner() {
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: Some(172800),         // 48 hours
             twaer_immutability_seconds: Some(172800), // 48 hours
+            twaer_diff_ppm: None,
         },
     };
 
@@ -210,6 +217,7 @@ fn update_config_by_owner() {
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 172800,
         twaer_immutability_seconds: 172800,
+        twaer_diff_ppm: None,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -228,6 +236,7 @@ fn update_config_by_unauthorized() {
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
+            twaer_diff_ppm: None,
         },
     };
 
@@ -242,6 +251,7 @@ fn update_config_by_unauthorized() {
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
+        twaer_diff_ppm: None,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -260,6 +270,7 @@ fn update_config_partial() {
             maxbtc_core_contract: Some(deps.api.addr_make("maxbtc_core_contract").to_string()),
             twa_window_seconds: Some(85000),
             twaer_immutability_seconds: None,
+            twaer_diff_ppm: None,
         },
     };
 
@@ -273,6 +284,7 @@ fn update_config_partial() {
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 85000,
         twaer_immutability_seconds: 0,
+        twaer_diff_ppm: None,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -293,6 +305,7 @@ fn query_config() {
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract"),
         twa_window_seconds: 86400,
         twaer_immutability_seconds: 0,
+        twaer_diff_ppm: None,
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -378,6 +391,7 @@ fn test_record_er() {
             maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
+            twaer_diff_ppm: None,
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
@@ -424,6 +438,7 @@ fn test_record_er_with_zero_maxbtc_supply() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: mocked_supply,
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -472,6 +487,7 @@ fn test_query_er_window_info() {
             maxbtc_core_contract: None,
             twa_window_seconds: Some(29),
             twaer_immutability_seconds: None,
+            twaer_diff_ppm: None,
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
@@ -758,6 +774,7 @@ fn test_publish_twaer_by_publisher() {
             maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: None,
+            twaer_diff_ppm: None,
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
@@ -809,6 +826,7 @@ fn test_twaer_immutability() {
             maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: Some(3600),
+            twaer_diff_ppm: None,
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
@@ -860,6 +878,7 @@ fn test_mock_unmock_maxbtc_supply() {
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: mocked_supply,
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1003,6 +1022,7 @@ fn test_reset_twaer() {
             maxbtc_core_contract: None,
             twa_window_seconds: None,
             twaer_immutability_seconds: Some(3600),
+            twaer_diff_ppm: None,
         },
     };
     execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
@@ -1513,59 +1533,6 @@ fn test_twaer_complex_intertwining_expiration() {
     assert_eq!(query_data_point_count(&deps).unwrap(), 1);
 }
 
-#[test]
-fn test_migrate() {
-    use cosmwasm_schema::cw_serde;
-    use serde_json;
-
-    let mut deps = mock_dependencies();
-    let env = mock_env();
-
-    #[cw_serde]
-    struct OldConfig {
-        pub publisher: Addr,
-        pub aum_oracles: Vec<Addr>,
-        pub maxbtc_core_contract: Addr,
-        pub twa_window_seconds: u64,
-        pub twaer_immutability_seconds: u64,
-    }
-
-    // simulate pre-migration state
-    let old_config = OldConfig {
-        publisher: deps.api.addr_make("old_publisher"),
-        aum_oracles: vec![deps.api.addr_make("oracle1"), deps.api.addr_make("oracle2")],
-        maxbtc_core_contract: deps.api.addr_make("old_maxbtc_core"),
-        twa_window_seconds: 86400,
-        twaer_immutability_seconds: 3600,
-    };
-    let old_config_bytes = serde_json::to_vec(&old_config).unwrap();
-    deps.storage.set(b"config", &old_config_bytes);
-
-    // execute migration
-    let recorder_addr = deps.api.addr_make("new_recorder");
-    let migrate_msg = MigrateMsg {
-        recorder: recorder_addr.to_string(),
-    };
-    let result = migrate(deps.as_mut(), env, migrate_msg);
-    assert!(result.is_ok(), "Migration should succeed");
-
-    let new_config = CONFIG.load(&deps.storage).unwrap();
-    // check that all old fields are preserved
-    assert_eq!(new_config.publisher, old_config.publisher);
-    assert_eq!(new_config.aum_oracles, old_config.aum_oracles);
-    assert_eq!(
-        new_config.maxbtc_core_contract,
-        old_config.maxbtc_core_contract
-    );
-    assert_eq!(new_config.twa_window_seconds, old_config.twa_window_seconds);
-    assert_eq!(
-        new_config.twaer_immutability_seconds,
-        old_config.twaer_immutability_seconds
-    );
-    // check that the new recorder field is properly set
-    assert_eq!(new_config.recorder, recorder_addr);
-}
-
 // ============================================================================
 // Test Helper Functions
 // ============================================================================
@@ -1614,6 +1581,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1653,6 +1621,7 @@ fn setup_contract_with_standard_querier_and_config(
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1694,18 +1663,21 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
     };
 
     let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+    let publisher = deps.api.addr_make("publisher");
     let oracle1 = deps.api.addr_make("oracle1");
     let maxbtc_core_contract = deps.api.addr_make("maxbtc_core_contract");
 
     let msg = InstantiateMsg {
         owner: owner.to_string(),
-        recorder: owner.to_string(),
-        publisher: owner.to_string(),
+        recorder: recorder.to_string(),
+        publisher: publisher.to_string(),
         aum_oracles: vec![oracle1.to_string()],
         twa_window_seconds: twa_window_seconds.unwrap_or(86400),
         twaer_immutability_seconds: 0,
         mocked_maxbtc_supply: Uint128::zero(),
         maxbtc_core_contract: deps.api.addr_make("maxbtc_core_contract").to_string(),
+        twaer_diff_ppm: None,
     };
     let info = message_info(&owner, &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -1722,6 +1694,7 @@ fn setup_maxbtc_core_contract_with_supply_and_deposits(
                 aum_oracles: None,
                 twa_window_seconds: None,
                 twaer_immutability_seconds: None,
+                twaer_diff_ppm: None,
             },
         },
     )
@@ -1930,4 +1903,366 @@ where
 {
     let bin = query_msg(deps, env, QueryMsg::PredictTwaer {})?;
     Ok(from_json(bin)?)
+}
+
+// ============================================================================
+// TWAER Diff PPM Tests
+// ============================================================================
+
+#[test]
+fn test_twaer_diff_check_allows_small_change() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record initial ER with rate = 2.0
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &owner).unwrap();
+
+    // First publish - should succeed (no previous TWAER)
+    execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
+    let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
+    assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128)); // 2.0
+
+    // Record ER with rate = 2.01 (0.5% increase)
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2010000u128,
+    ));
+    let env2 = test_env_with_time(1000001, 101);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+
+    // Second publish - should succeed (0.5% < 1% limit)
+    let res = execute_msg(&mut deps, env2.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_twaer_diff_check_blocks_large_change() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record initial ER with rate = 2.0
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &recorder).unwrap();
+
+    // First publish - should succeed, TWAER = 2.0
+    execute_msg(
+        &mut deps,
+        env1.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
+    let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
+    assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128));
+
+    // Record ER with rate = 2.5 (25% increase) at t+1000 seconds
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2500000u128,
+    ));
+    let env2 = test_env_with_time(1001000, 101);
+    record_er(&mut deps, env2.clone(), &recorder).unwrap();
+
+    // Publish much later so the rate 2.5 dominates the TWA
+    // At t=2000000: rate 2.0 was active for 1000s (1000000-1001000)
+    // rate 2.5 was active for 999000s (1001000-2000000)
+    // TWA = (2.0*1000 + 2.5*999000) / 1000000 ≈ 2.4995
+    // Diff from 2.0 to ~2.5 is ~25%, which exceeds 1% limit
+    let env3 = test_env_with_time(2000000, 102);
+    let err = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        TwaerDiffTooLarge {
+            new_twaer: "2.4995".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 249750,
+            max_allowed_ppm: 10000,
+        }
+    );
+}
+
+#[test]
+fn test_twaer_with_large_diff_still_can_be_published_by_publisher() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+    let publisher = deps.api.addr_make("publisher");
+
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record initial ER with rate = 2.0
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &recorder).unwrap();
+
+    // First publish - should succeed, TWAER = 2.0
+    execute_msg(
+        &mut deps,
+        env1.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
+    let twaer1 = query_twaer(&deps, env1.clone()).unwrap();
+    assert_eq!(twaer1.twaer, Decimal::from_ratio(2u128, 1u128));
+
+    // Record ER with rate = 2.5 (25% increase) at t+1000 seconds
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2500000u128,
+    ));
+    let env2 = test_env_with_time(1001000, 101);
+    record_er(&mut deps, env2.clone(), &recorder).unwrap();
+
+    // Publish much later so the rate 2.5 dominates the TWA
+    // At t=2000000: rate 2.0 was active for 1000s (1000000-1001000)
+    // rate 2.5 was active for 999000s (1001000-2000000)
+    // TWA = (2.0*1000 + 2.5*999000) / 1000000 ≈ 2.4995
+    // Diff from 2.0 to ~2.5 is ~25%, which exceeds 1% limit
+    let env3 = test_env_with_time(2000000, 102);
+    let err = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        TwaerDiffTooLarge {
+            new_twaer: "2.4995".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 249750,
+            max_allowed_ppm: 10000,
+        }
+    );
+
+    // publisher still can publish TWAER even with a huge diff
+    execute_msg(
+        &mut deps,
+        env3.clone(),
+        &publisher,
+        ExecuteMsg::PublishTwaer {},
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_twaer_diff_check_disabled_by_none() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+    let recorder = deps.api.addr_make("recorder");
+
+    // Set twaer_diff_ppm to 10000 (1% = 10000 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10000)), // 1%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record initial ER with rate = 2.0
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        2000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &owner).unwrap();
+
+    // First publish
+    execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {}).unwrap();
+
+    // Record ER with rate = 10.0 (400% increase - huge change) at t+1
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        10000000u128,
+    ));
+    let env2 = test_env_with_time(1000001, 101);
+    record_er(&mut deps, env2.clone(), &owner).unwrap();
+
+    // Publish at t+1001 (1000 seconds after recording the 10.0 rate)
+    // This ensures the 10.0 rate has time to affect the TWA calculation
+    // At t=1001001: rate 2.0 was active for 1s, rate 10.0 was active for 1000s
+    // TWA = (2.0*1 + 10.0*1000) / 1001 ≈ 9.98
+    // This is a huge change from 2.0, so with the check enabled it fails
+    let env3 = test_env_with_time(1001001, 102);
+    let res = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    );
+    assert_eq!(
+        res.err().unwrap(),
+        TwaerDiffTooLarge {
+            new_twaer: "9.992007992007992007".to_string(),
+            prev_twaer: "2".to_string(),
+            diff_ppm: 3996003,
+            max_allowed_ppm: 10000,
+        }
+    );
+
+    // Set twaer_diff_ppm to None
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(None),
+        },
+    };
+    execute_msg(&mut deps, env3.clone(), &owner, msg).unwrap();
+
+    // With twaer_diff_ppm disabled new twaer works
+    let res = execute_msg(
+        &mut deps,
+        env3.clone(),
+        &recorder,
+        ExecuteMsg::PublishTwaer {},
+    );
+    assert!(res.is_ok())
+}
+
+#[test]
+fn test_twaer_diff_check_first_publish_always_succeeds() {
+    let mut deps = setup_maxbtc_core_contract_with_supply_and_deposits(1000000u128, 0, None);
+    let owner = deps.api.addr_make("owner");
+
+    // Set very restrictive twaer_diff_ppm (0.001% = 10 PPM)
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(10)), // 0.001%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    // Record ER with any rate
+    deps.querier.update_wasm(mock_oracle_response(
+        deps.api.addr_make("maxbtc_core_contract").to_string(),
+        5000000u128,
+    ));
+    let env1 = test_env_with_time(1000000, 100);
+    record_er(&mut deps, env1.clone(), &owner).unwrap();
+
+    // First publish should always succeed (no previous TWAER to compare against)
+    let res = execute_msg(&mut deps, env1.clone(), &owner, ExecuteMsg::PublishTwaer {});
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_update_config_twaer_diff_ppm() {
+    let mut deps = setup_contract();
+    let owner = deps.api.addr_make("owner");
+
+    // Initially twaer_diff_ppm should be None
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert!(config.twaer_diff_ppm.is_none());
+
+    // Update to set twaer_diff_ppm
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(Some(50000)), // 5%
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(config.twaer_diff_ppm, Some(50000));
+
+    // Update to disable twaer_diff_ppm
+    let msg = ExecuteMsg::UpdateConfig {
+        new_config: UpdateConfig {
+            recorder: None,
+            publisher: None,
+            aum_oracles: None,
+            maxbtc_core_contract: None,
+            twa_window_seconds: None,
+            twaer_immutability_seconds: None,
+            twaer_diff_ppm: Some(None), // Disable
+        },
+    };
+    execute_msg(&mut deps, mock_env(), &owner, msg).unwrap();
+
+    let config = CONFIG.load(&deps.storage).unwrap();
+    assert!(config.twaer_diff_ppm.is_none());
 }
