@@ -5,7 +5,7 @@ use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Decimal, Empty, Env, Int256, Order, OwnedDeps,
-    StdError,  SystemResult, Timestamp, Uint128, WasmQuery,
+    StdError, SystemResult, Timestamp, Uint128, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
@@ -13,8 +13,7 @@ use std::str::FromStr;
 use twaer_common::error::ContractError;
 use twaer_common::error::ContractError::TwaerDiffTooLarge;
 use twaer_common::msg::{
-    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg,
-    UpdateConfig,
+    ErWindowInfoResponse, ExecuteMsg, GetTwaerResponse, InstantiateMsg, QueryMsg, UpdateConfig,
 };
 use twaer_common::types::{Config, MaxBTCCoreConfig, TwaAggregator};
 
