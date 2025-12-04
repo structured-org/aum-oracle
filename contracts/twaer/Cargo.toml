@@ -4,7 +4,7 @@ description = "Time-weighted average exchange rate contract"
 edition = "2021"
 name = "twaer"
 repository = "https://github.com/structured-org/aum-oracle"
-version = "0.2.0"
+version = "0.3.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

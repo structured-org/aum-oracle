@@ -146,10 +146,7 @@ pub struct ErWindowInfoResponse {
 
 /// MigrateMsg is used for contract migration.
 #[cw_serde]
-pub struct MigrateMsg {
-    // The address capable of recording the exchange rate after the migration.
-    pub recorder: String,
-}
+pub struct MigrateMsg {}
 
 /// Custom deserializer for Option<Option<u128>> to distinguish between missing field and null.
 /// - Missing field: None

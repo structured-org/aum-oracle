@@ -544,39 +544,8 @@ fn query_er_window_info(deps: Deps) -> ContractResult<ErWindowInfoResponse> {
 
 /// Migrates the contract
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(deps: DepsMut, _env: Env, _: MigrateMsg) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    #[cw_serde]
-    struct OldConfig {
-        pub publisher: Addr,
-        pub aum_oracles: Vec<Addr>,
-        pub maxbtc_core_contract: Addr,
-        pub twa_window_seconds: u64,
-        pub twaer_immutability_seconds: u64,
-    }
-    let Some(old_config_bytes) = deps.storage.get(b"config") else {
-        return Err(ContractError::Std(StdError::generic_err(
-            "data not found at key config",
-        )));
-    };
-    let old_config: OldConfig = serde_json::from_slice(&old_config_bytes).map_err(|e| {
-        ContractError::Std(StdError::generic_err(format!(
-            "failed to parse old config: {}",
-            e
-        )))
-    })?;
-
-    let new_config = Config {
-        recorder: deps.api.addr_validate(&msg.recorder)?,
-        publisher: old_config.publisher,
-        aum_oracles: old_config.aum_oracles,
-        maxbtc_core_contract: old_config.maxbtc_core_contract,
-        twa_window_seconds: old_config.twa_window_seconds,
-        twaer_immutability_seconds: old_config.twaer_immutability_seconds,
-        twaer_diff_ppm: None, // Default to disabled on migration
-    };
-    CONFIG.save(deps.storage, &new_config)?;
 
     Ok(Response::default())
 }
