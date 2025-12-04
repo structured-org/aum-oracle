@@ -29,7 +29,7 @@ func init() {
 
 // NewAlignedTicker returns a channel that ticks every 'n' duration,
 // aligned to 'lastTickTime'.
-func NewAlignedTicker(ctx context.Context, lastTickTime time.Time, n time.Duration) <-chan time.Time {
+func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan time.Time {
 	tickChan := make(chan time.Time)
 
 	go func() {
@@ -46,8 +46,6 @@ func NewAlignedTicker(ctx context.Context, lastTickTime time.Time, n time.Durati
 				// This ensures the NEXT tick waits for the full 'n' duration,
 				// rather than firing again instantly to catch up to a grid.
 				lastTickTime = now
-			case <-ctx.Done():
-				return
 			}
 		}
 
@@ -66,13 +64,7 @@ func NewAlignedTicker(ctx context.Context, lastTickTime time.Time, n time.Durati
 			// Fire the first aligned tick
 			select {
 			case tickChan <- t:
-			case <-ctx.Done():
-				timer.Stop()
-				return
 			}
-		case <-ctx.Done():
-			timer.Stop()
-			return
 		}
 
 		// 3. Switch to standard Ticker for long-term repeating
@@ -82,8 +74,6 @@ func NewAlignedTicker(ctx context.Context, lastTickTime time.Time, n time.Durati
 			select {
 			case t := <-ticker.C:
 				tickChan <- t
-			case <-ctx.Done():
-				return
 			}
 		}
 	}()
@@ -125,8 +115,8 @@ func main() {
 	}
 
 	// Main loop
-	recordErTicker := NewAlignedTicker(ctx, time.Unix(erWindow.WindowEnd, 0).UTC(), conf.RecordInterval)
-	publishTicker := NewAlignedTicker(ctx, time.Unix(twaerInfo.PublishedAt, 0).UTC(), conf.PublishInterval)
+	recordErTicker := NewAlignedTicker(time.Unix(erWindow.WindowEnd, 0).UTC(), conf.RecordInterval)
+	publishTicker := NewAlignedTicker(time.Unix(twaerInfo.PublishedAt, 0).UTC(), conf.PublishInterval)
 
 	for {
 		select {
@@ -134,39 +124,15 @@ func main() {
 			logger.Info("Recorder service stopped")
 			return
 		case <-recordErTicker:
-			if err := executeRecordER(ctx, neutronClient, logger); err != nil {
+			if err := neutronClient.RecordER(ctx); err != nil {
 				logger.Error("Failed to execute record_er", zap.Error(err))
 			}
 		case <-publishTicker:
-			if err := executePublishTwaer(ctx, neutronClient, logger); err != nil {
+			if err := neutronClient.PublishTwaer(ctx); err != nil {
 				logger.Error("Failed to execute publish_twaer", zap.Error(err))
 			}
 		}
 	}
-}
-
-// executeRecordER executes the record_er message on the TWAER contract
-func executeRecordER(ctx context.Context, client *neutronclient.Client, logger *zap.Logger) error {
-	logger.Info("Executing record_er")
-
-	if err := client.RecordER(ctx); err != nil {
-		return err
-	}
-
-	logger.Info("Successfully executed record_er")
-	return nil
-}
-
-// executePublishTwaer executes the record_er message on the TWAER contract
-func executePublishTwaer(ctx context.Context, client *neutronclient.Client, logger *zap.Logger) error {
-	logger.Info("Executing publish_twaer")
-
-	if err := client.PublishTwaer(ctx); err != nil {
-		return err
-	}
-
-	logger.Info("Successfully executed publish_twaer")
-	return nil
 }
 
 // initLogRegistry initializes loggers registry.
