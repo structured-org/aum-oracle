@@ -1,9 +1,8 @@
 use crate::state::{CONFIG, ER_HISTORY, MOCKED_MAXBTC_SUPPLY, TWAER, TWA_AGGREGATOR};
 use aum_receiver_common::types::{aum_response_from_uwbtc, GetAumResponse};
-use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     entry_point, to_json_binary, Addr, Binary, Decimal, Deps, DepsMut, Env, Int256, MessageInfo,
-    Order, Response, StdError, StdResult, Storage, Uint128,
+    Order, Response, StdResult, Storage, Uint128,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
