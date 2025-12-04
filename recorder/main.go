@@ -29,8 +29,8 @@ func init() {
 
 // NewAlignedTicker returns a channel that ticks every 'n' duration,
 // aligned to 'lastTickTime'.
-func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan time.Time {
-	tickChan := make(chan time.Time)
+func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan struct{} {
+	tickChan := make(chan struct{})
 
 	go func() {
 		defer close(tickChan)
@@ -40,13 +40,11 @@ func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan time.Time 
 
 		// 1. Check if we are already "late" (Immediate Execution)
 		if elapsed >= n {
-			select {
-			case tickChan <- now:
-				// If we fired immediately, we reset the anchor to NOW.
-				// This ensures the NEXT tick waits for the full 'n' duration,
-				// rather than firing again instantly to catch up to a grid.
-				lastTickTime = now
-			}
+			tickChan <- struct{}{}
+			// If we fired immediately, we reset the anchor to NOW.
+			// This ensures the NEXT tick waits for the full 'n' duration,
+			// rather than firing again instantly to catch up to a grid.
+			lastTickTime = now
 		}
 
 		// 2. Calculate alignment for the next tick
@@ -59,22 +57,16 @@ func NewAlignedTicker(lastTickTime time.Time, n time.Duration) <-chan time.Time 
 
 		timer := time.NewTimer(wait)
 
-		select {
-		case t := <-timer.C:
-			// Fire the first aligned tick
-			select {
-			case tickChan <- t:
-			}
-		}
+		<-timer.C
+		// Fire the first aligned tick
+		tickChan <- struct{}{}
 
 		// 3. Switch to standard Ticker for long-term repeating
 		ticker := time.NewTicker(n)
 
 		for {
-			select {
-			case t := <-ticker.C:
-				tickChan <- t
-			}
+			<-ticker.C
+			tickChan <- struct{}{}
 		}
 	}()
 
