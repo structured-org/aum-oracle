@@ -4,6 +4,9 @@ twaer_contract: ""
 # Interval between record_er executions (e.g., "30s", "1m", "5m")
 record_interval: 30s
 
+# Interval between publish_twaer executions (e.g., "30s", "1m", "5m")
+publish_interval: 24h
+
 clients:
   neutron:
     mnemonic: ""

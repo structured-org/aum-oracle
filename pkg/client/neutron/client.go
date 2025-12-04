@@ -199,6 +199,20 @@ func (c *Client) QueryERWindowInfo(ctx context.Context) (*GetERWindowInfo, error
 	return &response, nil
 }
 
+// QueryTwaerInfo queries er_window_info from TWAER contract
+func (c *Client) QueryTwaerInfo(ctx context.Context) (*GetTwaerInfo, error) {
+	msg := map[string]any{"get_twaer": struct{}{}}
+	resBz, err := c.client.QuerySmartContract(ctx, c.twaerContract, msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query smart contract: %w", err)
+	}
+	var response GetTwaerInfo
+	if err := json.Unmarshal(resBz, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal get_twaer response: %w", err)
+	}
+	return &response, nil
+}
+
 // internal: execute smart contract message
 func (c *Client) sendExecuteMsg(ctx context.Context, contract string, msg any) (*cometcoretypes.ResultBroadcastTxCommit, error) {
 	msgBz, err := json.Marshal(msg)
@@ -247,6 +261,45 @@ func (c *Client) RecordER(ctx context.Context) error {
 	}
 
 	c.logger.Info("executed record_er successfully",
+		zap.Uint32("code", resp.TxResult.Code),
+		zap.String("tx_hash", resp.Hash.String()),
+		zap.Int64("height", resp.Height),
+		zap.String("contract", c.twaerContract),
+		zap.Int64("tx_gas_used", resp.TxResult.GasUsed),
+	)
+
+	return nil
+}
+
+// PublishTwaer executes the publish_twaer message on a TWAER contract.
+func (c *Client) PublishTwaer(ctx context.Context) error {
+	c.logger.Info("executing publish_twaer on TWAER contract", zap.String("contract", c.twaerContract))
+
+	msg := map[string]any{
+		"publish_twaer": map[string]any{},
+	}
+
+	var resp *cometcoretypes.ResultBroadcastTxCommit
+	var err error
+
+	err = retry.Do(
+		func() error {
+			var innerError error
+			resp, innerError = c.sendExecuteMsg(ctx, c.twaerContract, msg)
+			return innerError
+		},
+		retry.Attempts(3),
+		retry.Delay(1*time.Second),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			c.logger.Info("Retry publish_twaer attempt", zap.Uint("attempt", n+1))
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to execute publish_twaer: %w", err)
+	}
+
+	c.logger.Info("executed publish_twaer successfully",
 		zap.Uint32("code", resp.TxResult.Code),
 		zap.String("tx_hash", resp.Hash.String()),
 		zap.Int64("height", resp.Height),
