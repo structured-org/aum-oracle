@@ -7,7 +7,7 @@ use consensus::consensus::ConsensusOutcome;
 use cosmwasm_std::testing::{message_info, mock_env, MockApi, MockQuerier, MockStorage};
 use cosmwasm_std::{
     from_json, to_json_binary, Addr, ContractResult, Env, OwnedDeps, SignedDecimal256, StdError,
-    SystemResult, WasmQuery,
+    SystemResult, Uint64, WasmQuery,
 };
 use cw_ownable::Action;
 use cw_ownable::OwnershipError::{NotOwner, NotPendingOwner};
@@ -26,7 +26,7 @@ fn proper_initialization() {
         locker: deps.api.addr_make("locker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
-        aum_stale_period: 100u64,
+        aum_stale_period: Uint64::from(100u64),
     };
     let owner = deps.api.addr_make("owner");
     cw_ownable::assert_owner(&deps.storage, &owner).unwrap();
@@ -45,7 +45,7 @@ fn test_instantiate_with_invalid_owner() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);
@@ -68,7 +68,7 @@ fn test_instantiate_with_invalid_locker() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);
@@ -91,7 +91,7 @@ fn test_instantiate_with_invalid_unlocker() {
             unlocker: Addr::unchecked("invalid...address..."),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);
@@ -114,7 +114,7 @@ fn test_instantiate_with_invalid_contract() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: Addr::unchecked("invalid...address..."),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);
@@ -145,7 +145,7 @@ fn test_ownership() {
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let result = instantiate(deps.as_mut(), env.clone(), owner_info.clone(), msg);
@@ -197,7 +197,7 @@ fn update_config_by_owner() {
             unlocker: Some(deps.api.addr_make("new_unlocker").to_string()),
             contract: Some(deps.api.addr_make("new_contract").to_string()),
             asset: Some("new_asset".to_string()),
-            aum_stale_period: Some(200u64),
+            aum_stale_period: Some(Uint64::from(200u64)),
         },
     };
 
@@ -210,7 +210,7 @@ fn update_config_by_owner() {
         unlocker: deps.api.addr_make("new_unlocker"),
         contract: deps.api.addr_make("new_contract"),
         asset: "new_asset".to_string(),
-        aum_stale_period: 200u64,
+        aum_stale_period: Uint64::from(200u64),
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -226,7 +226,7 @@ fn update_config_by_unauthorized() {
             unlocker: Some(deps.api.addr_make("new_unlocker").to_string()),
             contract: Some(deps.api.addr_make("new_contract").to_string()),
             asset: Some("new_asset".to_string()),
-            aum_stale_period: Some(200u64),
+            aum_stale_period: Some(Uint64::from(200u64)),
         },
     };
 
@@ -239,7 +239,7 @@ fn update_config_by_unauthorized() {
         unlocker: deps.api.addr_make("unlocker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
-        aum_stale_period: 100u64,
+        aum_stale_period: Uint64::from(100u64),
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -255,7 +255,7 @@ fn query_config() {
         unlocker: deps.api.addr_make("unlocker"),
         contract: deps.api.addr_make("receiver_contract"),
         asset: "asset".to_string(),
-        aum_stale_period: 100u64,
+        aum_stale_period: Uint64::from(100u64),
     };
     assert_config_equals(&config, &expected_config);
 }
@@ -287,7 +287,7 @@ fn lock_and_query_state() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 }
@@ -393,7 +393,7 @@ fn unlock_wrong_asset() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 
@@ -408,7 +408,7 @@ fn unlock_wrong_asset() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 }
@@ -438,7 +438,7 @@ fn unlock_stale_aum() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 
@@ -453,7 +453,7 @@ fn unlock_stale_aum() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 }
@@ -483,7 +483,7 @@ fn unlock_no_data() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 
@@ -498,7 +498,7 @@ fn unlock_no_data() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("100.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 }
@@ -528,7 +528,7 @@ fn unlock_little_amount() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("300.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 
@@ -543,7 +543,7 @@ fn unlock_little_amount() {
         res,
         State::Locked {
             amount: SignedDecimal256::from_str("300.50").unwrap(),
-            at_timestamp: mock_env().block.time.nanos(),
+            at_timestamp: Uint64::from(mock_env().block.time.nanos()),
         }
     );
 }
@@ -565,7 +565,7 @@ fn setup_contract() -> OwnedDeps<MockStorage, MockApi, crate::testing::mock_quer
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);
@@ -591,7 +591,7 @@ fn setup_contract_with_standard_querier_and_config() -> OwnedDeps<MockStorage, M
             unlocker: deps.api.addr_make("unlocker"),
             contract: deps.api.addr_make("receiver_contract"),
             asset: "asset".to_string(),
-            aum_stale_period: 100u64,
+            aum_stale_period: Uint64::from(100u64),
         },
     };
     let info = message_info(&owner, &[]);

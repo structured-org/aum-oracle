@@ -3,6 +3,7 @@ use crate::state::{CONFIG, STATE};
 use binance_aum_common::msg::GetDataResponse;
 use binance_aum_common::msg::QueryMsg as BinanceAumQueryMsg;
 
+use cosmwasm_std::Uint64;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     SignedDecimal256,
@@ -27,7 +28,7 @@ pub fn instantiate(
 ) -> ContractResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(msg.owner.as_str()))?;
-    if msg.config.aum_stale_period < 1 {
+    if msg.config.aum_stale_period.u64() < 1 {
         return Err(ContractError::StalePeriodMustBePositive {});
     }
     deps.api.addr_validate(msg.config.locker.as_ref())?;
@@ -79,7 +80,7 @@ fn execute_update_config(
         config.asset = asset;
     }
     if let Some(aum_stale_period) = new_config.aum_stale_period {
-        if aum_stale_period < 1 {
+        if aum_stale_period.u64() < 1 {
             return Err(ContractError::StalePeriodMustBePositive {});
         }
         config.aum_stale_period = aum_stale_period;
@@ -106,7 +107,7 @@ fn execute_lock(
     }
     let state = State::Locked {
         amount,
-        at_timestamp: env.block.time.nanos(),
+        at_timestamp: Uint64::from(env.block.time.nanos()),
     };
     STATE.save(deps.storage, &state)?;
     Ok(Response::new().add_attribute("action", "lock"))
@@ -131,7 +132,7 @@ fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<
             let contract_data = response
                 .last_published_data
                 .ok_or(ContractError::NoDataInContract {})?;
-            if env.block.time.seconds() - contract_data.timestamp > config.aum_stale_period {
+            if env.block.time.seconds() - contract_data.timestamp > config.aum_stale_period.u64() {
                 return Err(ContractError::AumDataStale {});
             }
             let position = contract_data
