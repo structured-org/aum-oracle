@@ -3,9 +3,10 @@ use crate::state::{CONFIG, STATE};
 use binance_aum_common::msg::GetDataResponse;
 use binance_aum_common::msg::QueryMsg as BinanceAumQueryMsg;
 
+use cosmwasm_std::Uint64;
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    SignedDecimal256, StdResult,
+    SignedDecimal256,
 };
 use cw2::set_contract_version;
 use cw_ownable::{get_ownership, update_ownership};
@@ -24,9 +25,12 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> ContractResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(msg.owner.as_str()))?;
+    if msg.config.aum_stale_period.u64() < 1 {
+        return Err(ContractError::StalePeriodMustBePositive {});
+    }
     deps.api.addr_validate(msg.config.locker.as_ref())?;
     deps.api.addr_validate(msg.config.unlocker.as_ref())?;
     deps.api.addr_validate(msg.config.contract.as_ref())?;
@@ -69,11 +73,25 @@ fn execute_update_config(
     if let Some(unlocker) = new_config.unlocker {
         config.unlocker = deps.api.addr_validate(&unlocker)?;
     }
+
+    if new_config.contract.is_some() || new_config.asset.is_some() {
+        let state = STATE.load(deps.storage)?;
+        if let State::Locked { .. } = state {
+            return Err(ContractError::CannotUpdateContractOrAssetWhileLocked {});
+        }
+    }
+
     if let Some(contract) = new_config.contract {
         config.contract = deps.api.addr_validate(&contract)?;
     }
     if let Some(asset) = new_config.asset {
         config.asset = asset;
+    }
+    if let Some(aum_stale_period) = new_config.aum_stale_period {
+        if aum_stale_period.u64() < 1 {
+            return Err(ContractError::StalePeriodMustBePositive {});
+        }
+        config.aum_stale_period = aum_stale_period;
     }
 
     CONFIG.save(deps.storage, &config)?;
@@ -91,19 +109,32 @@ fn execute_lock(
     {
         return Err(ContractError::Unauthorized {});
     }
+    if amount <= SignedDecimal256::zero() {
+        return Err(ContractError::LockAmountMustBePositive {});
+    }
     let current_state = STATE.load(deps.storage)?;
     if let State::Locked { .. } = current_state {
         return Err(ContractError::AlreadyLocked {});
     }
+    let (position_amount, _) = get_spot_position(
+        deps.as_ref(),
+        config.contract.to_string(),
+        config.asset.to_string(),
+    )?;
+
+    if !position_amount.is_zero() {
+        return Err(ContractError::SpotBalanceNotZero {});
+    }
+
     let state = State::Locked {
         amount,
-        at_timestamp: env.block.time.nanos(),
+        at_timestamp: Uint64::from(env.block.time.nanos()),
     };
     STATE.save(deps.storage, &state)?;
     Ok(Response::new().add_attribute("action", "lock"))
 }
 
-fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult<Response> {
+fn execute_unlock(deps: DepsMut, env: Env, info: MessageInfo) -> ContractResult<Response> {
     let config = CONFIG.load(deps.storage)?;
     if info.sender != config.unlocker
         && cw_ownable::assert_owner(deps.storage, &info.sender).is_err()
@@ -114,7 +145,7 @@ fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult
     match current_state {
         State::Locked {
             amount,
-            at_timestamp: _,
+            at_timestamp,
         } => {
             let response: GetDataResponse = deps
                 .querier
@@ -122,13 +153,18 @@ fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult
             let contract_data = response
                 .last_published_data
                 .ok_or(ContractError::NoDataInContract {})?;
-            let position = contract_data
-                .data
-                .spot_balances
-                .iter()
-                .find(|pos| pos.asset == config.asset)
-                .ok_or(ContractError::NoAssetFound {})?;
-            if position.amount < amount {
+            if env.block.time.seconds() - contract_data.timestamp > config.aum_stale_period.u64() {
+                return Err(ContractError::AumDataStale {});
+            }
+            let (position_amount, position_ts) = get_spot_position(
+                deps.as_ref(),
+                config.contract.to_string(),
+                config.asset.to_string(),
+            )?;
+            if position_ts * 1_000_000_000 < at_timestamp.u64() {
+                return Err(ContractError::PositionTimestampEarlierThanLock {});
+            }
+            if position_amount < amount {
                 return Err(ContractError::InsufficientAssetAmount {});
             }
             let state = State::Unlocked {};
@@ -137,6 +173,27 @@ fn execute_unlock(deps: DepsMut, _env: Env, info: MessageInfo) -> ContractResult
         }
         State::Unlocked {} => Err(ContractError::AlreadyUnlocked {}),
     }
+}
+
+fn get_spot_position(
+    deps: Deps,
+    contract: String,
+    asset: String,
+) -> ContractResult<(SignedDecimal256, u64)> {
+    let response: GetDataResponse = deps
+        .querier
+        .query_wasm_smart(contract, &BinanceAumQueryMsg::GetData {})?;
+    let contract_data = response
+        .last_published_data
+        .as_ref()
+        .ok_or(ContractError::NoDataInContract {})?;
+    let position = contract_data
+        .data
+        .spot_balances
+        .iter()
+        .find(|pos| pos.asset == asset)
+        .ok_or(ContractError::NoAssetFound {})?;
+    Ok((position.amount, contract_data.timestamp))
 }
 
 #[entry_point]

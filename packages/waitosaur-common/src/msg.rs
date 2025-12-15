@@ -1,6 +1,6 @@
 use crate::types::{Config, State};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::SignedDecimal256;
+use cosmwasm_std::{SignedDecimal256, Uint64};
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 
 #[cw_serde]
@@ -23,6 +23,7 @@ pub struct UpdateConfig {
     pub unlocker: Option<String>,
     pub contract: Option<String>,
     pub asset: Option<String>,
+    pub aum_stale_period: Option<Uint64>,
 }
 
 #[cw_ownable_query]
