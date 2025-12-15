@@ -73,6 +73,14 @@ fn execute_update_config(
     if let Some(unlocker) = new_config.unlocker {
         config.unlocker = deps.api.addr_validate(&unlocker)?;
     }
+
+    if new_config.contract.is_some() || new_config.asset.is_some() {
+        let state = STATE.load(deps.storage)?;
+        if let State::Locked { .. } = state {
+            return Err(ContractError::CannotUpdateContractOrAssetWhileLocked {});
+        }
+    }
+
     if let Some(contract) = new_config.contract {
         config.contract = deps.api.addr_validate(&contract)?;
     }
