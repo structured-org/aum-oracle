@@ -38,4 +38,10 @@ pub enum ContractError {
 
     #[error("Lock amount must be positive")]
     LockAmountMustBePositive {},
+
+    #[error("Spot balanace is not zero")]
+    SpotBalanceNotZero {},
+
+    #[error("Position timestamp is earlier than lock timestamp")]
+    PositionTimestampEarlierThanLock {},
 }
