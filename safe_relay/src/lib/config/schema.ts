@@ -21,6 +21,7 @@ const safeRelayerSolana = z.object({
     multisigAddress: z.string(),
     proposalDelay: z.number(), // Seconds
     vaultPda: z.string(),
+    aumOracleSol: z.string(),
 });
 
 const safeRelayerServiceConfig = z.object({

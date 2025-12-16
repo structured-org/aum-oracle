@@ -124,6 +124,7 @@ export class Config {
                 proposalDelay: this.tomlData?.ethereum.proposalDelay!,
                 multisigAddress: this.tomlData?.solana.multisigAddress,
                 vaultPda: this.tomlData?.solana.vaultPda,
+                aumOracleSol: this.tomlData?.solana.aumOracleSol,
                 seedPath: this.envData.SOLANA_SEED_PATH,
             };
         }

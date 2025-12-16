@@ -15,13 +15,6 @@ class Service {
 
     constructor() {
         this.logger = getLogger('debug');
-        process.on('SIGINT', () => {
-            this.logger.info('Stopping manager service...');
-            if (this.workHandler) {
-                clearInterval(this.workHandler);
-            }
-            process.exit(0);
-        });
     }
 
     async initialize() {
