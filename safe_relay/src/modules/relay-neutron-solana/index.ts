@@ -3,7 +3,7 @@ import {Logger} from "pino";
 import {NeutronConfig, SolanaConfig} from "../../lib/config";
 import {CosmWasmClient} from "@cosmjs/cosmwasm-stargate";
 import SquadsMultisig, {SquadsMultisigConfig} from "../../lib/multisig/squads";
-import {AnchorProvider, Wallet, web3} from "@project-serum/anchor";
+import {AnchorProvider, Program, setProvider, Wallet, web3} from "@coral-xyz/anchor";
 import * as fs from "node:fs";
 
 type AumData = {
@@ -28,6 +28,7 @@ type AumData = {
     };
 };
 
+export const PROGRAM_ID = new web3.PublicKey("orac315UJ2aQXvgiWjoFsZZDzEEuPaozYLDHf6epJzd");
 
 export default class RelaySolana implements Manager {
     private logger: Logger;
@@ -36,6 +37,8 @@ export default class RelaySolana implements Manager {
 
     private cosmWasmClient?: CosmWasmClient;
     private squadsMultisig?: SquadsMultisig;
+    private provider?: AnchorProvider;
+    private aumOracleProgram?: Program;
 
     constructor(logger: Logger, solanaConfig: SolanaConfig, neutronConfig: NeutronConfig) {
         this.logger = logger;
@@ -50,16 +53,20 @@ export default class RelaySolana implements Manager {
         const keypair = web3.Keypair.fromSecretKey(Uint8Array.from(
             JSON.parse(fs.readFileSync(this.solana.seedPath!, 'utf-8')),
         ));
+        this.provider = new AnchorProvider(new web3.Connection(this.solana.rpc, {
+                commitment: 'confirmed',
+            }),
+            new Wallet(keypair),
+            {
+                commitment: 'confirmed',
+                skipPreflight: true,
+            }
+        );
+        /* Global provider allows work with functions like fetchIdl */
+        setProvider(this.provider);
+
         const squadsMultisigConfig: SquadsMultisigConfig = {
-            anchorProvider: new AnchorProvider(new web3.Connection(this.solana.rpc, {
-                    commitment: 'confirmed',
-                }),
-                new Wallet(keypair),
-                {
-                    commitment: 'confirmed',
-                    skipPreflight: true,
-                }
-            ),
+            anchorProvider: this.provider,
             multisigAddress: new web3.PublicKey(this.solana.multisigAddress),
             vaultPda: new web3.PublicKey(this.solana.vaultPda),
             keypair: keypair
@@ -67,6 +74,9 @@ export default class RelaySolana implements Manager {
         this.squadsMultisig = new SquadsMultisig(
             this.logger,
             squadsMultisigConfig
+        );
+        this.aumOracleProgram = new Program(
+            await Program.fetchIdl(PROGRAM_ID, this.provider)
         );
     }
 
