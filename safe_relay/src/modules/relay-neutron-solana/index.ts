@@ -158,7 +158,7 @@ export default class RelaySolana implements Manager {
     /* Get all the proposals that are either Active of Approved */
     const proposals = (await this.squadsMultisig?.getPendingProposals())!;
     if (proposals.length) {
-      let proposal = proposals![proposals.length - 1];
+      let proposal = proposals![0];
       let proposalStatus = proposalStatusToString(proposal.status!);
 
       /* If it is Approved, execute */
@@ -206,12 +206,25 @@ export default class RelaySolana implements Manager {
         ))!;
         proposalStatus = proposalStatusToString(proposal.status!);
         if (proposalStatus === 'Approved') {
-          txhash = await this.squadsMultisig?.executeProposal(
-            Number(proposal.transactionIndex?.toString())!,
-          );
-          this.logger.info(
-            `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
-          );
+          try {
+            const txhash = await this.squadsMultisig?.executeProposal(
+              Number(proposal.transactionIndex?.toString())!,
+            );
+            this.logger.info(
+              `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
+            );
+          } catch (e: any) {
+            if (/SameTimestamp/.test(e.message.toString())) {
+              this.logger.warn(
+                `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
+              );
+              await this.createProposal();
+            } else {
+              this.logger.warn(
+                `Unknown error happened -- ${proposal.transactionIndex}`,
+              );
+            }
+          }
         }
       }
     } else {
