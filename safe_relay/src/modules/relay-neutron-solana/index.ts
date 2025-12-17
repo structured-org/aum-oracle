@@ -157,7 +157,9 @@ export default class RelaySolana implements Manager {
       */
       if (
         proposalStatus === 'Active' &&
-        !proposal.approved?.includes(this.signer?.publicKey!)
+        !proposal
+          .approved!.map((approved) => approved.toBase58())
+          .includes(this.signer?.publicKey.toBase58()!)
       ) {
         let txhash = await this.squadsMultisig?.voteProposal(
           Number(proposal.transactionIndex?.toString())!,
