@@ -19,6 +19,11 @@ function toFixedDecimal(number: string): FixedDecimal {
   };
 }
 
+type AumOracleState = {
+  lastPublishedData: AumDataSolana,
+  solanaPublicationTimestamp: BN
+};
+
 type AumDataSolana = {
   round: BN;
   timestamp: BN;
@@ -115,9 +120,10 @@ export default class RelaySolana implements Manager {
   }
 
   async tick(): Promise<void> {
-    const aumData = await this.getNeutronAumData();
-    const ix = await this.publishDataIx(aumData);
-    console.log(await this.squadsMultisig?.submitProposal(ix));
+    console.log(await this.getSolanaAumData());
+    // const aumData = await this.getNeutronAumData();
+    // const ix = await this.publishDataIx(aumData);
+    // console.log(await this.squadsMultisig?.submitProposal(ix));
   }
 
   private async publishDataIx(dataNeutron: AumDataNeutron): Promise<web3.TransactionInstruction> {
@@ -151,14 +157,14 @@ export default class RelaySolana implements Manager {
       .instruction()!;
   }
 
-  private async getSolanaAumData(): Promise<AumDataSolana> {
+  private async getSolanaAumData(): Promise<AumOracleState> {
     const aumOracleConfig = new web3.PublicKey(this.solana.aumOracleSol);
     const configData = await this.provider?.connection.getAccountInfo(aumOracleConfig);
     const config = this.aumOracleProgram?.coder.accounts.decode('aumOracleConfig', configData!.data);
     const aumOracleState = web3.PublicKey.findProgramAddressSync([Buffer.from('state'), config.instanceKey.toBuffer()], PROGRAM_ID)[0];
     const stateData = await this.provider?.connection.getAccountInfo(aumOracleState);
     const state = this.aumOracleProgram?.coder.accounts.decode('aumOracleState', stateData!.data);
-    return state as AumDataSolana;
+    return state as AumOracleState;
   }
 
   private async getNeutronAumData(): Promise<AumDataNeutron> {
