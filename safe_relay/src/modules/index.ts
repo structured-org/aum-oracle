@@ -1,5 +1,5 @@
 export default interface Module {
-    init(): Promise<void>;
+  init(): Promise<void>;
 
-    tick(): Promise<void>;
+  tick(): Promise<void>;
 }

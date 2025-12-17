@@ -14,7 +14,7 @@ import {
   web3,
 } from '@coral-xyz/anchor';
 import * as fs from 'node:fs';
-import { FixableBeetArgsStruct } from '@metaplex-foundation/beet';
+import { proposalStatusToString } from '../../lib/multisig/squads/internal';
 
 type FixedDecimal = {
   number: BN;
@@ -135,10 +135,62 @@ export default class RelaySolana implements Manager {
   }
 
   async tick(): Promise<void> {
-    console.log(await this.squadsMultisig?.voteProposal(6));
-    // const aumData = await this.getNeutronAumData();
-    // const ix = await this.publishDataIx(aumData);
-    // console.log(await this.squadsMultisig?.submitProposal(ix));
+    /* Get all the proposals that are either Active of Approved */
+    const proposals = (await this.squadsMultisig?.getPendingProposals())!;
+    if (proposals.length) {
+      let proposal = proposals![proposals.length - 1];
+      let proposalStatus = proposalStatusToString(proposal.status!);
+
+      /* If it is Approved, execute */
+      if (proposalStatus === 'Approved') {
+        const txhash = await this.squadsMultisig?.executeProposal(
+          Number(proposal.transactionIndex?.toString())!,
+        );
+        this.logger.info(
+          `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
+        );
+      }
+
+      /* If it is Active, then vote and check if it has gained Approved status. If so, execute */
+      if (proposalStatus === 'Active') {
+        let txhash = await this.squadsMultisig?.voteProposal(
+          Number(proposal.transactionIndex?.toString())!,
+        );
+        this.logger.info(
+          `Voted for proposal ${proposal.transactionIndex} -- ${txhash}`,
+        );
+
+        proposal = (await this.squadsMultisig?.getProposal(
+          Number(proposal.transactionIndex?.toString())!,
+        ))!;
+        proposalStatus = proposalStatusToString(proposal.status!);
+        if (proposalStatus === 'Approved') {
+          txhash = await this.squadsMultisig?.executeProposal(
+            Number(proposal.transactionIndex?.toString())!,
+          );
+          this.logger.info(
+            `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
+          );
+        }
+      }
+    } else {
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.solana.proposalDelay),
+      );
+      const aumNeutronData = await this.getNeutronAumData();
+      const aumSolanaData = await this.getSolanaAumData();
+
+      /* Check the freshness and if the new state needs to be submitted, propose */
+      if (
+        !aumSolanaData.lastPublishedData.timestamp.eqn(
+          aumNeutronData.last_published_data.timestamp,
+        )
+      ) {
+        const ix = await this.publishDataIx(aumNeutronData);
+        const txhash = await this.squadsMultisig?.submitProposal(ix);
+        this.logger.info(`Submited new proposal -- ${txhash}`);
+      }
+    }
   }
 
   private async publishDataIx(

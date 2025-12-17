@@ -69,25 +69,38 @@ export default class SquadsMultisig implements Multisig {
     ]);
   }
 
+  async getProposal(proposalIndex: number): Promise<Proposal | null> {
+    const [proposalPda] = getProposalPda({
+      multisigPda: this.squadsMultisigApp.multisigAddress,
+      transactionIndex: BigInt(proposalIndex),
+    });
+    const proposalPdaAccountInfo =
+      await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(
+        proposalPda,
+      );
+    if (proposalPdaAccountInfo === null) {
+      return null;
+    }
+    return Proposal.deserialize(proposalPdaAccountInfo!.data);
+  }
+
   async getPendingProposals(): Promise<Array<Proposal>> {
-    let proposalIndex = 0;
+    const multisigInfo = await this.getMultisigInfo();
+    let proposalIndex = Number(multisigInfo.transactionIndex) + 1;
+
     const result: Array<Proposal> = [];
-    while (++proposalIndex) {
-      const [proposalPda] = getProposalPda({
-        multisigPda: this.squadsMultisigApp.multisigAddress,
-        transactionIndex: BigInt(proposalIndex),
-      });
-
-      const proposalPdaAccountInfo =
-        await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(
-          proposalPda,
-        );
-      if (proposalPdaAccountInfo === null) {
-        return result;
+    while (--proposalIndex) {
+      const proposal = await this.getProposal(proposalIndex);
+      if (
+        proposal === null ||
+        proposalStatusToString(proposal.status!) === 'Executed'
+      ) {
+        break;
       }
-
-      const proposal = Proposal.deserialize(proposalPdaAccountInfo!.data);
-      if (proposalStatusToString(proposal.status!) === 'Active') {
+      if (
+        proposalStatusToString(proposal.status!) === 'Active' ||
+        proposalStatusToString(proposal.status!) === 'Approved'
+      ) {
         result.push(proposal);
       }
     }
