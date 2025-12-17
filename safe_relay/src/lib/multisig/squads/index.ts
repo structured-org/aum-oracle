@@ -36,7 +36,7 @@ export default class SquadsMultisig implements Multisig {
     const createProposalIx = await this.createProposalIx();
     const addInstructionIx = await this.batchAddIxV0(ix);
     const proposalActivateIx = await this.proposalActivateIx();
-    const proposalApproveIx = await this.proposalApproveIx(true);
+    const proposalApproveIx = await this.proposalApproveIx();
     const tx = new web3.Transaction().add(
       createBatchIx,
       createProposalIx,
@@ -56,7 +56,7 @@ export default class SquadsMultisig implements Multisig {
   }
 
   async voteProposal(id: number): Promise<string> {
-    const ix = await this.proposalApproveIx(false);
+    const ix = await this.proposalApproveIx(id);
     const tx = new web3.Transaction().add(ix);
     return await this.squadsMultisigApp.anchorProvider.sendAndConfirm(tx, [this.squadsMultisigApp.keypair]);
   }
@@ -234,9 +234,9 @@ export default class SquadsMultisig implements Multisig {
     });
   }
 
-  private async proposalApproveIx(whileCreatingProposal: boolean): Promise<web3.TransactionInstruction> {
+  private async proposalApproveIx(custom?: number): Promise<web3.TransactionInstruction> {
     const multisigInfo = await this.getMultisigInfo();
-    const transactionIndex = Number(multisigInfo.transactionIndex) + (whileCreatingProposal ? 1 : 0);
+    const transactionIndex = custom ? custom : (Number(multisigInfo.transactionIndex) + 1);
     this.logger.info(`Proposal Approve Transaction Index -- ${transactionIndex}`);
     return multisig.instructions.proposalApprove({
       multisigPda: this.squadsMultisigApp.multisigAddress,
