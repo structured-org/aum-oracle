@@ -6,7 +6,12 @@ import Safe from '@safe-global/protocol-kit';
 import { HDAccount, mnemonicToAccount } from 'viem/accounts';
 import SafeApiKit from '@safe-global/api-kit';
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate';
-import { createPublicClient, decodeFunctionData, http, PublicClient } from 'viem';
+import {
+  createPublicClient,
+  decodeFunctionData,
+  http,
+  PublicClient,
+} from 'viem';
 import { mainnet } from 'viem/chains';
 
 import RECEIVER_ABI from '../../generic/Receiver.abi.json';
@@ -21,7 +26,11 @@ export default class RelayEthereum implements Manager {
   private ethAccount?: HDAccount;
   private safeMultisig?: SafeMultisig;
 
-  constructor(logger: Logger, ethereumConfig: EthereumConfig, neutronConfig: NeutronConfig) {
+  constructor(
+    logger: Logger,
+    ethereumConfig: EthereumConfig,
+    neutronConfig: NeutronConfig,
+  ) {
     this.logger = logger;
     this.ethereum = ethereumConfig;
     this.neutron = neutronConfig;
@@ -41,11 +50,18 @@ export default class RelayEthereum implements Manager {
         signer: `0x${Buffer.from(pk!).toString('hex')}`,
         safeAddress: this.ethereum.safeAddress,
       }),
-      safeApi: new SafeApiKit({ chainId: 1n, apiKey: this.ethereum.safeApiKey }),
+      safeApi: new SafeApiKit({
+        chainId: 1n,
+        apiKey: this.ethereum.safeApiKey,
+      }),
       receiverAddress: this.ethereum.receiverAddress,
       signer: account,
     };
-    this.safeMultisig = new SafeMultisig(this.ethereum.safeAddress, this.logger, safeConfig);
+    this.safeMultisig = new SafeMultisig(
+      this.ethereum.safeAddress,
+      this.logger,
+      safeConfig,
+    );
     this.ethClient = createPublicClient({
       chain: mainnet,
       transport: http(this.ethereum.rpc),
@@ -53,15 +69,26 @@ export default class RelayEthereum implements Manager {
   }
 
   async tick(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, this.ethereum.proposalDelay));
+    await new Promise((resolve) =>
+      setTimeout(resolve, this.ethereum.proposalDelay),
+    );
 
     const neutronData = await this.getTWAERData();
     const ethereumData = await this.getReceverData();
     const pendingProposals = await this.safeMultisig?.getPendingProposals()!;
 
     if (pendingProposals.results.length > 0) {
-      this.logger.info('There are pending proposals. Skipping new proposal submission.');
-      const proposals = pendingProposals.results.filter(p => (p.to === this.ethereum.receiverAddress) && ((p.confirmations || []).every(c => c.owner.toLowerCase() !== this.ethAccount?.address.toLowerCase())));
+      this.logger.info(
+        'There are pending proposals. Skipping new proposal submission.',
+      );
+      const proposals = pendingProposals.results.filter(
+        (p) =>
+          p.to === this.ethereum.receiverAddress &&
+          (p.confirmations || []).every(
+            (c) =>
+              c.owner.toLowerCase() !== this.ethAccount?.address.toLowerCase(),
+          ),
+      );
       if (proposals.length > 0) {
         this.logger.trace('There is a proposal to vote on.');
         const proposal = proposals[0];
@@ -73,12 +100,27 @@ export default class RelayEthereum implements Manager {
           });
           this.logger.trace('Data from Proposal: %o', dataFromProposal);
           if (dataFromProposal.functionName !== 'publish') {
-            this.logger.error('Unexpected function name in proposal: %s', dataFromProposal.functionName);
+            this.logger.error(
+              'Unexpected function name in proposal: %s',
+              dataFromProposal.functionName,
+            );
             return;
           }
-          const [erFromProposal, tsFromProposal] = dataFromProposal.args as [BigInt, BigInt];
-          if (erFromProposal !== neutronData.er || Number(tsFromProposal) !== neutronData.ts) {
-            this.logger.warn('Data in proposal does not match Neutron data. Neutron ER: %o, TS: %d; Proposal ER: %d, TS: %d', neutronData.er, neutronData.ts, Number(erFromProposal), Number(tsFromProposal));
+          const [erFromProposal, tsFromProposal] = dataFromProposal.args as [
+            BigInt,
+            BigInt,
+          ];
+          if (
+            erFromProposal !== neutronData.er ||
+            Number(tsFromProposal) !== neutronData.ts
+          ) {
+            this.logger.warn(
+              'Data in proposal does not match Neutron data. Neutron ER: %o, TS: %d; Proposal ER: %d, TS: %d',
+              neutronData.er,
+              neutronData.ts,
+              Number(erFromProposal),
+              Number(tsFromProposal),
+            );
             return;
           }
           this.logger.info('Data in proposal matches Neutron data');
@@ -86,7 +128,11 @@ export default class RelayEthereum implements Manager {
         this.logger.info('Voting on proposal ID: %s', proposal.safeTxHash);
         await this.safeMultisig?.confirmProposal(proposal.safeTxHash);
       }
-      const readyProposals = pendingProposals.results.filter(p => (p.to === this.ethereum.receiverAddress) && ((p.confirmations || []).length === p.confirmationsRequired));
+      const readyProposals = pendingProposals.results.filter(
+        (p) =>
+          p.to === this.ethereum.receiverAddress &&
+          (p.confirmations || []).length === p.confirmationsRequired,
+      );
       if (readyProposals.length > 0) {
         this.logger.info('There are proposals ready to be executed.');
         const readyProposal = readyProposals[0];
@@ -94,25 +140,37 @@ export default class RelayEthereum implements Manager {
         this.logger.info('Ready proposal ID: %s', readyProposal.safeTxHash);
         await this.safeMultisig?.executeProposal(readyProposal.safeTxHash);
       }
-
     } else {
-      if (neutronData.ts > ethereumData.ts || neutronData.er !== ethereumData.er) {
-        this.logger.info('New data available. Neutron TS: %d, Ethereum TS: %d', neutronData.ts, ethereumData.ts);
+      if (
+        neutronData.ts > ethereumData.ts ||
+        neutronData.er !== ethereumData.er
+      ) {
+        this.logger.info(
+          'New data available. Neutron TS: %d, Ethereum TS: %d',
+          neutronData.ts,
+          ethereumData.ts,
+        );
         await this.safeMultisig?.submitProposal(neutronData.er, neutronData.ts);
       }
     }
   }
 
-  private async getTWAERData(): Promise<{ er: BigInt, ts: number }> {
+  private async getTWAERData(): Promise<{ er: BigInt; ts: number }> {
     this.logger.info('Querying TWAER data from Neutron');
-    const result = await this.cosmWasmClient?.queryContractSmart(this.neutron.twaerContract, {
-      'get_twaer': {},
-    });
+    const result = await this.cosmWasmClient?.queryContractSmart(
+      this.neutron.twaerContract,
+      {
+        get_twaer: {},
+      },
+    );
     this.logger.trace('TWAER Query Result: %o', result);
-    return { er: this.toBigIntTimes10Pow(result.twaer), ts: result.published_at };
+    return {
+      er: this.toBigIntTimes10Pow(result.twaer),
+      ts: result.published_at,
+    };
   }
 
-  private async getReceverData(): Promise<{ er: BigInt, ts: number }> {
+  private async getReceverData(): Promise<{ er: BigInt; ts: number }> {
     this.logger.info('Querying Receiver data from Ethereum');
     const [er, ts] = (await this.ethClient?.readContract({
       address: this.ethereum.receiverAddress as `0x${string}`,

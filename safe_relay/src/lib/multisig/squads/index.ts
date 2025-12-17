@@ -20,7 +20,7 @@ export type SquadsMultisigConfig = {
   multisigAddress: web3.PublicKey;
   keypair: web3.Keypair;
   vaultPda: web3.PublicKey;
-}
+};
 
 export default class SquadsMultisig implements Multisig {
   private logger: Logger;
@@ -31,7 +31,9 @@ export default class SquadsMultisig implements Multisig {
     this.squadsMultisigApp = squadsMultisigConfig;
   }
 
-  async submitProposal(ix: web3.TransactionInstruction): Promise<string | null> {
+  async submitProposal(
+    ix: web3.TransactionInstruction,
+  ): Promise<string | null> {
     const createBatchIx = await this.createBatchIx();
     const createProposalIx = await this.createProposalIx();
     const addInstructionIx = await this.batchAddIxV0(ix);
@@ -44,7 +46,9 @@ export default class SquadsMultisig implements Multisig {
       proposalActivateIx,
       proposalApproveIx,
     );
-    return await this.squadsMultisigApp.anchorProvider.sendAndConfirm(tx, [this.squadsMultisigApp.keypair]);
+    return await this.squadsMultisigApp.anchorProvider.sendAndConfirm(tx, [
+      this.squadsMultisigApp.keypair,
+    ]);
   }
 
   async executeProposal(id: number): Promise<string> {
@@ -52,18 +56,22 @@ export default class SquadsMultisig implements Multisig {
     const msg = await this.proposalExecuteMsgV0(id, batch.size!);
     const tx = new web3.VersionedTransaction(msg);
     tx.sign([this.squadsMultisigApp.keypair]);
-    return await this.squadsMultisigApp.anchorProvider.connection.sendTransaction(tx);
+    return await this.squadsMultisigApp.anchorProvider.connection.sendTransaction(
+      tx,
+    );
   }
 
   async voteProposal(id: number): Promise<string> {
     const ix = await this.proposalApproveIx(id);
     const tx = new web3.Transaction().add(ix);
-    return await this.squadsMultisigApp.anchorProvider.sendAndConfirm(tx, [this.squadsMultisigApp.keypair]);
+    return await this.squadsMultisigApp.anchorProvider.sendAndConfirm(tx, [
+      this.squadsMultisigApp.keypair,
+    ]);
   }
 
-  async getPendingProposals(): Promise<Array<number>> {
+  async getPendingProposals(): Promise<Array<Proposal>> {
     let proposalIndex = 0;
-    const result: Array<number> = [];
+    const result: Array<Proposal> = [];
     while (++proposalIndex) {
       const [proposalPda] = getProposalPda({
         multisigPda: this.squadsMultisigApp.multisigAddress,
@@ -71,14 +79,16 @@ export default class SquadsMultisig implements Multisig {
       });
 
       const proposalPdaAccountInfo =
-        await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(proposalPda);
+        await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(
+          proposalPda,
+        );
       if (proposalPdaAccountInfo === null) {
         return result;
       }
 
       const proposal = Proposal.deserialize(proposalPdaAccountInfo!.data);
       if (proposalStatusToString(proposal.status!) === 'Active') {
-        result.push(proposalIndex);
+        result.push(proposal);
       }
     }
     return result;
@@ -148,7 +158,9 @@ export default class SquadsMultisig implements Multisig {
       index: BigInt(proposalIndex),
     });
     const batchPdaAccountInfo =
-      await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(batchPda);
+      await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(
+        batchPda,
+      );
     return Batch.deserialize(batchPdaAccountInfo!.data);
   }
 
@@ -226,7 +238,9 @@ export default class SquadsMultisig implements Multisig {
   private async proposalActivateIx(): Promise<web3.TransactionInstruction> {
     const multisigInfo = await this.getMultisigInfo();
     const transactionIndex = Number(multisigInfo.transactionIndex) + 1;
-    this.logger.info(`Proposal Activate Transaction Index -- ${transactionIndex}`);
+    this.logger.info(
+      `Proposal Activate Transaction Index -- ${transactionIndex}`,
+    );
     return multisig.instructions.proposalActivate({
       multisigPda: this.squadsMultisigApp.multisigAddress,
       member: this.squadsMultisigApp.keypair.publicKey,
@@ -234,10 +248,16 @@ export default class SquadsMultisig implements Multisig {
     });
   }
 
-  private async proposalApproveIx(custom?: number): Promise<web3.TransactionInstruction> {
+  private async proposalApproveIx(
+    custom?: number,
+  ): Promise<web3.TransactionInstruction> {
     const multisigInfo = await this.getMultisigInfo();
-    const transactionIndex = custom ? custom : (Number(multisigInfo.transactionIndex) + 1);
-    this.logger.info(`Proposal Approve Transaction Index -- ${transactionIndex}`);
+    const transactionIndex = custom
+      ? custom
+      : Number(multisigInfo.transactionIndex) + 1;
+    this.logger.info(
+      `Proposal Approve Transaction Index -- ${transactionIndex}`,
+    );
     return multisig.instructions.proposalApprove({
       multisigPda: this.squadsMultisigApp.multisigAddress,
       member: this.squadsMultisigApp.keypair.publicKey,

@@ -43,10 +43,11 @@ export const envSchema = z.object({
   SAFE_API_KEY: z.string().optional(),
 });
 
-type CommonConfigProperties = { mnemonic?: string, seedPath?: string };
+type CommonConfigProperties = { mnemonic?: string; seedPath?: string };
 export type ServiceConfig = z.infer<typeof safeRelayerServiceConfig>;
 export type NeutronConfig = z.infer<typeof safeRelayerNeutron>;
-export type SolanaConfig = z.infer<typeof safeRelayerSolana> & CommonConfigProperties;
+export type SolanaConfig = z.infer<typeof safeRelayerSolana> &
+  CommonConfigProperties;
 export type EthereumConfig = z.infer<typeof safeRelayerEthereum> &
   CommonConfigProperties & { safeApiKey: string };
 

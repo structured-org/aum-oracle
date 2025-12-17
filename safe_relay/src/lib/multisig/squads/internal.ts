@@ -13,7 +13,6 @@ import {
 } from '@solana/web3.js';
 import assert from 'assert';
 
-
 export class Ms {
   createKey?: web3.PublicKey;
   configAuthority?: web3.PublicKey;
@@ -273,8 +272,8 @@ export type BatchAddTransactionInstructionArgs = {
 
 const batchAddTransactionStruct = new beet.FixableBeetArgsStruct<
   BatchAddTransactionInstructionArgs & {
-  instructionDiscriminator: number[] /* size: 8 */;
-}
+    instructionDiscriminator: number[] /* size: 8 */;
+  }
 >(
   [
     ['instructionDiscriminator', beet.uniformFixedSizeArray(beet.u8, 8)],
@@ -383,7 +382,7 @@ export function fixedSizeSmallArray<T, V = Partial<T>>(
   const firstElement = len === 0 ? '<EMPTY>' : elements[0].description;
 
   return {
-    write: function(buf: Buffer, offset: number, value: V[]): void {
+    write: function (buf: Buffer, offset: number, value: V[]): void {
       invariant(
         value.length === len,
         `array length ${value.length} should match len ${len}`,
@@ -398,7 +397,7 @@ export function fixedSizeSmallArray<T, V = Partial<T>>(
       }
     },
 
-    read: function(buf: Buffer, offset: number): T[] {
+    read: function (buf: Buffer, offset: number): T[] {
       const size = lengthBeet.read(buf, offset);
       invariant(size === len, 'invalid byte size');
 
@@ -681,11 +680,11 @@ export class CompiledKeys {
 }
 
 export function compileToWrappedMessageV0({
-                                            payerKey,
-                                            recentBlockhash,
-                                            instructions,
-                                            addressLookupTableAccounts,
-                                          }: {
+  payerKey,
+  recentBlockhash,
+  instructions,
+  addressLookupTableAccounts,
+}: {
   payerKey: web3.PublicKey;
   recentBlockhash: string;
   instructions: web3.TransactionInstruction[];
