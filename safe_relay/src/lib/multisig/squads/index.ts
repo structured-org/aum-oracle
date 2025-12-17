@@ -5,7 +5,13 @@ import * as multisig from '@sqds/multisig';
 import { Multisig as SquadsMultisigGenerated } from '@sqds/multisig/lib/generated';
 import { Logger } from 'pino';
 import { AddressLookupTableAccount } from '@solana/web3.js';
-import { compileToWrappedMessageV0, createBatchAddTransactionInstruction, transactionMessageBeet } from './internal';
+import {
+  compileToWrappedMessageV0,
+  createBatchAddTransactionInstruction,
+  Proposal, proposalStatusToString,
+  transactionMessageBeet,
+} from './internal';
+import { getProposalPda } from '@sqds/multisig';
 
 export type SquadsMultisigConfig = {
   anchorProvider: AnchorProvider;
@@ -43,8 +49,27 @@ export default class SquadsMultisig implements Multisig {
     return '';
   }
 
-  async getPendingProposals(): Promise<any> {
-    return [];
+  async getPendingProposals(): Promise<Array<number>> {
+    let proposalIndex = 0;
+    const result: Array<number> = [];
+    while (++proposalIndex) {
+      const [proposalPda] = getProposalPda({
+        multisigPda: this.squadsMultisigApp.multisigAddress,
+        transactionIndex: BigInt(proposalIndex),
+      });
+
+      const proposalPdaAccountInfo =
+        await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(proposalPda);
+      if (proposalPdaAccountInfo === null) {
+        return result;
+      }
+
+      const proposal = Proposal.deserialize(proposalPdaAccountInfo!.data);
+      if (proposalStatusToString(proposal.status!) === 'Active') {
+        result.push(proposalIndex);
+      }
+    }
+    return result;
   }
 
   private async getMultisigInfo(): Promise<SquadsMultisigGenerated> {

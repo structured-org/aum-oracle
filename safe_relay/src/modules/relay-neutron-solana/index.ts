@@ -120,7 +120,7 @@ export default class RelaySolana implements Manager {
   }
 
   async tick(): Promise<void> {
-    console.log(await this.getSolanaAumData());
+    console.log(await this.squadsMultisig?.getPendingProposals());
     // const aumData = await this.getNeutronAumData();
     // const ix = await this.publishDataIx(aumData);
     // console.log(await this.squadsMultisig?.submitProposal(ix));
