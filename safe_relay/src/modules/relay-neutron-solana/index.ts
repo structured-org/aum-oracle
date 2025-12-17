@@ -193,7 +193,7 @@ export default class RelaySolana implements Manager {
     }
   }
 
-  private async publishDataIx(
+  private publishDataIx(
     dataNeutron: AumDataNeutron,
   ): Promise<web3.TransactionInstruction> {
     const dataSolana: AumDataSolana = {
@@ -226,10 +226,9 @@ export default class RelaySolana implements Manager {
         ),
       },
     };
-    return this.aumOracleProgram?.methods
-      .publishData({
-        data: dataSolana,
-      })
+    return this.aumOracleProgram!.methods.publishData({
+      data: dataSolana,
+    })
       .accounts({
         signer: this.solana.vaultPda,
         aumOracleConfig: new web3.PublicKey(this.solana.aumOracleSol),
