@@ -1,17 +1,19 @@
 import type Multisig from '../index';
 import { AnchorProvider, web3 } from '@project-serum/anchor';
 import * as multisig from '@sqds/multisig';
+import { getProposalPda, getTransactionPda } from '@sqds/multisig';
 // @ts-ignore
 import { Multisig as SquadsMultisigGenerated } from '@sqds/multisig/lib/generated';
 import { Logger } from 'pino';
 import { AddressLookupTableAccount } from '@solana/web3.js';
 import {
+  Batch,
   compileToWrappedMessageV0,
   createBatchAddTransactionInstruction,
-  Proposal, proposalStatusToString,
+  Proposal,
+  proposalStatusToString,
   transactionMessageBeet,
 } from './internal';
-import { getProposalPda } from '@sqds/multisig';
 
 export type SquadsMultisigConfig = {
   anchorProvider: AnchorProvider;
@@ -46,7 +48,11 @@ export default class SquadsMultisig implements Multisig {
   }
 
   async executeProposal(id: number): Promise<string> {
-    return '';
+    const batch = await this.getBatch(id);
+    const msg = await this.proposalExecuteMsgV0(id, batch.size!);
+    const tx = new web3.VersionedTransaction(msg);
+    tx.sign([this.squadsMultisigApp.keypair]);
+    return await this.squadsMultisigApp.anchorProvider.connection.sendTransaction(tx);
   }
 
   async getPendingProposals(): Promise<Array<number>> {
@@ -86,6 +92,58 @@ export default class SquadsMultisig implements Multisig {
     const multisigInfo = await this.getMultisigInfo();
     const transactionIndex = Number(multisigInfo.transactionIndex) + 1;
     return this.batchAddByIndexIxV0(transactionIndex, 1, instruction, altData);
+  }
+
+  private async proposalExecuteBatchIxs(
+    index: number,
+    instructionsCount: number,
+  ): Promise<{
+    batchIxs: Array<web3.TransactionInstruction>;
+    altTables: Array<web3.AddressLookupTableAccount>;
+  }> {
+    const batchInstructions: Array<web3.TransactionInstruction> = [];
+    const altTables: Array<web3.AddressLookupTableAccount> = [];
+    for (let i = 1; i <= instructionsCount; i += 1) {
+      const res = await multisig.instructions.batchExecuteTransaction({
+        connection: this.squadsMultisigApp.anchorProvider.connection,
+        multisigPda: this.squadsMultisigApp.multisigAddress,
+        member: this.squadsMultisigApp.keypair.publicKey,
+        batchIndex: BigInt(index),
+        transactionIndex: i,
+      });
+      batchInstructions.push(res.instruction);
+      for (const alt of res.lookupTableAccounts) {
+        altTables.push(alt);
+      }
+    }
+    return { batchIxs: batchInstructions, altTables: altTables };
+  }
+
+  private async proposalExecuteMsgV0(
+    index: number,
+    instructionsCount: number,
+  ): Promise<web3.MessageV0> {
+    const batchIxs = await this.proposalExecuteBatchIxs(
+      index,
+      instructionsCount,
+    );
+    return new web3.TransactionMessage({
+      payerKey: this.squadsMultisigApp.keypair.publicKey,
+      recentBlockhash: (
+        await this.squadsMultisigApp.anchorProvider.connection.getLatestBlockhash()
+      ).blockhash,
+      instructions: batchIxs.batchIxs,
+    }).compileToV0Message([...batchIxs.altTables]);
+  }
+
+  async getBatch(proposalIndex: number): Promise<Batch> {
+    const [batchPda] = getTransactionPda({
+      multisigPda: this.squadsMultisigApp.multisigAddress,
+      index: BigInt(proposalIndex),
+    });
+    const batchPdaAccountInfo =
+      await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(batchPda);
+    return Batch.deserialize(batchPdaAccountInfo!.data);
   }
 
   private async batchAddByIndexIxV0(
