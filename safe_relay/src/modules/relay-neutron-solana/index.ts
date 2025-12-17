@@ -151,8 +151,14 @@ export default class RelaySolana implements Manager {
         );
       }
 
-      /* If it is Active, then vote and check if it has gained Approved status. If so, execute */
-      if (proposalStatus === 'Active') {
+      /*
+         If it is Active, then if we have not voted yet,
+         vote and check if it has gained Approved status. If so, execute
+      */
+      if (
+        proposalStatus === 'Active' &&
+        !proposal.approved?.includes(this.signer?.publicKey!)
+      ) {
         let txhash = await this.squadsMultisig?.voteProposal(
           Number(proposal.transactionIndex?.toString())!,
         );
