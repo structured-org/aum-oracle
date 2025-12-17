@@ -14,11 +14,6 @@ export type SquadsMultisigConfig = {
     vaultPda: web3.PublicKey;
 }
 
-export type SubmitProposalPayload = {
-    ix: web3.TransactionInstruction;
-    alt: web3.PublicKey;
-}
-
 export default class SquadsMultisig implements Multisig {
     private logger: Logger;
     private squadsMultisigApp: SquadsMultisigConfig;
@@ -28,18 +23,10 @@ export default class SquadsMultisig implements Multisig {
         this.squadsMultisigApp = squadsMultisigConfig;
     }
 
-    async submitProposal(payload: SubmitProposalPayload, timestamp: number): Promise<string | null> {
-        const lookupTableAccount = (
-            await this.squadsMultisigApp.anchorProvider.connection.getAddressLookupTable(
-                payload.alt,
-            )
-        ).value;
+    async submitProposal(ix: web3.TransactionInstruction, timestamp: number): Promise<string | null> {
         const createBatchIx = await this.createBatchIx();
         const createProposalIx = await this.createProposalIx();
-        const addInstructionIx = await this.batchAddIxV0(
-            payload.ix,
-            lookupTableAccount!,
-        );
+        const addInstructionIx = await this.batchAddIxV0(ix);
         const proposalActivateIx = await this.proposalActivateIx();
         const tx = new web3.Transaction().add(
             createBatchIx,
