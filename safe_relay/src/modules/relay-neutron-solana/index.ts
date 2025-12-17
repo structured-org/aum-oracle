@@ -134,7 +134,27 @@ export default class RelaySolana implements Manager {
     );
   }
 
+  async createProposal() {
+    const aumNeutronData = await this.getNeutronAumData();
+    const aumSolanaData = await this.getSolanaAumData();
+
+    /* Check the freshness and if the new state needs to be submitted, propose */
+    if (
+      !aumSolanaData.lastPublishedData.timestamp.eqn(
+        aumNeutronData.last_published_data.timestamp,
+      )
+    ) {
+      const ix = await this.publishDataIx(aumNeutronData);
+      const txhash = await this.squadsMultisig?.submitProposal(ix);
+      this.logger.info(`Submited new proposal -- ${txhash}`);
+    }
+  }
+
   async tick(): Promise<void> {
+    await new Promise((resolve) =>
+      setTimeout(resolve, this.solana.proposalDelay * 1000),
+    );
+
     /* Get all the proposals that are either Active of Approved */
     const proposals = (await this.squadsMultisig?.getPendingProposals())!;
     if (proposals.length) {
@@ -143,12 +163,25 @@ export default class RelaySolana implements Manager {
 
       /* If it is Approved, execute */
       if (proposalStatus === 'Approved') {
-        const txhash = await this.squadsMultisig?.executeProposal(
-          Number(proposal.transactionIndex?.toString())!,
-        );
-        this.logger.info(
-          `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
-        );
+        try {
+          const txhash = await this.squadsMultisig?.executeProposal(
+            Number(proposal.transactionIndex?.toString())!,
+          );
+          this.logger.info(
+            `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
+          );
+        } catch (e: any) {
+          if (/SameTimestamp/.test(e.message.toString())) {
+            this.logger.warn(
+              `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
+            );
+            await this.createProposal();
+          } else {
+            this.logger.warn(
+              `Unknown error happened -- ${proposal.transactionIndex}`,
+            );
+          }
+        }
       }
 
       /*
@@ -182,22 +215,7 @@ export default class RelaySolana implements Manager {
         }
       }
     } else {
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.solana.proposalDelay * 1000),
-      );
-      const aumNeutronData = await this.getNeutronAumData();
-      const aumSolanaData = await this.getSolanaAumData();
-
-      /* Check the freshness and if the new state needs to be submitted, propose */
-      if (
-        !aumSolanaData.lastPublishedData.timestamp.eqn(
-          aumNeutronData.last_published_data.timestamp,
-        )
-      ) {
-        const ix = await this.publishDataIx(aumNeutronData);
-        const txhash = await this.squadsMultisig?.submitProposal(ix);
-        this.logger.info(`Submited new proposal -- ${txhash}`);
-      }
+      await this.createProposal();
     }
   }
 

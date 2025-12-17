@@ -1,14 +1,9 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "module": "commonjs",
-    "lib": [
-      "esnext",
-      "DOM"
-    ],
+    "lib": ["esnext", "DOM"],
     "outDir": "lib",
     "resolveJsonModule": true,
     "esModuleInterop": true,
@@ -17,7 +12,5 @@
     "strict": true,
     "noErrorTruncation": true
   },
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }
