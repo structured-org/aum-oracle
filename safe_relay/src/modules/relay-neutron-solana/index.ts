@@ -95,31 +95,33 @@ export default class RelaySolana implements Manager {
   }
 
   async tick(): Promise<void> {
-    const aumData = await this.getNeutronAumData();
+    const aumData = await this.getSolanaAumData();
     console.log(aumData);
     await this.publishDataIx(aumData);
   }
 
   private async publishDataIx(data: AumData): Promise<web3.TransactionInstruction> {
-    /* For numbers > u64 or floats (hereby strings) we need to use BN for serialization */
-    data.last_published_data.timestamp = new BN(data.last_published_data.timestamp);
-    data.last_published_data.round = new BN(data.last_published_data.round);
+    /* It possibly can be null */
+    if (data.last_published_data) {
+      /* For numbers > u64 or floats (hereby strings) we need to use BN for serialization */
+      data.last_published_data.timestamp = new BN(data.last_published_data.timestamp);
+      data.last_published_data.round = new BN(data.last_published_data.round);
 
-    data.last_published_data.data.pm_account_actual_equity = toFixedDecimal(data.last_published_data.data.pm_account_actual_equity as string);
-    data.last_published_data.data.unimmr = toFixedDecimal(data.last_published_data.data.unimmr as string);
-    data.last_published_data.data.um_balance_usdt = toFixedDecimal(data.last_published_data.data.um_balance_usdt as string);
-    data.last_published_data.data.withdrawable_usdt = toFixedDecimal(data.last_published_data.data.withdrawable_usdt as string);
+      data.last_published_data.data.pm_account_actual_equity = toFixedDecimal(data.last_published_data.data.pm_account_actual_equity as string);
+      data.last_published_data.data.unimmr = toFixedDecimal(data.last_published_data.data.unimmr as string);
+      data.last_published_data.data.um_balance_usdt = toFixedDecimal(data.last_published_data.data.um_balance_usdt as string);
+      data.last_published_data.data.withdrawable_usdt = toFixedDecimal(data.last_published_data.data.withdrawable_usdt as string);
 
-    data.last_published_data.data.positions = data.last_published_data.data.positions.map((e) => ({
-      pnl: toFixedDecimal(e.pnl as string),
-      amount: toFixedDecimal(e.amount as string),
-      symbol: e.symbol,
-    }));
-    data.last_published_data.data.spot_balances = data.last_published_data.data.spot_balances.map((e) => ({
-      amount: toFixedDecimal(e.amount as string),
-      asset: e.asset,
-    }));
-
+      data.last_published_data.data.positions = data.last_published_data.data.positions.map((e) => ({
+        pnl: toFixedDecimal(e.pnl as string),
+        amount: toFixedDecimal(e.amount as string),
+        symbol: e.symbol,
+      }));
+      data.last_published_data.data.spot_balances = data.last_published_data.data.spot_balances.map((e) => ({
+        amount: toFixedDecimal(e.amount as string),
+        asset: e.asset,
+      }));
+    }
     return this.aumOracleProgram?.methods
       .publishData({
         data,
@@ -129,6 +131,16 @@ export default class RelaySolana implements Manager {
         aumOracleConfig: new web3.PublicKey(this.solana.aumOracleSol),
       })
       .instruction()!;
+  }
+
+  private async getSolanaAumData(): Promise<AumData> {
+    const aumOracleConfig = new web3.PublicKey(this.solana.aumOracleSol);
+    const configData = await this.provider?.connection.getAccountInfo(aumOracleConfig);
+    const config = this.aumOracleProgram?.coder.accounts.decode('aumOracleConfig', configData!.data);
+    const aumOracleState = web3.PublicKey.findProgramAddressSync([Buffer.from('state'), config.instanceKey.toBuffer()], PROGRAM_ID)[0];
+    const stateData = await this.provider?.connection.getAccountInfo(aumOracleState);
+    const state = this.aumOracleProgram?.coder.accounts.decode('aumOracleState', stateData!.data);
+    return state as AumData;
   }
 
   private async getNeutronAumData(): Promise<AumData> {
