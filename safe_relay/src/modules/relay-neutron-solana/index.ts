@@ -175,7 +175,7 @@ export default class RelaySolana implements Manager {
       }
     } else {
       await new Promise((resolve) =>
-        setTimeout(resolve, this.solana.proposalDelay),
+        setTimeout(resolve, this.solana.proposalDelay * 1000),
       );
       const aumNeutronData = await this.getNeutronAumData();
       const aumSolanaData = await this.getSolanaAumData();
