@@ -158,8 +158,8 @@ export default class RelaySolana implements Manager {
     /* Get all the proposals that are either Active of Approved */
     const proposals = (await this.squadsMultisig?.getPendingProposals())!;
     if (proposals.length) {
-      let proposal = proposals![0];
-      let proposalStatus = proposalStatusToString(proposal.status!);
+      const proposal = proposals![0];
+      const proposalStatus = proposalStatusToString(proposal.status!);
 
       /* If it is Approved, execute */
       if (proposalStatus === 'Approved') {
@@ -184,48 +184,19 @@ export default class RelaySolana implements Manager {
         }
       }
 
-      /*
-         If it is Active, then if we have not voted yet,
-         vote and check if it has gained Approved status. If so, execute
-      */
+      /* If it is Active, then if we have not voted yet, vote */
       if (
         proposalStatus === 'Active' &&
         !proposal
           .approved!.map((approved) => approved.toBase58())
           .includes(this.signer?.publicKey.toBase58()!)
       ) {
-        let txhash = await this.squadsMultisig?.voteProposal(
+        const txhash = await this.squadsMultisig?.voteProposal(
           Number(proposal.transactionIndex?.toString())!,
         );
         this.logger.info(
           `Voted for proposal ${proposal.transactionIndex} -- ${txhash}`,
         );
-
-        proposal = (await this.squadsMultisig?.getProposal(
-          Number(proposal.transactionIndex?.toString())!,
-        ))!;
-        proposalStatus = proposalStatusToString(proposal.status!);
-        if (proposalStatus === 'Approved') {
-          try {
-            const txhash = await this.squadsMultisig?.executeProposal(
-              Number(proposal.transactionIndex?.toString())!,
-            );
-            this.logger.info(
-              `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
-            );
-          } catch (e: any) {
-            if (/SameTimestamp/.test(e.message.toString())) {
-              this.logger.warn(
-                `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
-              );
-              await this.createProposal();
-            } else {
-              this.logger.warn(
-                `Unknown error happened -- ${proposal.transactionIndex}`,
-              );
-            }
-          }
-        }
       }
     } else {
       await this.createProposal();
