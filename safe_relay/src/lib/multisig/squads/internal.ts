@@ -13,82 +13,115 @@ import {
 } from '@solana/web3.js';
 import assert from 'assert';
 
-export class Ms {
-  createKey?: web3.PublicKey;
-  configAuthority?: web3.PublicKey;
-  threshold?: number; // u16
-  timelock?: number; // u32
-  transactionIndex?: bigint; // u64
-  staleTransactionIndex?: bigint; // u64
-  rentCollector?: null | web3.PublicKey; // Option<web3.PublicKey>
+export class VaultTransaction {
   bump?: number; // u8
-  members?: Array<{
-    key: web3.PublicKey;
-    permissions: {
-      mask: number; // u8
-    };
-  }>;
+  ephemeralSignerBumps?: Array<number>; // Vec<u8>
+  message?: {
+    numSigners: number;
+    numWritableSigners: number;
+    numWritableNonSigners: number;
+    accountKeys: Array<web3.PublicKey>;
+    instructions: Array<{
+      programIdIndex: number;
+      accountIndexes: Uint8Array;
+      data: Uint8Array;
+    }>;
+    addressTableLookups: Array<{
+      accountKey: web3.PublicKey;
+      writableIndexes: Uint8Array;
+      readonlyIndexes: Uint8Array;
+    }>;
+  };
 
-  static deserialize(data: Uint8Array): Ms {
+  static deserialize(data: Uint8Array): VaultTransaction {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    let offset = 8;
-
-    const createKey = new web3.PublicKey(data.slice(offset, offset + 32));
-    offset += 32;
-
-    const configAuthority = new web3.PublicKey(data.slice(offset, offset + 32));
-    offset += 32;
-
-    const threshold = view.getUint16(offset, true);
-    offset += 2;
-
-    const timelock = view.getUint32(offset, true);
-    offset += 4;
-
-    const transactionIndex = view.getBigUint64(offset, true);
-    offset += 8;
-
-    const staleTransactionIndex = view.getBigUint64(offset, true);
-    offset += 8;
-
-    // Option<PublicKey>
-    const hasRentCollector = view.getUint8(offset);
-    offset += 1;
-
-    let rentCollector: web3.PublicKey | null = null;
-    if (hasRentCollector) {
-      rentCollector = new web3.PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-    }
+    let offset = 8; // skip discriminator
 
     const bump = view.getUint8(offset);
     offset += 1;
 
-    // Vec<Member>
-    const membersLength = view.getUint32(offset, true);
+    // Deserialize ephemeralSignerBumps (Vec<u8>)
+    const bumpsLen = view.getUint32(offset, true);
     offset += 4;
-
-    const members: Ms['members'] = [];
-    for (let i = 0; i < membersLength; i++) {
-      const key = new web3.PublicKey(data.slice(offset, offset + 32));
-      offset += 32;
-
-      const mask = view.getUint8(offset);
+    const ephemeralSignerBumps: number[] = [];
+    for (let i = 0; i < bumpsLen; i++) {
+      ephemeralSignerBumps.push(view.getUint8(offset));
       offset += 1;
-
-      members.push({ key, permissions: { mask } });
     }
 
+    // numSigners, numWritableSigners, numWritableNonSigners (u8 each)
+    const numSigners = view.getUint8(offset++);
+    const numWritableSigners = view.getUint8(offset++);
+    const numWritableNonSigners = view.getUint8(offset++);
+
+    // Deserialize accountKeys (Vec<Pubkey>)
+    const accKeysLen = view.getUint32(offset, true);
+    offset += 4;
+    const accountKeys: web3.PublicKey[] = [];
+    for (let i = 0; i < accKeysLen; i++) {
+      accountKeys.push(new web3.PublicKey(data.slice(offset, offset + 32)));
+      offset += 32;
+    }
+
+    // Deserialize instructions (Vec)
+    const instrLen = view.getUint32(offset, true);
+    offset += 4;
+    const instructions = [];
+    for (let i = 0; i < instrLen; i++) {
+      const programIdIndex = view.getUint8(offset++);
+
+      const accountIndexesLen = view.getUint32(offset, true);
+      offset += 4;
+      const accountIndexes = data.slice(offset, offset + accountIndexesLen);
+      offset += accountIndexesLen;
+
+      const dataLen = view.getUint32(offset, true);
+      offset += 4;
+      const instrData = data.slice(offset, offset + dataLen);
+      offset += dataLen;
+
+      instructions.push({
+        programIdIndex,
+        accountIndexes,
+        data: instrData,
+      });
+    }
+
+    // Deserialize addressTableLookups (Vec)
+    const tableLookupsLen = view.getUint32(offset, true);
+    offset += 4;
+    const addressTableLookups = [];
+    for (let i = 0; i < tableLookupsLen; i++) {
+      const accountKey = new web3.PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+
+      const writableLen = view.getUint32(offset, true);
+      offset += 4;
+      const writableIndexes = data.slice(offset, offset + writableLen);
+      offset += writableLen;
+
+      const readonlyLen = view.getUint32(offset, true);
+      offset += 4;
+      const readonlyIndexes = data.slice(offset, offset + readonlyLen);
+      offset += readonlyLen;
+
+      addressTableLookups.push({
+        accountKey,
+        writableIndexes,
+        readonlyIndexes,
+      });
+    }
     return {
-      createKey,
-      configAuthority,
-      threshold,
-      timelock,
-      transactionIndex,
-      staleTransactionIndex,
-      rentCollector,
       bump,
-      members,
+      ephemeralSignerBumps,
+      message: {
+        numSigners,
+        numWritableSigners,
+        numWritableNonSigners,
+        accountKeys,
+        instructions,
+        addressTableLookups,
+      },
     };
   }
 }

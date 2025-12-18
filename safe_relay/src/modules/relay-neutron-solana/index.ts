@@ -14,7 +14,10 @@ import {
   web3,
 } from '@coral-xyz/anchor';
 import * as fs from 'node:fs';
-import { proposalStatusToString } from '../../lib/multisig/squads/internal';
+import {
+  proposalStatusToString,
+  VaultTransaction,
+} from '../../lib/multisig/squads/internal';
 
 type FixedDecimal = {
   number: BN;
@@ -191,6 +194,14 @@ export default class RelaySolana implements Manager {
           .approved!.map((approved) => approved.toBase58())
           .includes(this.signer?.publicKey.toBase58()!)
       ) {
+        const batchIxs = await this.squadsMultisig?.getBatchIxs(
+          Number(proposal.transactionIndex!.toString()),
+        );
+        if (!this.validateIxs(batchIxs!)) {
+          this.logger.warn(`Invalid proposal -- ${proposal.transactionIndex}`);
+          return;
+        }
+
         const txhash = await this.squadsMultisig?.voteProposal(
           Number(proposal.transactionIndex?.toString())!,
         );
@@ -201,6 +212,22 @@ export default class RelaySolana implements Manager {
     } else {
       await this.createProposal();
     }
+  }
+
+  private validateIxs(ixs: Array<VaultTransaction>): boolean {
+    for (const [, transaction] of ixs.entries()) {
+      for (const instruction of transaction.message!.instructions) {
+        const method = instruction.data.subarray(0, 8);
+        /* Validate the discriminator for publishData */
+        if (
+          JSON.stringify(method) !=
+          JSON.stringify([230, 18, 158, 253, 73, 167, 115, 188])
+        ) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private publishDataIx(

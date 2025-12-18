@@ -1,7 +1,11 @@
 import type Multisig from '../index';
 import { AnchorProvider, web3 } from '@project-serum/anchor';
 import * as multisig from '@sqds/multisig';
-import { getProposalPda, getTransactionPda } from '@sqds/multisig';
+import {
+  getBatchTransactionPda,
+  getProposalPda,
+  getTransactionPda,
+} from '@sqds/multisig';
 // @ts-ignore
 import { Multisig as SquadsMultisigGenerated } from '@sqds/multisig/lib/generated';
 import { Logger } from 'pino';
@@ -11,6 +15,7 @@ import {
   compileToWrappedMessageV0,
   createBatchAddTransactionInstruction,
   Proposal,
+  VaultTransaction,
   proposalStatusToString,
   transactionMessageBeet,
 } from './internal';
@@ -59,6 +64,25 @@ export default class SquadsMultisig implements Multisig {
     return await this.squadsMultisigApp.anchorProvider.connection.sendTransaction(
       tx,
     );
+  }
+
+  async getBatchIxs(id: number): Promise<Array<VaultTransaction>> {
+    const batch = await this.getBatch(id);
+    const vaultTxs = [];
+    for (let i = 1; i <= batch.size!; i += 1) {
+      const [transactionPda] = getBatchTransactionPda({
+        multisigPda: this.squadsMultisigApp.multisigAddress,
+        batchIndex: BigInt(id),
+        transactionIndex: i,
+      });
+      const accountInfo =
+        await this.squadsMultisigApp.anchorProvider.connection.getAccountInfo(
+          transactionPda,
+        );
+      const transaction = VaultTransaction.deserialize(accountInfo!.data);
+      vaultTxs.push(transaction);
+    }
+    return vaultTxs;
   }
 
   async voteProposal(id: number): Promise<string> {
