@@ -104,6 +104,10 @@ export default class RelaySolana implements Manager {
   }
 
   async init(): Promise<void> {
+    this.logger.info(
+      `RelaySolana proposal delay -- ${this.solana.proposalDelay}`,
+    );
+
     /* Neutron */
     this.cosmWasmClient = await CosmWasmClient.connect(this.neutron.rpc);
     /* Solana */
@@ -143,9 +147,8 @@ export default class RelaySolana implements Manager {
 
     /* Check the freshness and if the new state needs to be submitted, propose */
     if (
-      !aumSolanaData.lastPublishedData.timestamp.eqn(
-        aumNeutronData.last_published_data.timestamp,
-      )
+      aumSolanaData.lastPublishedData.timestamp.toString() !==
+      aumNeutronData.last_published_data.timestamp.toString()
     ) {
       const ix = await this.publishDataIx(aumNeutronData);
       const txhash = await this.squadsMultisig?.submitProposal(ix);
@@ -220,7 +223,7 @@ export default class RelaySolana implements Manager {
         const method = instruction.data.subarray(0, 8);
         /* Validate the discriminator for publishData */
         if (
-          JSON.stringify(method) !=
+          JSON.stringify(Array.from(method)) !=
           JSON.stringify([230, 18, 158, 253, 73, 167, 115, 188])
         ) {
           return false;

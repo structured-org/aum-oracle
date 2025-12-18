@@ -121,7 +121,7 @@ export class Config {
       config.solana = {
         rpc: this.tomlData?.solana.rpc!,
         enabled: this.tomlData?.solana.enabled!,
-        proposalDelay: this.tomlData?.ethereum.proposalDelay!,
+        proposalDelay: this.tomlData?.solana.proposalDelay!,
         multisigAddress: this.tomlData?.solana.multisigAddress,
         vaultPda: this.tomlData?.solana.vaultPda,
         aumOracleSol: this.tomlData?.solana.aumOracleSol,
