@@ -214,13 +214,12 @@ export default class RelaySolana implements Manager {
   }
 
   private validateIxs(ixs: Array<VaultTransaction>): boolean {
-const DISCRIMINATOR = "230,18,158,253,73,167,115,188";
-
-return ixs.entries().every(([, transaction]) =>
-  transaction.message?.instructions.every(instruction =>
-    Array.from(instruction.data.subarray(0, 8)).join(",") === DISCRIMINATOR
-  )
-);
+    const DISCRIMINATOR = "230,18,158,253,73,167,115,188";
+    return ixs.entries().every(([, transaction]) =>
+      transaction.message?.instructions.every(instruction =>
+        Array.from(instruction.data.subarray(0, 8)).join(",") === DISCRIMINATOR
+      )
+    );
   }
 
   private publishDataIx(
