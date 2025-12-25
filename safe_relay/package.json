@@ -2,13 +2,9 @@
   "name": "neutron_safe_relay",
   "version": "1.0.0",
   "license": "MIT",
-  "scripts": {
-    "start": "node -r ts-node/register --env-file=./.env src/index.ts"
-  },
   "devDependencies": {
     "@types/bun": "1.2.20",
-    "@types/invariant": "^2.2.37",
-    "ts-node": "^10.9.2"
+    "@types/invariant": "^2.2.37"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
