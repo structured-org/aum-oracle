@@ -122,6 +122,7 @@ export class Config {
         rpc: this.tomlData?.solana.rpc!,
         enabled: this.tomlData?.solana.enabled!,
         proposalDelay: this.tomlData?.solana.proposalDelay!,
+        oracleProgramId: this.tomlData?.solana.oracleProgramId,
         multisigAddress: this.tomlData?.solana.multisigAddress,
         vaultPda: this.tomlData?.solana.vaultPda,
         aumOracleSol: this.tomlData?.solana.aumOracleSol,

@@ -78,10 +78,6 @@ type AumDataNeutron = {
   };
 };
 
-export const PROGRAM_ID = new web3.PublicKey(
-  'orac315UJ2aQXvgiWjoFsZZDzEEuPaozYLDHf6epJzd',
-);
-
 export default class RelaySolana implements Manager {
   private logger: Logger;
   private solana: SolanaConfig;
@@ -137,7 +133,7 @@ export default class RelaySolana implements Manager {
     };
     this.squadsMultisig = new SquadsMultisig(this.logger, squadsMultisigConfig);
     this.aumOracleProgram = new Program(
-      await Program.fetchIdl(PROGRAM_ID, this.provider),
+      await Program.fetchIdl(this.solana.oracleProgramId, this.provider),
     );
   }
 
@@ -286,7 +282,7 @@ export default class RelaySolana implements Manager {
     );
     const aumOracleState = web3.PublicKey.findProgramAddressSync(
       [Buffer.from('state'), config.instanceKey.toBuffer()],
-      PROGRAM_ID,
+      new web3.PublicKey(this.solana.oracleProgramId),
     )[0];
     const stateData =
       await this.provider?.connection.getAccountInfo(aumOracleState);

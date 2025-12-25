@@ -18,6 +18,7 @@ const safeRelayerNeutron = z.object({
 const safeRelayerSolana = z.object({
   rpc: z.string(),
   enabled: z.boolean(),
+  oracleProgramId: z.string(),
   multisigAddress: z.string(),
   proposalDelay: z.number(), // Seconds
   vaultPda: z.string(),
