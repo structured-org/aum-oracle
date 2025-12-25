@@ -14,13 +14,14 @@ export class ModuleManager {
 
   async registerModules(config: Config): Promise<void> {
     this.logger.info('Registering modules...');
+    const modulesInits = [];
     if (config.ethereum?.enabled) {
       const relayEthereum = new RelayEthereum(
         this.logger.child({ ctx: 'RelayEthereum' }),
         config.ethereum!,
         config.neutron!,
       );
-      await relayEthereum.init();
+      modulesInits.push(relayEthereum.init());
       this.modules.push(relayEthereum);
       this.logger.info('RelayEthereum registered');
     }
@@ -30,11 +31,12 @@ export class ModuleManager {
         config.solana!,
         config.neutron!,
       );
-      await relaySolana.init();
+      modulesInits.push(relaySolana.init());
       this.modules.push(relaySolana);
       this.logger.info('RelaySolana registered');
     }
     this.logger.info(`Total modules registered: ${this.modules.length}`);
+    await Promise.all(modulesInits);
   }
 
   async runModules(): Promise<void> {
