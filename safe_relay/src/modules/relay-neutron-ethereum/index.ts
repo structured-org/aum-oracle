@@ -21,6 +21,7 @@ export default class RelayEthereum implements Manager {
   private ethereum: EthereumConfig;
   private neutron: NeutronConfig;
 
+  private msParticipantIndex?: number;
   private cosmWasmClient?: CosmWasmClient;
   private ethClient?: PublicClient;
   private ethAccount?: HDAccount;
@@ -68,12 +69,12 @@ export default class RelayEthereum implements Manager {
       chain: mainnet,
       transport: http(this.ethereum.rpc),
     }) as PublicClient;
+    const safeInfo = await this.safeApi?.getSafeInfo(this.safeMultisig?.multisigAddress!)!;
+    this.msParticipantIndex = safeInfo.owners.findIndex(owner => owner.toLowerCase() === this.ethAccount?.address.toLowerCase());
   }
 
   async tick(): Promise<void> {
-    const safeInfo = await this.safeApi?.getSafeInfo(this.safeMultisig?.multisigAddress!)!;
-    const msParticipantIndex = safeInfo.owners.findIndex(owner => owner.toLowerCase() === this.ethAccount?.address.toLowerCase());
-    const delayTimeMs = this.ethereum.proposalDelay * msParticipantIndex
+    const delayTimeMs = this.ethereum.proposalDelay * this.msParticipantIndex! * 1000
     await new Promise((resolve) => setTimeout(resolve, delayTimeMs));
 
     const neutronData = await this.getTWAERData();
