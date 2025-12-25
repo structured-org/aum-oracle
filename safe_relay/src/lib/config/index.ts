@@ -10,6 +10,7 @@ import {
 } from './schema';
 import { tomlAdapter } from 'zod-config/toml-adapter';
 import { loadConfig } from 'zod-config';
+import fs from "node:fs";
 
 export class Config {
   private readonly logger: pino.Logger;
@@ -126,7 +127,9 @@ export class Config {
         multisigAddress: this.tomlData?.solana.multisigAddress,
         vaultPda: this.tomlData?.solana.vaultPda,
         aumOracleSol: this.tomlData?.solana.aumOracleSol,
-        seedPath: this.envData.SOLANA_SEED_PATH,
+        seed: Uint8Array.from(
+            JSON.parse(fs.readFileSync(this.envData.SOLANA_SEED_PATH!, 'utf-8')),
+        ),
         mnemonic: this.envData.SOLANA_MNEMONIC,
       };
     }

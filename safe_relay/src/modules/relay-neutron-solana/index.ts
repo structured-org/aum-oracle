@@ -127,12 +127,8 @@ export default class RelaySolana implements Manager {
     /* Neutron */
     this.cosmWasmClient = await CosmWasmClient.connect(this.neutron.rpc);
     /* Solana */
-    if(this.solana.seedPath) {
-      this.signer = web3.Keypair.fromSecretKey(
-        Uint8Array.from(
-          JSON.parse(fs.readFileSync(this.solana.seedPath!, 'utf-8')),
-        ),
-      );
+    if(this.solana.seed) {
+      this.signer = web3.Keypair.fromSecretKey(this.solana.seed);
     } else if (this.solana.mnemonic) {
       this.signer = keypairFromMnemonic(this.solana.mnemonic!);
     } else {
