@@ -19,6 +19,8 @@ import {
   proposalStatusToString,
   VaultTransaction,
 } from '../../lib/multisig/squads/internal';
+import { mnemonicToSeedSync, validateMnemonic } from 'bip39';
+import { derivePath } from 'ed25519-hd-key';
 
 type FixedDecimal = {
   number: BN;
@@ -79,6 +81,22 @@ type AumDataNeutron = {
   };
 };
 
+function keypairFromMnemonic(
+  mnemonic: string,
+  derivationPath = "m/44'/501'/0'/0'",
+): web3.Keypair {
+  if (!validateMnemonic(mnemonic)) {
+    throw new Error('Invalid mnemonic');
+  }
+  const seed = mnemonicToSeedSync(mnemonic);
+  const derived = derivePath(derivationPath, seed.toString('hex'));
+  const derivedKey = derived.key;
+  if (derivedKey.length !== 32) {
+    throw new Error('Derived key is not 32 bytes');
+  }
+  return web3.Keypair.fromSeed(derivedKey);
+}
+
 export default class RelaySolana implements Manager {
   private logger: Logger;
   private solana: SolanaConfig;
@@ -109,11 +127,18 @@ export default class RelaySolana implements Manager {
     /* Neutron */
     this.cosmWasmClient = await CosmWasmClient.connect(this.neutron.rpc);
     /* Solana */
-    this.signer = web3.Keypair.fromSecretKey(
-      Uint8Array.from(
-        JSON.parse(fs.readFileSync(this.solana.seedPath!, 'utf-8')),
-      ),
-    );
+    if(this.solana.seedPath) {
+      this.signer = web3.Keypair.fromSecretKey(
+        Uint8Array.from(
+          JSON.parse(fs.readFileSync(this.solana.seedPath!, 'utf-8')),
+        ),
+      );
+    } else if (this.solana.mnemonic) {
+      this.signer = keypairFromMnemonic(this.solana.mnemonic!);
+    } else {
+      throw new Error('Neither seedPath nor mnemonic were provided');
+    }
+
     this.provider = new AnchorProvider(
       new web3.Connection(this.solana.rpc, {
         commitment: 'confirmed',

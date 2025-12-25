@@ -41,6 +41,7 @@ export const envSchema = z.object({
   CONFIG_PATH: z.string(),
   ETHEREUM_MNEMONIC: z.string().optional(),
   SOLANA_SEED_PATH: z.string().optional(),
+  SOLANA_MNEMONIC: z.string().optional(),
   SAFE_API_KEY: z.string().optional(),
 });
 

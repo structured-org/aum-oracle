@@ -113,9 +113,9 @@ export class Config {
       };
     }
     if (this.tomlData?.solana.enabled) {
-      if (!this.envData.SOLANA_SEED_PATH) {
+      if (!this.envData.SOLANA_SEED_PATH && !this.envData.SOLANA_MNEMONIC) {
         throw new Error(
-          'SOLANA_SEED_PATH is required when SolanaClaim module is enabled',
+          'SOLANA_SEED_PATH or SOLANA_MNEMONIC is required when SolanaClaim module is enabled',
         );
       }
       config.solana = {
@@ -127,6 +127,7 @@ export class Config {
         vaultPda: this.tomlData?.solana.vaultPda,
         aumOracleSol: this.tomlData?.solana.aumOracleSol,
         seedPath: this.envData.SOLANA_SEED_PATH,
+        mnemonic: this.envData.SOLANA_MNEMONIC,
       };
     }
 
