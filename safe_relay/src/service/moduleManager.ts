@@ -40,10 +40,11 @@ export class ModuleManager {
   }
 
   async runModules(): Promise<void> {
+    const moduleTicks = [];
     for (const module of this.modules) {
       try {
         this.logger.info(`Running ${module.constructor.name} module...`);
-        await module.tick();
+        moduleTicks.push(module.tick());
       } catch (error) {
         console.log(error);
         this.logger.error(
@@ -52,5 +53,6 @@ export class ModuleManager {
         );
       }
     }
+    await Promise.all(moduleTicks)
   }
 }
