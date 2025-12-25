@@ -25,6 +25,7 @@ export default class RelayEthereum implements Manager {
   private ethClient?: PublicClient;
   private ethAccount?: HDAccount;
   private safeMultisig?: SafeMultisig;
+  private safeApi?: SafeApiKit;
 
   constructor(
     logger: Logger,
@@ -44,16 +45,17 @@ export default class RelayEthereum implements Manager {
     this.ethAccount = account;
 
     const pk = account.getHdKey().privateKey;
+    this.safeApi = new SafeApiKit({
+      chainId: 1n,
+      apiKey: this.ethereum.safeApiKey,
+    });
     const safeConfig: SafeMultisigConfig = {
       safeClient: await Safe.init({
         provider: this.ethereum.rpc,
         signer: `0x${Buffer.from(pk!).toString('hex')}`,
         safeAddress: this.ethereum.safeAddress,
       }),
-      safeApi: new SafeApiKit({
-        chainId: 1n,
-        apiKey: this.ethereum.safeApiKey,
-      }),
+      safeApi: this.safeApi,
       receiverAddress: this.ethereum.receiverAddress,
       signer: account,
     };
@@ -69,14 +71,14 @@ export default class RelayEthereum implements Manager {
   }
 
   async tick(): Promise<void> {
-    await new Promise((resolve) =>
-      setTimeout(resolve, this.ethereum.proposalDelay),
-    );
+    const safeInfo = await this.safeApi?.getSafeInfo(this.safeMultisig?.multisigAddress!)!;
+    const msParticipantIndex = safeInfo.owners.findIndex(owner => owner.toLowerCase() === this.ethAccount?.address.toLowerCase());
+    const delayTimeMs = this.ethereum.proposalDelay * msParticipantIndex
+    await new Promise((resolve) => setTimeout(resolve, delayTimeMs));
 
     const neutronData = await this.getTWAERData();
     const ethereumData = await this.getReceverData();
     const pendingProposals = await this.safeMultisig?.getPendingProposals()!;
-
     if (pendingProposals.results.length > 0) {
       this.logger.info(
         'There are pending proposals. Skipping new proposal submission.',
