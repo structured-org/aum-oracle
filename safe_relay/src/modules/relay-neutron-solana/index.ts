@@ -238,25 +238,25 @@ export default class RelaySolana implements Manager {
       data: {
         pmAccountActualEquity: toFixedDecimal(
           dataNeutron.last_published_data.data
-            .pm_account_actual_equity as string,
+            .pm_account_actual_equity,
         ),
         unimmr: toFixedDecimal(
-          dataNeutron.last_published_data.data.unimmr as string,
+          dataNeutron.last_published_data.data.unimmr,
         ),
         umBalanceUsdt: toFixedDecimal(
-          dataNeutron.last_published_data.data.um_balance_usdt as string,
+          dataNeutron.last_published_data.data.um_balance_usdt,
         ),
         withdrawableUsdt: toFixedDecimal(
-          dataNeutron.last_published_data.data.withdrawable_usdt as string,
+          dataNeutron.last_published_data.data.withdrawable_usdt,
         ),
         positions: dataNeutron.last_published_data.data.positions.map((e) => ({
-          pnl: toFixedDecimal(e.pnl as string),
-          amount: toFixedDecimal(e.amount as string),
+          pnl: toFixedDecimal(e.pnl),
+          amount: toFixedDecimal(e.amount),
           symbol: e.symbol,
         })),
         spotBalances: dataNeutron.last_published_data.data.spot_balances.map(
           (e) => ({
-            amount: toFixedDecimal(e.amount as string),
+            amount: toFixedDecimal(e.amount),
             asset: e.asset,
           }),
         ),
