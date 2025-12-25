@@ -13,6 +13,86 @@ import {
 } from '@solana/web3.js';
 import assert from 'assert';
 
+export class Ms {
+  createKey?: web3.PublicKey;
+  configAuthority?: web3.PublicKey;
+  threshold?: number; // u16
+  timelock?: number; // u32
+  transactionIndex?: bigint; // u64
+  staleTransactionIndex?: bigint; // u64
+  rentCollector?: null | web3.PublicKey; // Option<web3.PublicKey>
+  bump?: number; // u8
+  members?: Array<{
+    key: web3.PublicKey;
+    permissions: {
+      mask: number; // u8
+    };
+  }>;
+
+  static deserialize(data: Uint8Array): Ms {
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    let offset = 8;
+
+    const createKey = new web3.PublicKey(data.slice(offset, offset + 32));
+    offset += 32;
+
+    const configAuthority = new web3.PublicKey(data.slice(offset, offset + 32));
+    offset += 32;
+
+    const threshold = view.getUint16(offset, true);
+    offset += 2;
+
+    const timelock = view.getUint32(offset, true);
+    offset += 4;
+
+    const transactionIndex = view.getBigUint64(offset, true);
+    offset += 8;
+
+    const staleTransactionIndex = view.getBigUint64(offset, true);
+    offset += 8;
+
+    // Option<PublicKey>
+    const hasRentCollector = view.getUint8(offset);
+    offset += 1;
+
+    let rentCollector: web3.PublicKey | null = null;
+    if (hasRentCollector) {
+      rentCollector = new web3.PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+    }
+
+    const bump = view.getUint8(offset);
+    offset += 1;
+
+    // Vec<Member>
+    const membersLength = view.getUint32(offset, true);
+    offset += 4;
+
+    const members: Ms['members'] = [];
+    for (let i = 0; i < membersLength; i++) {
+      const key = new web3.PublicKey(data.slice(offset, offset + 32));
+      offset += 32;
+
+      const mask = view.getUint8(offset);
+      offset += 1;
+
+      members.push({ key, permissions: { mask } });
+    }
+
+    return {
+      createKey,
+      configAuthority,
+      threshold,
+      timelock,
+      transactionIndex,
+      staleTransactionIndex,
+      rentCollector,
+      bump,
+      members,
+    };
+  }
+}
+
 export class VaultTransaction {
   bump?: number; // u8
   ephemeralSignerBumps?: Array<number>; // Vec<u8>

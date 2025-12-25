@@ -15,6 +15,7 @@ import {
 } from '@coral-xyz/anchor';
 import * as fs from 'node:fs';
 import {
+  Ms,
   proposalStatusToString,
   VaultTransaction,
 } from '../../lib/multisig/squads/internal';
@@ -83,6 +84,7 @@ export default class RelaySolana implements Manager {
   private solana: SolanaConfig;
   private neutron: NeutronConfig;
 
+  private msParticipantIndex?: number;
   private cosmWasmClient?: CosmWasmClient;
   private squadsMultisig?: SquadsMultisig;
   private provider?: AnchorProvider;
@@ -135,6 +137,15 @@ export default class RelaySolana implements Manager {
     this.aumOracleProgram = new Program(
       await Program.fetchIdl(this.solana.oracleProgramId, this.provider),
     );
+
+    /* Find the participant index. It is used alongside the 'proposalDelay' */
+    const msData = await this.provider.connection.getAccountInfo(
+      new web3.PublicKey(this.solana.multisigAddress),
+    );
+    const ms = Ms.deserialize(msData?.data!);
+    this.msParticipantIndex = ms.members!.findIndex(
+      (member) => member.key.toBase58() === this.signer?.publicKey.toBase58(),
+    );
   }
 
   async createProposal() {
@@ -154,7 +165,7 @@ export default class RelaySolana implements Manager {
 
   async tick(): Promise<void> {
     await new Promise((resolve) =>
-      setTimeout(resolve, this.solana.proposalDelay * 1000),
+      setTimeout(resolve, this.solana.proposalDelay * this.msParticipantIndex! * 1000),
     );
 
     /* Get all the proposals that are either Active of Approved */
