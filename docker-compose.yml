@@ -8,7 +8,22 @@ services:
     container_name: aum-messenger
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-    command: ["--config", "/app/config.yaml"]
+    ports:
+      - "16400:16400"
+    command: ["--config", "/app/config.yaml", "--rest-laddr", "0.0.0.0:16400"]
+
+  # Simulation mode: does not submit on-chain, exposes last captured values over HTTP.
+  # Usage: docker compose up aum-messenger-sim
+  aum-messenger-sim:
+    build:
+      context: .
+      dockerfile: Dockerfile.aum_messenger
+    container_name: aum-messenger-sim
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      - "16400:16400"
+    command: ["--config", "/app/config.yaml", "--simulation", "--rest-laddr", "0.0.0.0:16400"]
 
   recorder:
     build:

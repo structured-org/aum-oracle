@@ -2,6 +2,7 @@ package jupiter
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -116,4 +117,84 @@ func TestMessengerForNeutronRun(t *testing.T) {
 
 	time.Sleep(4 * time.Second)
 	cancel()
+}
+
+func TestSimulationForNeutronStoresValue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	solanaClient := mock_jupiter.NewMockSolanaClient(ctrl)
+	neutronAumRecv := mock_jupiter.NewMockNeutronAumReceiverClient(ctrl)
+	jupiterClient := mock_jupiter.NewMockJupiterClient(ctrl)
+
+	usdtPubKey := testPubKey1
+	btcPubKey := testPubKey3
+
+	jupCfg := JupiterConfig{
+		Custodies: map[string]solana.PublicKey{
+			"USDT": usdtPubKey,
+			"BTC":  btcPubKey,
+		},
+	}
+
+	neutronAumRecv.EXPECT().GetJupiterAumReceiverNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+		Round: 2, Timestamp: 1,
+	}, nil).AnyTimes()
+
+	jupiterClient.EXPECT().GetJupiterPoolInfo(gomock.Any(), gomock.Any()).Return(&jupiterclient.JupiterPoolAccount{
+		AumUsd: solanabin.Uint128{Lo: 1000000},
+	}, nil).AnyTimes()
+	solanaClient.EXPECT().GetTokenSupply(gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
+		Amount: "500000", Decimals: 6,
+	}, nil).AnyTimes()
+	solanaClient.EXPECT().GetTokenAccountBalance(gomock.Any(), gomock.Any(), gomock.Any()).Return(&solanarpc.UiTokenAmount{
+		Amount: "100000", Decimals: 6,
+	}, nil).AnyTimes()
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), usdtPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 10000, Locked: 5000, GuaranteedUsd: 15000}, Decimals: 6,
+	}, nil).AnyTimes()
+	jupiterClient.EXPECT().GetJupiterCustodyInfo(gomock.Any(), btcPubKey).Return(&jupiterclient.JupiterPerpsCustodyAccount{
+		Assets: jupiterclient.JupiterPerpsCustodyAssets{Owned: 2000, Locked: 1000, GuaranteedUsd: 3000}, Decimals: 8,
+	}, nil).AnyTimes()
+
+	inner := NewJupiterAumMessengerForNeutron(solanaClient, neutronAumRecv, jupiterClient, jupCfg, zap.NewNop())
+	store := &msgr.LastValueStore[*neutronclient.JupiterAumData]{}
+	sim := msgr.WrapWithSimulation(inner, store)
+
+	data, err := sim.FetchData(context.Background())
+	if err != nil {
+		t.Fatalf("FetchData failed: %v", err)
+	}
+
+	_, err = sim.SubmitData(context.Background(), data)
+	if err != nil {
+		t.Fatalf("SubmitData failed: %v", err)
+	}
+
+	v, ok, capturedAt := store.Load()
+	if !ok {
+		t.Fatal("expected store to have a value")
+	}
+	if v == nil {
+		t.Fatal("expected non-nil stored value")
+	}
+	if capturedAt.IsZero() {
+		t.Fatal("expected capturedAt to be set")
+	}
+
+	expected := &neutronclient.JupiterAumData{
+		CustodyAssets: []neutronclient.JupiterCustodyAsset{
+			{Denom: "BTC", Owned: 2000, Locked: 1000, GuaranteedUsd: 3000, Decimals: 8},
+			{Denom: "USDT", Owned: 10000, Locked: 5000, GuaranteedUsd: 15000, Decimals: 6},
+		},
+		AumUsd:                     math.NewUintFromString("1"),
+		TotalJlpSupply:             math.NewUintFromString("500000"),
+		StrategyJlpBalance:         math.NewUintFromString("100000"),
+		TotalJlpSupplyDecimals:     6,
+		StrategyJlpBalanceDecimals: 6,
+	}
+
+	if !reflect.DeepEqual(v, expected) {
+		t.Fatalf("stored value mismatch:\ngot:  %+v\nwant: %+v", v, expected)
+	}
 }

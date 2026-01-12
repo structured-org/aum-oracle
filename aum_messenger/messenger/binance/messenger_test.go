@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -145,4 +146,152 @@ func TestMessengerForSolanaRun(t *testing.T) {
 
 	time.Sleep(4 * time.Second)
 	cancel()
+}
+
+func TestSimulationForNeutronStoresValue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	binanceClient := mock_binance.NewMockBinanceClient(ctrl)
+	neutronAumRecv := mock_binance.NewMockNeutronAumReceiverClient(ctrl)
+
+	neutronAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&neutronclient.NextRound{
+		Round: 2, Timestamp: 1,
+	}, nil).AnyTimes()
+
+	binanceClient.EXPECT().GetUmPositions(gomock.Any()).Return([]*binanceportfolio.UMPosition{
+		{Symbol: "BTCUSDT", PositionAmt: "0.5", UnrealizedProfit: "100.0"},
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetSpotAccountInfo(gomock.Any()).Return(&binance.Account{
+		Balances: []binance.Balance{
+			{Asset: "USDT", Free: "10.0", Locked: "5.0"},
+		},
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetPMAccountInfo(gomock.Any()).Return(&binanceportfolio.Account{
+		ActualEquity:             "200.0",
+		VirtualMaxWithdrawAmount: "150.0",
+		UniMMR:                   "1.5",
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetPMAccountBalance(gomock.Any()).Return([]*binanceportfolio.Balance{
+		{Asset: "USDT", UMWalletBalance: "50.0"},
+	}, nil).AnyTimes()
+
+	config := Config{
+		UmPositionsList: []string{"BTCUSDT"},
+		SpotAssetsList:  []string{"USDT"},
+	}
+
+	inner := NewBinanceAumMessengerForNeutron(binanceClient, neutronAumRecv, config, zap.NewNop())
+	store := &msgr.LastValueStore[*neutronclient.BinanceAumData]{}
+	sim := msgr.WrapWithSimulation(inner, store)
+
+	data, err := sim.FetchData(context.Background())
+	if err != nil {
+		t.Fatalf("FetchData failed: %v", err)
+	}
+
+	_, err = sim.SubmitData(context.Background(), data)
+	if err != nil {
+		t.Fatalf("SubmitData failed: %v", err)
+	}
+
+	v, ok, capturedAt := store.Load()
+	if !ok {
+		t.Fatal("expected store to have a value")
+	}
+	if v == nil {
+		t.Fatal("expected non-nil stored value")
+	}
+	if capturedAt.IsZero() {
+		t.Fatal("expected capturedAt to be set")
+	}
+
+	expected := &neutronclient.BinanceAumData{
+		Unimmr: math.LegacyMustNewDecFromStr("1.5"),
+		Positions: []neutronclient.BinancePosition{
+			{Symbol: "BTCUSDT", Amount: math.LegacyMustNewDecFromStr("0.5"), Pnl: math.LegacyMustNewDecFromStr("100.0")},
+		},
+		UmBalanceUsdt:         math.LegacyMustNewDecFromStr("50.0"),
+		SpotBalances:          []neutronclient.BinanceBalance{{Asset: "USDT", Amount: math.LegacyMustNewDecFromStr("15.0")}},
+		PmAccountActualEquity: math.LegacyMustNewDecFromStr("200.0"),
+		WithdrawableUsdt:      math.LegacyMustNewDecFromStr("150.0"),
+	}
+
+	if !reflect.DeepEqual(v, expected) {
+		t.Fatalf("stored value mismatch:\ngot:  %+v\nwant: %+v", v, expected)
+	}
+}
+
+func TestSimulationForSolanaStoresValue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	binanceClient := mock_binance.NewMockBinanceClient(ctrl)
+	solanaAumRecv := mock_binance.NewMockSolanaAumReceiverClient(ctrl)
+
+	solanaAumRecv.EXPECT().GetBinanceAumReceiverNextRound(gomock.Any()).Return(&solanaclient.NextRound{
+		Round: 2, Timestamp: 1,
+	}, nil).AnyTimes()
+
+	binanceClient.EXPECT().GetUmPositions(gomock.Any()).Return([]*binanceportfolio.UMPosition{
+		{Symbol: "BTCUSDT", PositionAmt: "0.5", UnrealizedProfit: "100.0"},
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetSpotAccountInfo(gomock.Any()).Return(&binance.Account{
+		Balances: []binance.Balance{
+			{Asset: "USDT", Free: "10.0", Locked: "5.0"},
+		},
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetPMAccountInfo(gomock.Any()).Return(&binanceportfolio.Account{
+		ActualEquity:             "200.0",
+		VirtualMaxWithdrawAmount: "150.0",
+		UniMMR:                   "1.5",
+	}, nil).AnyTimes()
+	binanceClient.EXPECT().GetPMAccountBalance(gomock.Any()).Return([]*binanceportfolio.Balance{
+		{Asset: "USDT", UMWalletBalance: "50.0"},
+	}, nil).AnyTimes()
+
+	config := Config{
+		UmPositionsList: []string{"BTCUSDT"},
+		SpotAssetsList:  []string{"USDT"},
+	}
+
+	inner := NewBinanceAumMessengerForSolana(binanceClient, solanaAumRecv, config, zap.NewNop())
+	store := &msgr.LastValueStore[*solanaclient.BinanceAumData]{}
+	sim := msgr.WrapWithSimulation(inner, store)
+
+	data, err := sim.FetchData(context.Background())
+	if err != nil {
+		t.Fatalf("FetchData failed: %v", err)
+	}
+
+	_, err = sim.SubmitData(context.Background(), data)
+	if err != nil {
+		t.Fatalf("SubmitData failed: %v", err)
+	}
+
+	v, ok, capturedAt := store.Load()
+	if !ok {
+		t.Fatal("expected store to have a value")
+	}
+	if v == nil {
+		t.Fatal("expected non-nil stored value")
+	}
+	if capturedAt.IsZero() {
+		t.Fatal("expected capturedAt to be set")
+	}
+
+	expected := &solanaclient.BinanceAumData{
+		Unimmr: 1.5,
+		Positions: []solanaclient.BinancePosition{
+			{Symbol: "BTCUSDT", Amount: 0.5, Pnl: 100.0},
+		},
+		UmBalanceUsdt:         50.0,
+		SpotBalances:          []solanaclient.BinanceBalance{{Asset: "USDT", Amount: 15.0}},
+		PmAccountActualEquity: 200.0,
+		WithdrawableUsdt:      150.0,
+	}
+
+	if !reflect.DeepEqual(v, expected) {
+		t.Fatalf("stored value mismatch:\ngot:  %+v\nwant: %+v", v, expected)
+	}
 }

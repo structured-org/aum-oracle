@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gagliardetto/solana-go"
@@ -41,6 +43,8 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
+
 	conf := readConfig()
 	logRegistry := initLogRegistry(conf.LoggerLevel)
 	logger := logRegistry.Get(mainContext)
@@ -150,28 +154,59 @@ func main() {
 		logRegistry.Get(jupiterAumMsgrContext),
 	)
 
+	binanceMsgrForNeutronRunner := msgr.Messenger[*neutronclient.BinanceAumData](binanceMsgrForNeutron)
+	binanceMsgrForSolanaRunner := msgr.Messenger[*solanaclient.BinanceAumData](binanceMsgrForSolana)
+	jupiterMsgrForNeutronRunner := msgr.Messenger[*neutronclient.JupiterAumData](jupiterMsgrForNeutron)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
+
+	storeBinanceNeutron := &msgr.LastValueStore[*neutronclient.BinanceAumData]{}
+	storeBinanceSolana := &msgr.LastValueStore[*solanaclient.BinanceAumData]{}
+	storeJupiterNeutron := &msgr.LastValueStore[*neutronclient.JupiterAumData]{}
+
+	mode := "live"
+
+	if *simulationEnabled {
+		mode = "simulation"
+
+		binanceMsgrForNeutronRunner = msgr.WrapWithSimulation(binanceMsgrForNeutronRunner, storeBinanceNeutron)
+		binanceMsgrForSolanaRunner = msgr.WrapWithSimulation(binanceMsgrForSolanaRunner, storeBinanceSolana)
+		jupiterMsgrForNeutronRunner = msgr.WrapWithSimulation(jupiterMsgrForNeutronRunner, storeJupiterNeutron)
+	} else {
+		binanceMsgrForNeutronRunner = msgr.WrapWithCapture(binanceMsgrForNeutronRunner, storeBinanceNeutron)
+		binanceMsgrForSolanaRunner = msgr.WrapWithCapture(binanceMsgrForSolanaRunner, storeBinanceSolana)
+		jupiterMsgrForNeutronRunner = msgr.WrapWithCapture(jupiterMsgrForNeutronRunner, storeJupiterNeutron)
+	}
+
+	startRestServer(ctx, logger, *restLaddr, func() lastStateResponse {
+		return buildLastStateResponse(
+			mode,
+			storeBinanceNeutron,
+			storeJupiterNeutron,
+			time.Now().UTC(),
+		)
+	})
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		logger.Info("running binance messenger for neutron")
-		msgr.RunMessenger(ctx, binanceMsgrForNeutron, conf.OperationalConfig)
+		msgr.RunMessenger(ctx, binanceMsgrForNeutronRunner, conf.OperationalConfig)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		logger.Info("running binance messenger for solana")
-		msgr.RunMessenger(ctx, binanceMsgrForSolana, conf.OperationalConfig)
+		msgr.RunMessenger(ctx, binanceMsgrForSolanaRunner, conf.OperationalConfig)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		logger.Info("running jupiter messenger for neutron")
-		msgr.RunMessenger(ctx, jupiterMsgrForNeutron, conf.OperationalConfig)
+		msgr.RunMessenger(ctx, jupiterMsgrForNeutronRunner, conf.OperationalConfig)
 	}()
 
 	go func() {
