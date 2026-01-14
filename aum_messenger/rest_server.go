@@ -83,7 +83,30 @@ func startRestServer(
 func newRestMux(getState func() lastStateResponse) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+	withCORS := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "600")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	handle := func(pattern string, handler http.Handler) {
+		mux.Handle(pattern, withCORS(handler))
+	}
+
+	handleFunc := func(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+		handle(pattern, http.HandlerFunc(handler))
+	}
+
+	handleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte("ok"))
 	})
@@ -93,7 +116,7 @@ func newRestMux(getState func() lastStateResponse) http.Handler {
 		enc := json.NewEncoder(w)
 		_ = enc.Encode(getState())
 	}
-	mux.HandleFunc("/last", lastHandler)
+	handleFunc("/last", lastHandler)
 
 	return mux
 }
