@@ -2,22 +2,11 @@ import { z } from 'zod';
 
 const safeRelayerEthereum = z.object({
   rpc: z.string(),
-  enabled: z.boolean(),
-  safeAddress: z.string(),
-  proposalDelay: z.number(), // Seconds
-  receiverAddress: z.string(),
-  verifyValuesOnVote: z.boolean(),
-});
-
-const safeRelayerNeutron = z.object({
-  rpc: z.string(),
-  twaerContract: z.string(),
   binanceAum: z.string(),
 });
 
 const safeRelayerSolana = z.object({
   rpc: z.string(),
-  enabled: z.boolean(),
   oracleProgramId: z.string(),
   multisigAddress: z.string(),
   proposalDelay: z.number(), // Seconds
@@ -33,7 +22,6 @@ const safeRelayerServiceConfig = z.object({
 export const safeRelayerConfigSchema = z.object({
   serviceConfig: safeRelayerServiceConfig,
   ethereum: safeRelayerEthereum,
-  neutron: safeRelayerNeutron,
   solana: safeRelayerSolana,
 });
 
@@ -47,16 +35,13 @@ export const envSchema = z.object({
 
 type CommonConfigProperties = { mnemonic?: string; seed?: Uint8Array };
 export type ServiceConfig = z.infer<typeof safeRelayerServiceConfig>;
-export type NeutronConfig = z.infer<typeof safeRelayerNeutron>;
 export type SolanaConfig = z.infer<typeof safeRelayerSolana> &
   CommonConfigProperties;
-export type EthereumConfig = z.infer<typeof safeRelayerEthereum> &
-  CommonConfigProperties & { safeApiKey: string };
+export type EthereumConfig = z.infer<typeof safeRelayerEthereum>;
 
 export interface ProcessedConfig {
   serviceConfig?: ServiceConfig;
   ethereum?: EthereumConfig;
-  neutron?: NeutronConfig;
   solana?: SolanaConfig;
 }
 
