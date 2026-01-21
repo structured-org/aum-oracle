@@ -22,6 +22,7 @@ import {
 import { mnemonicToSeedSync, validateMnemonic } from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 
+import { AUM_DATA } from '../../generic/BinanceAumReceiverAumData';
 import BINANCE_AUM_ABI from '../../generic/BinanceAumReceiver.abi.json';
 
 type FixedDecimal = {
@@ -34,6 +35,10 @@ function toFixedDecimal(number: bigint): FixedDecimal {
         number: new BN(String(number).replace(/\./g, '')),
         decimals: String(number).split('.')[1]?.length ?? 0,
     };
+}
+
+function fromFixedDecimal(number: FixedDecimal): bigint {
+    return BigInt(number.number.toString(10)) * (10n ** BigInt(number.decimals));
 }
 
 type AumOracleState = {
@@ -208,7 +213,7 @@ export default class RelaySolana implements Manager {
                         `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
                     );
                 } catch (e: any) {
-                    if (/SameTimestamp/.test(e.message.toString())) {
+                    if (/InvalidTimestamp/.test(e.message.toString())) {
                         this.logger.warn(
                             `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
                         );
@@ -231,7 +236,7 @@ export default class RelaySolana implements Manager {
                 const batchIxs = await this.squadsMultisig?.getBatchIxs(
                     Number(proposal.transactionIndex!.toString()),
                 );
-                if (!this.validateIxs(batchIxs!)) {
+                if (!await this.validateIxs(batchIxs!)) {
                     this.logger.warn(`Invalid proposal -- ${proposal.transactionIndex}`);
                     return;
                 }
@@ -248,12 +253,43 @@ export default class RelaySolana implements Manager {
         }
     }
 
-    private validateIxs(ixs: Array<VaultTransaction>): boolean {
+    private async validateIxs(ixs: Array<VaultTransaction>): Promise<boolean> {
         const DISCRIMINATOR = "230,18,158,253,73,167,115,188";
+        const aumEthereumData = await this.getEthereumAumData();
         return ixs.entries().every(([, transaction]) =>
-            transaction.message?.instructions.every(instruction =>
-                Array.from(instruction.data.subarray(0, 8)).join(",") === DISCRIMINATOR
-            )
+            transaction.message?.instructions.every(instruction => {
+                const buffer = Array.from(instruction.data);
+                const publishParams = this.aumOracleProgram?.coder.types.decode('publishDataParams', Buffer.from(buffer).subarray(8));
+                const aumSolanaData = publishParams.data;
+
+                if (aumSolanaData.round.toNumber() != aumEthereumData.round
+                    || aumSolanaData.timestamp.toNumber() != aumEthereumData.timestamp
+                    || fromFixedDecimal(aumSolanaData.data.unimmr) != aumEthereumData.data.unimmr
+                    || aumSolanaData.data.positions.length != aumEthereumData.data.positions.length
+                    || fromFixedDecimal(aumSolanaData.data.umBalanceUsdt) != aumEthereumData.data.umBalanceUsdt
+                    || aumSolanaData.data.spotBalances.length != aumEthereumData.data.spotBalances.length
+                    || fromFixedDecimal(aumSolanaData.data.pmAccountActualEquity) != aumEthereumData.data.pmAccountActualEquity
+                    || fromFixedDecimal(aumSolanaData.data.withdrawableUsdt) != aumEthereumData.data.withdrawableUsdt) {
+                    return false;
+                }
+
+                for (let i in (aumSolanaData.data.positions as Array<any>)) {
+                    if (aumSolanaData.data.positions[i].symbol != aumEthereumData.data.positions[i].symbol
+                        || fromFixedDecimal(aumSolanaData.data.positions[i].amount) != aumEthereumData.data.positions[i].amount
+                        || fromFixedDecimal(aumSolanaData.data.positions[i].pnl) != aumEthereumData.data.positions[i].pnl) {
+                        return false;
+                    }
+                }
+
+                for (let i in (aumSolanaData.data.spotBalances as Array<any>)) {
+                    if (aumSolanaData.data.spotBalances[i].asset != aumEthereumData.data.spotBalances[i].asset
+                        || fromFixedDecimal(aumSolanaData.data.spotBalances[i].amount) != aumEthereumData.data.spotBalances[i].amount) {
+                        return false;
+                    }
+                }
+
+                return Array.from(instruction.data.subarray(0, 8)).join(",") === DISCRIMINATOR;
+            })
         );
     }
 
@@ -290,6 +326,8 @@ export default class RelaySolana implements Manager {
                 ),
             },
         };
+        // TODO: this method has been changed in the upstream aum-oracle Solana program.
+        //       we will have to update it once we deploy a fresh version of the program.
         return this.aumOracleProgram!.methods.publishData({
             data: dataSolana,
         })
@@ -334,42 +372,14 @@ export default class RelaySolana implements Manager {
         }
         this.logger.trace('TWAER Query Result: %s %s %s', round, timestamp, data);
 
-        const decodedData = decodeAbiParameters([
-            {
-                type: 'tuple',
-                name: 'binanceData',
-                components: [
-                    { name: 'unimmr', type: 'int256' },
-                    {
-                        name: 'positions',
-                        type: 'tuple[]',
-                        components: [
-                            { name: 'symbol', type: 'bytes32' },
-                            { name: 'amount', type: 'int256' },
-                            { name: 'pnl', type: 'int256' },
-                        ],
-                    },
-                    { name: 'umBalanceUsdt', type: 'int256' },
-                    {
-                        name: 'spotBalances',
-                        type: 'tuple[]',
-                        components: [
-                            { name: 'asset', type: 'bytes32' },
-                            { name: 'amount', type: 'int256' },
-                        ],
-                    },
-                    { name: 'pmAccountActualEquity', type: 'int256' },
-                    { name: 'withdrawableUsdt', type: 'int256' },
-                ],
-            },
-        ], data)[0];
+        const decodedData = decodeAbiParameters(AUM_DATA, data)[0] as any;
 
         const aumDataEthereum = {
             round,
             timestamp,
             data: {
                 unimmr: decodedData.unimmr,
-                positions: decodedData.positions.map((position) => {
+                positions: decodedData.positions.map((position: any) => {
                     return {
                         symbol: stringFromBytes32(position.symbol),
                         amount: position.amount,
@@ -377,7 +387,7 @@ export default class RelaySolana implements Manager {
                     };
                 }),
                 umBalanceUsdt: decodedData.umBalanceUsdt,
-                spotBalances: decodedData.spotBalances.map((spotBalance) => {
+                spotBalances: decodedData.spotBalances.map((spotBalance: any) => {
                     return {
                         asset: stringFromBytes32(spotBalance.asset),
                         amount: spotBalance.amount,
