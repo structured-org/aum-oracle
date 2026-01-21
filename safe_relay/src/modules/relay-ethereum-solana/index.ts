@@ -213,7 +213,9 @@ export default class RelaySolana implements Manager {
                         `Executed proposal ${proposal.transactionIndex} -- ${txhash}`,
                     );
                 } catch (e: any) {
-                    if (/InvalidTimestamp/.test(e.message.toString())) {
+                    // TODO: error message has been changed to `InvalidTimestamp` in the upstream Solana program.
+                    //       once we deploy it, we will have to update the following regexp here.
+                    if (/SameTimestamp/.test(e.message.toString())) {
                         this.logger.warn(
                             `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
                         );
