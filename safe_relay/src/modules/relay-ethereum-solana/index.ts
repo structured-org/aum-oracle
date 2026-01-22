@@ -177,8 +177,7 @@ export default class RelaySolana implements Manager {
         );
     }
 
-    async createProposal() {
-        const aumEthereumData = await this.getEthereumAumData();
+    async createProposal(aumEthereumData: AumDataEthereum) {
         const aumSolanaData = await this.getSolanaAumData();
 
         /* Check the freshness and if the new state needs to be submitted, propose */
@@ -196,6 +195,8 @@ export default class RelaySolana implements Manager {
         await new Promise((resolve) =>
             setTimeout(resolve, this.solana.proposalDelay * this.msParticipantIndex! * 1000),
         );
+
+        const aumEthereumData = await this.getEthereumAumData();
 
         /* Get all the proposals that are either Active of Approved */
         const proposals = (await this.squadsMultisig?.getPendingProposals())!;
@@ -219,7 +220,7 @@ export default class RelaySolana implements Manager {
                         this.logger.warn(
                             `Outdated timestamp proposal -- ${proposal.transactionIndex}`,
                         );
-                        await this.createProposal();
+                        await this.createProposal(aumEthereumData);
                     } else {
                         this.logger.warn(
                             `Unknown error happened -- ${proposal.transactionIndex}`,
@@ -238,7 +239,7 @@ export default class RelaySolana implements Manager {
                 const batchIxs = await this.squadsMultisig?.getBatchIxs(
                     Number(proposal.transactionIndex!.toString()),
                 );
-                if (!await this.validateIxs(batchIxs!)) {
+                if (!await this.validateIxs(batchIxs!, aumEthereumData)) {
                     this.logger.warn(`Invalid proposal -- ${proposal.transactionIndex}`);
                     return;
                 }
@@ -251,13 +252,12 @@ export default class RelaySolana implements Manager {
                 );
             }
         } else {
-            await this.createProposal();
+            await this.createProposal(aumEthereumData);
         }
     }
 
-    private async validateIxs(ixs: Array<VaultTransaction>): Promise<boolean> {
+    private async validateIxs(ixs: Array<VaultTransaction>, aumEthereumData: AumDataEthereum): Promise<boolean> {
         const DISCRIMINATOR = "230,18,158,253,73,167,115,188";
-        const aumEthereumData = await this.getEthereumAumData();
         return ixs.entries().every(([, transaction]) =>
             transaction.message?.instructions.every(instruction => {
                 const buffer = Array.from(instruction.data);
