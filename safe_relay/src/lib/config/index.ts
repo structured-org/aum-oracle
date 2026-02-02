@@ -85,54 +85,28 @@ export class Config {
   private createProcessedConfig(): ProcessedConfig {
     const config: ProcessedConfig = {
       serviceConfig: this.tomlData?.serviceConfig,
-      neutron: {
-        twaerContract: this.tomlData?.neutron.twaerContract!,
-        binanceAum: this.tomlData?.neutron.binanceAum!,
-        rpc: this.tomlData?.neutron.rpc!,
-      },
     };
-    if (this.tomlData?.ethereum.enabled) {
-      if (!this.envData.ETHEREUM_MNEMONIC) {
-        throw new Error(
-          'ETHEREUM_MNEMONIC is required when EthereumClaim module is enabled',
-        );
-      }
-      if (!this.envData.SAFE_API_KEY) {
-        throw new Error(
-          'SAFE_API_KEY is required when EthereumClaim module is enabled',
-        );
-      }
-      config.ethereum = {
-        mnemonic: this.envData.ETHEREUM_MNEMONIC,
-        enabled: this.tomlData?.ethereum.enabled!,
-        proposalDelay: this.tomlData?.ethereum.proposalDelay!,
-        safeAddress: this.tomlData?.ethereum.safeAddress!,
-        safeApiKey: this.envData.SAFE_API_KEY,
-        receiverAddress: this.tomlData?.ethereum.receiverAddress!,
-        verifyValuesOnVote: this.tomlData?.ethereum.verifyValuesOnVote!,
-        rpc: this.tomlData?.ethereum.rpc!,
-      };
+    config.ethereum = {
+      rpc: this.tomlData?.ethereum.rpc!,
+      binanceAum: this.tomlData?.ethereum.binanceAum!,
+    };
+    if (!this.envData.SOLANA_SEED_PATH && !this.envData.SOLANA_MNEMONIC) {
+      throw new Error(
+        'SOLANA_SEED_PATH or SOLANA_MNEMONIC is required',
+      );
     }
-    if (this.tomlData?.solana.enabled) {
-      if (!this.envData.SOLANA_SEED_PATH && !this.envData.SOLANA_MNEMONIC) {
-        throw new Error(
-          'SOLANA_SEED_PATH or SOLANA_MNEMONIC is required when SolanaClaim module is enabled',
-        );
-      }
-      config.solana = {
-        rpc: this.tomlData?.solana.rpc!,
-        enabled: this.tomlData?.solana.enabled!,
-        proposalDelay: this.tomlData?.solana.proposalDelay!,
-        oracleProgramId: this.tomlData?.solana.oracleProgramId,
-        multisigAddress: this.tomlData?.solana.multisigAddress,
-        vaultPda: this.tomlData?.solana.vaultPda,
-        aumOracleSol: this.tomlData?.solana.aumOracleSol,
-        seed: Uint8Array.from(
-            JSON.parse(fs.readFileSync(this.envData.SOLANA_SEED_PATH!, 'utf-8')),
-        ),
-        mnemonic: this.envData.SOLANA_MNEMONIC,
-      };
-    }
+    config.solana = {
+      rpc: this.tomlData?.solana.rpc!,
+      proposalDelay: this.tomlData?.solana.proposalDelay!,
+      oracleProgramId: this.tomlData?.solana.oracleProgramId!,
+      multisigAddress: this.tomlData?.solana.multisigAddress!,
+      vaultPda: this.tomlData?.solana.vaultPda!,
+      aumOracleSol: this.tomlData?.solana.aumOracleSol!,
+      seed: Uint8Array.from(
+        JSON.parse(fs.readFileSync(this.envData.SOLANA_SEED_PATH!, 'utf-8')),
+      ),
+      mnemonic: this.envData.SOLANA_MNEMONIC,
+    };
 
     return config;
   }
@@ -143,10 +117,6 @@ export class Config {
 
   get ethereum() {
     return this.processedConfig?.ethereum;
-  }
-
-  get neutron() {
-    return this.processedConfig?.neutron;
   }
 
   get solana() {
