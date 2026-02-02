@@ -1,0 +1,15 @@
+[serviceConfig]
+logLevel = "trace"
+callInterval = 60
+
+[ethereum]
+rpc = ""
+binanceAum = ""
+
+[solana]
+proposalDelay = 5
+oracleProgramId = ""
+multisigAddress = ""
+vaultPda = ""
+aumOracleSol = ""
+rpc = ""

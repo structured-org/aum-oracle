@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "types": ["node"],
+    "module": "commonjs",
+    "lib": ["esnext", "DOM"],
+    "outDir": "lib",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "strict": true,
+    "noErrorTruncation": true
+  },
+  "exclude": ["node_modules"]
+}
