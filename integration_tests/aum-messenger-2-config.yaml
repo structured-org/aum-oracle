@@ -14,9 +14,13 @@ jupiter_custodies:
   WBTC: "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm"
   USDC: "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa"
   USDT: "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
-jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
 jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
-jupiter_strategy_address: "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf"
+solana_balances_list:
+  "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf":
+    - "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+    - "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
+solana_token_supply_list:
+  - "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
 
 binance_aum_contract: "neutron1u6shqnk4k5fza2exaet4gyczc4td8drnnclgu0ngn00lurmlu3tqpwjugm"
 jupiter_aum_contract: "neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj"

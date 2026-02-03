@@ -14,6 +14,7 @@ import {
   JupiterPerpsCustodyAccount,
   JupiterPoolAccount,
   SolanaUiTokenAmount,
+  SolanaTokenMint,
   MockController,
 } from '../helpers/messenger';
 
@@ -73,8 +74,9 @@ describe('Mock controller', () => {
       spotAccountInfo?: BinanceSpotAccountInfo;
       custodyInfo?: JupiterPerpsCustodyAccount;
       poolInfo?: JupiterPoolAccount;
-      tokenSupply?: SolanaUiTokenAmount;
+      tokenMint?: SolanaTokenMint;
       tokenAccountBalance?: SolanaUiTokenAmount;
+      nativeBalance?: SolanaUiTokenAmount;
     } = {};
 
     describe('GET - Fetch initial mock data', () => {
@@ -114,16 +116,22 @@ describe('Mock controller', () => {
         initialData.poolInfo = poolInfo;
       });
 
-      it('should fetch initial Solana token supply', async () => {
-        const tokenSupply = await mockController.getSolanaTokenSupply();
-        expect(tokenSupply).toBeTruthy();
-        initialData.tokenSupply = tokenSupply;
+      it('should fetch initial Solana token mint', async () => {
+        const tokenMint = await mockController.getSolanaTokenMint();
+        expect(tokenMint).toBeTruthy();
+        initialData.tokenMint = tokenMint;
       });
 
       it('should fetch initial Solana token account balance', async () => {
         const tokenAccountBalance = await mockController.getSolanaTokenAccountBalance(sampleTokenPublicKey);
         expect(tokenAccountBalance).toBeTruthy();
         initialData.tokenAccountBalance = tokenAccountBalance;
+      });
+
+      it('should fetch initial Solana native balance', async () => {
+        const nativeBalance = await mockController.getSolanaNativeBalance();
+        expect(nativeBalance).toBeTruthy();
+        initialData.nativeBalance = nativeBalance;
       });
     });
 
@@ -134,8 +142,9 @@ describe('Mock controller', () => {
       spotAccountInfo?: BinanceSpotAccountInfo;
       custodyInfo?: JupiterPerpsCustodyAccount;
       poolInfo?: JupiterPoolAccount;
-      tokenSupply?: SolanaUiTokenAmount;
+      tokenMint?: SolanaTokenMint;
       tokenAccountBalance?: SolanaUiTokenAmount;
+      nativeBalance?: SolanaUiTokenAmount;
     } = {};
 
     describe('POST - Set modified mock data', () => {
@@ -215,14 +224,19 @@ describe('Mock controller', () => {
           },
         };
 
-        modifiedData.tokenSupply = {
-          ...initialData.tokenSupply,
-          amount: (BigInt(initialData.tokenSupply.amount) + BigInt('1000000000')).toString(),
+        modifiedData.tokenMint = {
+          ...initialData.tokenMint,
+          Supply: initialData.tokenMint.Supply + 1000000000,
         };
 
         modifiedData.tokenAccountBalance = {
           ...initialData.tokenAccountBalance,
           amount: (BigInt(initialData.tokenAccountBalance.amount) + BigInt('500000000')).toString(),
+        };
+
+        modifiedData.nativeBalance = {
+          ...initialData.nativeBalance,
+          amount: (BigInt(initialData.nativeBalance.amount) + BigInt('1000000000')).toString(),
         };
       });
 
@@ -250,12 +264,16 @@ describe('Mock controller', () => {
         await mockController.setJupiterPoolInfo(modifiedData.poolInfo);
       });
 
-      it('should set modified Solana token supply', async () => {
-        await mockController.setSolanaTokenSupply(modifiedData.tokenSupply);
+      it('should set modified Solana token mint', async () => {
+        await mockController.setSolanaTokenMint(modifiedData.tokenMint);
       });
 
       it('should set modified Solana token account balance', async () => {
         await mockController.setSolanaTokenAccountBalance(sampleTokenPublicKey, modifiedData.tokenAccountBalance);
+      });
+
+      it('should set modified Solana native balance', async () => {
+        await mockController.setSolanaNativeBalance(modifiedData.nativeBalance);
       });
     });
 
@@ -290,14 +308,19 @@ describe('Mock controller', () => {
         expect(updatedPoolInfo).toEqual(modifiedData.poolInfo);
       });
 
-      it('should verify modified Solana token supply', async () => {
-        const updatedTokenSupply = await mockController.getSolanaTokenSupply();
-        expect(updatedTokenSupply).toEqual(modifiedData.tokenSupply);
+      it('should verify modified Solana token mint', async () => {
+        const updatedTokenMint = await mockController.getSolanaTokenMint();
+        expect(updatedTokenMint).toEqual(modifiedData.tokenMint);
       });
 
       it('should verify modified Solana token account balance', async () => {
         const updatedTokenBalance = await mockController.getSolanaTokenAccountBalance(sampleTokenPublicKey);
         expect(updatedTokenBalance).toEqual(modifiedData.tokenAccountBalance);
+      });
+
+      it('should verify modified Solana native balance', async () => {
+        const updatedNativeBalance = await mockController.getSolanaNativeBalance();
+        expect(updatedNativeBalance).toEqual(modifiedData.nativeBalance);
       });
     });
   });

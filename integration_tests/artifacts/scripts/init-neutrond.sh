@@ -738,8 +738,16 @@ JUPITER_AUM_RECEIVER_INIT_MSG='{
   "data_delta_ppm": 10000,
   "round_length": 15,
   "consensus_data_valid_period": 60,
+  "price_data_valid_period": 100,
   "required_custody_assets": ["SOL", "USDC", "USDT", "WBTC", "WETH"],
-  "price_data_valid_period": 100
+  "required_solana_balances": {
+    "AYBzGpmCGLvLJQHAKEFZGBAm3R8yER7K4c3GZ2YgMEnf": ["27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4","7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"]
+  },
+  "required_solana_token_total_supply": ["27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"],
+  "solana_slinky_map": {
+    "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {"slinky":{"asset": "ETH"}}, 
+    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4": "jlp"
+  }
 }'
 
 echo "Instantiate contracts"

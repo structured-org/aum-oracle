@@ -16,3 +16,4 @@ cw-ownable = { workspace = true }
 ed25519-zebra = { workspace = true }
 consensus = { path = "../consensus" }
 aum-receiver-common = { path = "../aum-receiver-common" }
+neutron-std = {workspace = true}

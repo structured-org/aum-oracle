@@ -201,16 +201,43 @@
         }
       ]
     },
+    "SolanaBalance": {
+      "description": "Represents a single asset balance on a Solana account.",
+      "type": "object",
+      "required": [
+        "address",
+        "amount",
+        "asset"
+      ],
+      "properties": {
+        "address": {
+          "description": "Address of the account.",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Amount of the asset on the account balance.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            }
+          ]
+        },
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "SolanaData": {
       "description": "SolanaData represents the off-chain data pulled from the Solana blockchain specifically for Jupiter AUM (Assets Under Management) calculation.",
       "type": "object",
       "required": [
         "aum_usd",
         "custody_assets",
-        "strategy_jlp_balance",
-        "strategy_jlp_balance_decimals",
-        "total_jlp_supply",
-        "total_jlp_supply_decimals"
+        "solana_balances",
+        "solana_token_decimals",
+        "solana_token_total_supply"
       ],
       "properties": {
         "aum_usd": {
@@ -228,33 +255,70 @@
             "$ref": "#/definitions/CustodyAsset"
           }
         },
-        "strategy_jlp_balance": {
-          "description": "The balance of JLP tokens held by the strategy.",
+        "solana_balances": {
+          "description": "Contains information about asset balances on Solana accounts",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaBalance"
+          }
+        },
+        "solana_token_decimals": {
+          "description": "Contains information about token decimals on Solana",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaTokenDecimals"
+          }
+        },
+        "solana_token_total_supply": {
+          "description": "Contains information about the total supply of Solana tokens",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SolanaTokenTotalSupply"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SolanaTokenDecimals": {
+      "description": "Represents the decimals of a token on Solana.",
+      "type": "object",
+      "required": [
+        "asset",
+        "decimals"
+      ],
+      "properties": {
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        },
+        "decimals": {
+          "description": "Decimals of the asset.",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SolanaTokenTotalSupply": {
+      "description": "Represents the total supply of a token on Solana.",
+      "type": "object",
+      "required": [
+        "asset",
+        "total_supply"
+      ],
+      "properties": {
+        "asset": {
+          "description": "Asset name.",
+          "type": "string"
+        },
+        "total_supply": {
+          "description": "Total supply of the asset.",
           "allOf": [
             {
               "$ref": "#/definitions/Uint128"
             }
           ]
-        },
-        "strategy_jlp_balance_decimals": {
-          "description": "JLP token balance decimal precision",
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0.0
-        },
-        "total_jlp_supply": {
-          "description": "The total supply of JLP (Jupiter Liquidity Provider) tokens.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Uint128"
-            }
-          ]
-        },
-        "total_jlp_supply_decimals": {
-          "description": "JLP token supply decimal precision",
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -279,7 +343,7 @@
       "type": "object",
       "properties": {
         "consensus_data_valid_period": {
-          "description": "Contract config updates.\n\nNew validity period for data in seconds.",
+          "description": "New validity period for data in seconds.",
           "type": [
             "integer",
             "null"
@@ -296,8 +360,15 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "jlp_token": {
+          "description": "New address of the JLP token used in AUM calculations. Must be specified in the required_solana_balances along with strategy_address.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "messengers": {
-          "description": "Consensus configuration updates\n\nNew list of messengers.",
+          "description": "New list of messengers.",
           "type": [
             "array",
             "null"
@@ -325,6 +396,24 @@
             "type": "string"
           }
         },
+        "required_solana_balances": {
+          "description": "New list of solana addresses (key) which balances of assets (value) are required for consensus. Must contain jlp_token balance tracking for the strategy_address.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false
+        },
+        "required_solana_token_total_supply": {
+          "description": "New list of solana tokens which total supply is required for consensus.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "round_length": {
           "description": "New round length in seconds.",
           "type": [
@@ -333,6 +422,21 @@
           ],
           "format": "uint64",
           "minimum": 0.0
+        },
+        "solana_slinky_map": {
+          "description": "New map of Solana asset names to Slinky oracle asset names for price lookups",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false
+        },
+        "strategy_address": {
+          "description": "New address of the strategy contract used in AUM calculations. Must be specified in the required_solana_balances along with jlp_token.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "threshold": {
           "description": "New threshold needed for consensus.",

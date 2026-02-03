@@ -175,18 +175,18 @@ export class MockController {
   }
 
   /**
-   * Set mock Solana token supply
+   * Set mock Solana token mint
    */
-  async setSolanaTokenSupply(tokenSupply: SolanaUiTokenAmount): Promise<void> {
-    await this.postToMockController('/mock/solana/tokensupply', tokenSupply);
+  async setSolanaTokenMint(tokenMint: SolanaTokenMint): Promise<void> {
+    await this.postToMockController('/mock/solana/tokenmint', tokenMint);
   }
 
   /**
-   * Get current mock Solana token supply
+   * Get current mock Solana token mint
    */
-  async getSolanaTokenSupply(): Promise<SolanaUiTokenAmount> {
-    return this.getFromMockController<SolanaUiTokenAmount>(
-      '/mock/solana/tokensupply',
+  async getSolanaTokenMint(): Promise<SolanaTokenMint> {
+    return this.getFromMockController<SolanaTokenMint>(
+      '/mock/solana/tokenmint',
     );
   }
 
@@ -222,6 +222,21 @@ export class MockController {
     );
   }
 
+  /**
+   * Set mock Solana native balance
+   */
+  async setSolanaNativeBalance(balance: SolanaUiTokenAmount): Promise<void> {
+    await this.postToMockController('/mock/solana/nativebalance', balance);
+  }
+
+  /**
+   * Get current mock Solana native balance
+   */
+  async getSolanaNativeBalance(): Promise<SolanaUiTokenAmount> {
+    return this.getFromMockController<SolanaUiTokenAmount>(
+      '/mock/solana/nativebalance',
+    );
+  }
   /**
    * Enable timeouts for binance queries
    */
@@ -508,4 +523,10 @@ export interface SolanaUiTokenAmount {
 export interface SolanaTokenAccountBalanceRequest {
   publicKey: string; // Token's PublicKey as base58 string
   data: SolanaUiTokenAmount;
+}
+
+// Solana Token Mint
+export interface SolanaTokenMint {
+  Supply: number; // capitalized because json tag isn't defined in respective go struct
+  Decimals: number; // capitalized because json tag isn't defined in respective go struct
 }

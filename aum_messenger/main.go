@@ -136,11 +136,21 @@ func main() {
 	for token, programId := range conf.JupiterCustodies {
 		jupiterCustodies[token] = solana.MustPublicKeyFromBase58(programId)
 	}
+	solanaBalancesList := make(map[solana.PublicKey][]string)
+	for address, tokens := range conf.SolanaBalancesList {
+		for _, token := range tokens {
+			solanaBalancesList[solana.MustPublicKeyFromBase58(address)] = append(solanaBalancesList[solana.MustPublicKeyFromBase58(address)], token)
+		}
+	}
+	solanaTokenSupplyList := make([]solana.PublicKey, 0, len(conf.SolanaTokenSupplyList))
+	for _, token := range conf.SolanaTokenSupplyList {
+		solanaTokenSupplyList = append(solanaTokenSupplyList, solana.MustPublicKeyFromBase58(token))
+	}
 	jupiterConfig := jupitermsgr.JupiterConfig{
-		Custodies: jupiterCustodies,
-		Token:     solana.MustPublicKeyFromBase58(conf.JupiterJlpToken),
-		Pool:      solana.MustPublicKeyFromBase58(conf.JupiterPool),
-		Strategy:  solana.MustPublicKeyFromBase58(conf.JupiterStrategyAddress),
+		Custodies:             jupiterCustodies,
+		Pool:                  solana.MustPublicKeyFromBase58(conf.JupiterPool),
+		SolanaBalancesList:    solanaBalancesList,
+		SolanaTokenSupplyList: solanaTokenSupplyList,
 	}
 	jupiterMsgrForNeutron := jupitermsgr.NewJupiterAumMessengerForNeutron(
 		jupiterMsgrForNeutronDeps.solanaClient,

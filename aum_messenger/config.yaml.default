@@ -14,9 +14,13 @@ jupiter_custodies:
   WBTC: "5Pv3gM9JrFFH883SWAhvJC9RPYmo8UNxuFtv5bMMALkm"
   USDC: "G18jKKXQwBbrHeiK3C9MRXhkHsLHf7XgCSisykV46EZa"
   USDT: "4vkNeXiYEUizLdrpdPS1eC2mccyM4NUPRtERrk6ZETkk"
-jupiter_jlp_token: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
 jupiter_jlp_pool: "5BUwFW4nRbftYTDMbgxykoFWqWHPzahFSNAaaaJtVKsq"
-jupiter_strategy_address: ""
+solana_balances_list:
+  "": # address
+    - "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+    - "SOL"
+solana_token_supply_list:
+  - "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
 
 jupiter_aum_contract: ""
 binance_aum_contract: ""

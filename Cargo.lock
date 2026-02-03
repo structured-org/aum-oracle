@@ -821,13 +821,14 @@ dependencies = [
  "cosmwasm-std",
  "cw-ownable",
  "ed25519-zebra",
+ "neutron-std",
  "serde",
  "thiserror",
 ]
 
 [[package]]
 name = "jupiter-aum-receiver"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aum-receiver-common",
  "consensus",
@@ -839,6 +840,7 @@ dependencies = [
  "ed25519-zebra",
  "jupiter-aum-common",
  "neutron-std",
+ "serde_json",
 ]
 
 [[package]]

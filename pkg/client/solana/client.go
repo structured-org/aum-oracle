@@ -6,7 +6,16 @@ import (
 	"time"
 
 	solana "github.com/gagliardetto/solana-go"
+	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
+)
+
+const (
+	// SolanaNativeTokenDecimals is the number of decimals of SOL. 1 SOL is represented as
+	// 1,000,000,000 lamports which are its smallest units.
+	SolanaNativeTokenDecimals = 9
+	// SolanaNativeTokenName is the name of the native token of Solana.
+	SolanaNativeTokenName = "SOL"
 )
 
 // Client is a client for Solana.
@@ -42,14 +51,13 @@ func (c *Client) SubmitBinanceAumData(ctx context.Context, data *BinanceAumData)
 	}, nil
 }
 
-// GetTokenSupply gets the token total supply.
-func (c *Client) GetTokenSupply(ctx context.Context, token solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
-	supply, err := c.client.GetTokenSupply(ctx, token, solanarpc.CommitmentFinalized)
-	if err != nil {
+// GetTokenMint gets the token mint account info.
+func (c *Client) GetTokenMint(ctx context.Context, tokenPubKey solana.PublicKey) (*solanatoken.Mint, error) {
+	mint := &solanatoken.Mint{}
+	if err := c.client.GetAccountDataBorshInto(ctx, tokenPubKey, mint); err != nil {
 		return nil, err
 	}
-
-	return supply.Value, nil
+	return mint, nil
 }
 
 // GetTokenAccountBalance gets the token account balance.
@@ -65,4 +73,17 @@ func (c *Client) GetTokenAccountBalance(ctx context.Context, token solana.Public
 	}
 
 	return balance.Value, nil
+}
+
+// GetNativeBalance gets the SOL balance of an account.
+func (c *Client) GetNativeBalance(ctx context.Context, account solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
+	balance, err := c.client.GetBalance(ctx, account, solanarpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+
+	return &solanarpc.UiTokenAmount{
+		Amount:   fmt.Sprintf("%d", balance.Value),
+		Decimals: SolanaNativeTokenDecimals,
+	}, nil
 }

@@ -1,4 +1,6 @@
-use crate::contract::{calculate_aum_in_wbtc, execute, instantiate, query};
+use crate::contract::{
+    calculate_aum, calculate_aum_in_wbtc, execute, get_jlp_price_in_usd, instantiate, query,
+};
 use crate::state::{CONFIG, CONSENSUS_STATE};
 use crate::testing::mock_querier::{mock_dependencies, WasmMockQuerier};
 use aum_receiver_common::types::GetAumResponse;
@@ -14,7 +16,11 @@ use jupiter_aum_common::error::ContractError;
 use jupiter_aum_common::msg;
 use jupiter_aum_common::msg::ExecuteMsg::UpdateConfig;
 use jupiter_aum_common::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use jupiter_aum_common::types::{CustodyAsset, SolanaData};
+use jupiter_aum_common::types::{
+    Config, CustodyAsset, PriceTicker, SolanaBalance, SolanaData, SolanaTokenDecimals,
+    SolanaTokenTotalSupply,
+};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 // Helper to create a default instantiate message
@@ -32,6 +38,12 @@ fn default_init_msg(api: &MockApi) -> InstantiateMsg {
         consensus_data_valid_period: 1_000,
         required_custody_assets: vec!["USDC".to_string()],
         price_data_valid_period: 100,
+        required_solana_balances: HashMap::from([(
+            "strategy".to_string(),
+            vec!["jlp_token".to_string()],
+        )]),
+        required_solana_token_total_supply: vec!["jlp_token".to_string()],
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
     }
 }
 
@@ -181,6 +193,15 @@ fn test_update_config() {
         threshold: Some(1),
         data_delta_ppm: Some(1234),
         round_length: Some(99),
+        required_solana_balances: Some(HashMap::from([(
+            "new_strategy".to_string(),
+            vec!["new_jlp_token".to_string()],
+        )])),
+        required_solana_token_total_supply: Some(vec!["new_jlp_token".to_string()]),
+        solana_slinky_map: Some(HashMap::from([(
+            "new_jlp_token".to_string(),
+            PriceTicker::Jlp,
+        )])),
     };
 
     let update_msg = UpdateConfig {
@@ -206,6 +227,21 @@ fn test_update_config() {
     assert_eq!(config.consensus_data_valid_period, 50_000);
     assert_eq!(config.required_custody_assets, vec!["BTC"]);
     assert_eq!(config.price_data_valid_period, 999);
+    assert_eq!(
+        config.required_solana_balances,
+        HashMap::from([(
+            "new_strategy".to_string(),
+            vec!["new_jlp_token".to_string()],
+        )])
+    );
+    assert_eq!(
+        config.required_solana_token_total_supply,
+        vec!["new_jlp_token".to_string()]
+    );
+    assert_eq!(
+        config.solana_slinky_map,
+        HashMap::from([("new_jlp_token".to_string(), PriceTicker::Jlp,)])
+    );
 
     // Pending config also updated
     let consensus = CONSENSUS_STATE.pending_config.load(&deps.storage).unwrap();
@@ -232,6 +268,9 @@ fn test_update_config_validation() {
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
         new_config: update.clone(),
@@ -252,6 +291,9 @@ fn test_update_config_validation() {
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
         new_config: update.clone(),
@@ -272,6 +314,9 @@ fn test_update_config_validation() {
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
         new_config: update.clone(),
@@ -301,6 +346,9 @@ fn test_update_config_validation() {
         threshold: None,
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
         new_config: update.clone(),
@@ -321,6 +369,9 @@ fn test_update_config_validation() {
         threshold: Some(0),
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig {
         new_config: update.clone(),
@@ -341,6 +392,9 @@ fn test_update_config_validation() {
         threshold: Some(msg.messengers.len() as u32 + 1),
         data_delta_ppm: None,
         round_length: None,
+        required_solana_balances: None,
+        required_solana_token_total_supply: None,
+        solana_slinky_map: None,
     };
     let update_msg = UpdateConfig { new_config: update };
     let result = execute(deps.as_mut(), env, owner_info, update_msg);
@@ -357,16 +411,37 @@ fn test_calculate_aum_in_wbtc() {
     let data1 = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(500_000), // $500,000 AUM USD
-        total_jlp_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
-        strategy_jlp_balance: Uint128::new(10_000_000_000u128), // 10,000 JLP balance
-        total_jlp_supply_decimals: 6,
-        strategy_jlp_balance_decimals: 6,
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(10_000_000_000), // 10,000 JLP balance
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "jlp_token".to_string(),
+            total_supply: Uint128::new(1_000_000_000), // 1,000 JLP total supply
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "jlp_token".to_string(),
+            decimals: 6,
+        }],
     };
     let btc_price_in_usd1 = SignedDecimal256::from_str("25000.0").unwrap(); // $25,000 per BTC
                                                                             // jlp_virtual_price = 500,000 / 1,000 = 500 USD/JLP
                                                                             // jlp_balance_in_usd = 500 * 10,000 = 5,000,000 USD
                                                                             // aum_in_btc = 5,000,000 / 25,000 = 200 BTC
-    let res1 = calculate_aum_in_wbtc(data1, btc_price_in_usd1);
+    let jlp_virtual_price = get_jlp_price_in_usd(&data1, "jlp_token").unwrap();
+    assert_eq!(
+        jlp_virtual_price,
+        SignedDecimal256::from_str("500").unwrap(),
+        "Test Case 1 Failed"
+    );
+    let mut prices: HashMap<String, SignedDecimal256> = HashMap::new();
+    prices.insert(
+        "jlp_token".to_string(),
+        jlp_virtual_price.checked_div(btc_price_in_usd1).unwrap(),
+    );
+
+    let res1 = calculate_aum_in_wbtc(prices, data1);
     assert_eq!(
         res1.unwrap(),
         Int256::from(20_000_000_000_i128),
@@ -376,17 +451,37 @@ fn test_calculate_aum_in_wbtc() {
     // Test case 2: Different values
     let data2 = SolanaData {
         custody_assets: vec![],
-        aum_usd: Uint128::new(1_000_000_000u128), // $1 Billion AUM
-        total_jlp_supply: Uint128::new(50_000_000_000u128), // 50,000 JLP total
-        strategy_jlp_balance: Uint128::new(20_000_000_000u128), // 20,000 JLP balance
-        total_jlp_supply_decimals: 6,
-        strategy_jlp_balance_decimals: 6,
+        aum_usd: Uint128::new(1_000_000_000), // $1 Billion AUM
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(20_000_000_000), // 20,000 JLP balance
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "jlp_token".to_string(),
+            total_supply: Uint128::new(50_000_000_000), // 50,000 JLP total supply
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "jlp_token".to_string(),
+            decimals: 6,
+        }],
     };
     let btc_price_in_usd2 = SignedDecimal256::from_str("50000.0").unwrap(); // $50,000 per BTC
                                                                             // jlp_virtual_price = 1,000,000,000 / 50,000 = 20,000 USD/JLP
                                                                             // jlp_balance_in_usd = 20,000 * 20,000 = 400,000,000 USD
                                                                             // aum_in_btc = 400,000,000 / 50,000 = 8,000 BTC
-    let res2 = calculate_aum_in_wbtc(data2, btc_price_in_usd2);
+    let jlp_virtual_price2 = get_jlp_price_in_usd(&data2, "jlp_token").unwrap();
+    assert_eq!(
+        jlp_virtual_price2,
+        SignedDecimal256::from_str("20000").unwrap(),
+        "Test Case 2 Failed"
+    );
+    let mut prices2: HashMap<String, SignedDecimal256> = HashMap::new();
+    prices2.insert(
+        "jlp_token".to_string(),
+        jlp_virtual_price2.checked_div(btc_price_in_usd2).unwrap(),
+    );
+    let res2 = calculate_aum_in_wbtc(prices2, data2);
     assert_eq!(
         res2.unwrap(),
         Int256::from(800_000_000_000_i128),
@@ -397,34 +492,79 @@ fn test_calculate_aum_in_wbtc() {
     let data3 = SolanaData {
         custody_assets: vec![],
         aum_usd: Uint128::new(100),
-        total_jlp_supply: Uint128::zero(), // Zero supply
-        strategy_jlp_balance: Uint128::new(10),
-        total_jlp_supply_decimals: 6,
-        strategy_jlp_balance_decimals: 6,
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(10), // 10 JLP balance
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "jlp_token".to_string(),
+            total_supply: Uint128::zero(), // Zero supply
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "jlp_token".to_string(),
+            decimals: 6,
+        }],
     };
-    let btc_price_in_usd3 = SignedDecimal256::from_str("1.0").unwrap();
-    let err3 = calculate_aum_in_wbtc(data3, btc_price_in_usd3).unwrap_err();
+    let err3 = get_jlp_price_in_usd(&data3, "jlp_token").unwrap_err();
     assert!(
         matches!(&err3, ContractError::CheckedDiv(_)),
         "Test Case 3 Failed: {:?}",
         err3
     );
+}
 
-    // Test case 4: Division by zero for btc_price_in_usd
-    let data4 = SolanaData {
+#[test]
+fn test_calculate_aum_in_wbtc_missing_jlp_total_supply() {
+    let data = SolanaData {
         custody_assets: vec![],
-        aum_usd: Uint128::new(100),
-        total_jlp_supply: Uint128::new(10),
-        strategy_jlp_balance: Uint128::new(5),
-        total_jlp_supply_decimals: 6,
-        strategy_jlp_balance_decimals: 6,
+        aum_usd: Uint128::new(500_000),
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(10_000_000_000),
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "some_token".to_string(), // missing JLP total supply
+            total_supply: Uint128::new(1_000_000_000),
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "jlp_token".to_string(),
+            decimals: 6,
+        }],
     };
-    let btc_price_in_usd4 = SignedDecimal256::from_str("0.0").unwrap(); // Zero BTC price
-    let err4 = calculate_aum_in_wbtc(data4, btc_price_in_usd4).unwrap_err();
-    assert!(
-        matches!(&err4, ContractError::CheckedDiv(_)),
-        "Test Case 4 Failed: {:?}",
-        err4
+    assert_eq!(
+        get_jlp_price_in_usd(&data, "jlp_token").unwrap_err(),
+        ContractError::CrucialConsensusDataMissing {
+            details: "JLP total supply".to_string()
+        }
+    );
+}
+
+#[test]
+fn test_calculate_aum_in_wbtc_missing_jlp_decimals() {
+    let data = SolanaData {
+        custody_assets: vec![],
+        aum_usd: Uint128::new(500_000),
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(10_000_000_000),
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "jlp_token".to_string(),
+            total_supply: Uint128::new(1_000_000_000),
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "some_token".to_string(), // missing JLP decimals
+            decimals: 6,
+        }],
+    };
+    assert_eq!(
+        get_jlp_price_in_usd(&data, "jlp_token").unwrap_err(),
+        ContractError::CrucialConsensusDataMissing {
+            details: "JLP decimals".to_string()
+        }
     );
 }
 
@@ -464,7 +604,7 @@ fn test_query_get_aum_behavior() {
     let (_, exec_res) = publish_till_consensus(mock_dependencies(), &mut env, "".to_string(), 200);
     assert!(matches!(
         exec_res,
-        Err(ContractError::SlinkyBTCPriceIncorrect { price: _, error: _ })
+        Err(ContractError::SlinkyAssetPriceIncorrect { .. })
     ));
 
     // 4. error: BTC price is malformed
@@ -477,7 +617,7 @@ fn test_query_get_aum_behavior() {
     // let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
         exec_res,
-        Err(ContractError::SlinkyBTCPriceIncorrect { .. })
+        Err(ContractError::SlinkyAssetPriceIncorrect { .. })
     ));
 
     // 5. error: BTC price is too old (block_height + max_blocks_old < env.height)
@@ -486,7 +626,7 @@ fn test_query_get_aum_behavior() {
     // let res = query(deps.as_ref(), env.clone(), QueryMsg::GetAum {});
     assert!(matches!(
         exec_res,
-        Err(ContractError::SlinkyBTCPriceTooOld { .. })
+        Err(ContractError::SlinkyAssetPriceTooOld { .. })
     ));
 
     // 6. success: valid price and block height
@@ -656,10 +796,19 @@ fn dummy_solana_data() -> SolanaData {
             denom: "USDC".to_string(),
         }],
         aum_usd: Uint128::new(500_000),
-        total_jlp_supply: Uint128::new(1_000),
-        strategy_jlp_balance: Uint128::new(10_000),
-        total_jlp_supply_decimals: 6,
-        strategy_jlp_balance_decimals: 6,
+        solana_balances: vec![SolanaBalance {
+            address: "strategy".to_string(),
+            asset: "jlp_token".to_string(),
+            amount: Uint128::new(10_000),
+        }],
+        solana_token_total_supply: vec![SolanaTokenTotalSupply {
+            asset: "jlp_token".to_string(),
+            total_supply: Uint128::new(1_000),
+        }],
+        solana_token_decimals: vec![SolanaTokenDecimals {
+            asset: "jlp_token".to_string(),
+            decimals: 6,
+        }],
     }
 }
 
@@ -687,7 +836,9 @@ fn publish_till_consensus(
 
     instantiate(deps.as_mut(), env.clone(), owner_info, msg).unwrap();
 
-    deps.querier.with_price_and_height(price, height);
+    deps.querier.add_price("BTC", price, height);
+    // Set up JLP price for the calculation
+    deps.querier.add_price("JLP", "1000000", height);
 
     let data = dummy_solana_data();
     env.block.time = env.block.time.plus_seconds(101); // next round
@@ -719,4 +870,297 @@ fn publish_till_consensus(
     );
 
     (deps, res)
+}
+
+#[test]
+fn test_calculate_aum_multiple_addresses_and_tokens_success() {
+    let mut deps = mock_dependencies();
+    let mut env = mock_env();
+    // Set block height to ensure prices are not too old
+    env.block.height = 200; // price_data_valid_period is 100, so prices at height 150 are valid until 250
+
+    // Create config with multiple addresses and tokens
+    let config = Config {
+        consensus_data_valid_period: 1_000,
+        price_data_valid_period: 100,
+        required_custody_assets: vec!["USDC".to_string()],
+        required_solana_balances: HashMap::from([
+            (
+                "strategy".to_string(),
+                vec!["jlp_token".to_string(), "token_a".to_string()],
+            ),
+            ("vault_a".to_string(), vec!["token_b".to_string()]),
+        ]),
+        required_solana_token_total_supply: vec![
+            "jlp_token".to_string(),
+            "token_a".to_string(),
+            "token_b".to_string(),
+        ],
+        solana_slinky_map: HashMap::from([
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "token_a".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_A".to_string(),
+                },
+            ),
+            (
+                "token_b".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_B".to_string(),
+                },
+            ),
+        ]),
+    };
+    config.validate().unwrap();
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up mock prices for all assets
+    deps.querier.add_price("BTC", "25000000000", 150); // $25,000 BTC
+    deps.querier.add_price("TOKEN_A", "2000000", 150); // $2 TOKEN_A
+    deps.querier.add_price("TOKEN_B", "500000", 150); // $0.5 TOKEN_B
+
+    // Create test data with multiple addresses and tokens
+    let data = SolanaData {
+        custody_assets: vec![CustodyAsset {
+            owned: 1,
+            locked: 0,
+            guaranteed_usd: 1,
+            decimals: 6,
+            denom: "USDC".to_string(),
+        }],
+        aum_usd: Uint128::new(1_000_000), // $1M AUM
+        solana_balances: vec![
+            SolanaBalance {
+                address: "strategy".to_string(),
+                asset: "jlp_token".to_string(),
+                amount: Uint128::new(500_000_000_000), // 500,000 JLP in strategy
+            },
+            SolanaBalance {
+                address: "strategy".to_string(),
+                asset: "token_a".to_string(),
+                amount: Uint128::new(100_000_000_000_000), // 100,000 TOKEN_A in strategy
+            },
+            SolanaBalance {
+                address: "vault_a".to_string(),
+                asset: "token_b".to_string(),
+                amount: Uint128::new(200_000_000_000_000_000), // 200,000 TOKEN_B in vault_a
+            },
+        ],
+        solana_token_total_supply: vec![
+            SolanaTokenTotalSupply {
+                asset: "jlp_token".to_string(),
+                total_supply: Uint128::new(1_000_000_000_000), // 1M JLP total supply
+            },
+            SolanaTokenTotalSupply {
+                asset: "token_a".to_string(),
+                total_supply: Uint128::new(500_000_000_000_000), // 500K TOKEN_A total supply
+            },
+            SolanaTokenTotalSupply {
+                asset: "token_b".to_string(),
+                total_supply: Uint128::new(1_000_000_000_000_000_000), // 1M TOKEN_B total supply
+            },
+        ],
+        solana_token_decimals: vec![
+            SolanaTokenDecimals {
+                asset: "jlp_token".to_string(),
+                decimals: 6,
+            },
+            SolanaTokenDecimals {
+                asset: "token_a".to_string(),
+                decimals: 9,
+            },
+            SolanaTokenDecimals {
+                asset: "token_b".to_string(),
+                decimals: 12,
+            },
+        ],
+    };
+
+    // Calculate AUM
+    let result = calculate_aum(deps.as_ref(), env, data);
+    if let Err(ref e) = result {
+        println!("Error: {:?}", e);
+    }
+    assert!(result.is_ok());
+
+    let aum_in_wbtc = result.unwrap();
+    // Expected calculation:
+    // JLP virtual price = 1,000,000 / 1,000,000 = $1 per JLP
+    // TOKEN_A price = $2
+    // TOKEN_B price = $0.5
+    // BTC price = $25,000
+    //
+    // JLP in BTC: (500,000 * $1) / $25,000 = 20 BTC
+    // TOKEN_A in BTC: (100,000 * $2) / $25,000 = 8 BTC
+    // TOKEN_B in BTC: (200,000 * $0.5) / $25,000 = 4 BTC
+    // Total: 20 + 8 + 4 = 32 BTC
+    // In wBTC units (8 decimals): 32 * 10^8 = 3,200,000,000
+    assert_eq!(aum_in_wbtc, Int256::from(3_200_000_000_i128));
+}
+
+#[test]
+fn test_calculate_aum_multiple_addresses_and_tokens_missing_price() {
+    let mut deps = mock_dependencies();
+    let mut env = mock_env();
+    // Set block height to ensure prices are not too old
+    env.block.height = 200; // price_data_valid_period is 100, so prices at height 150 are valid until 250
+
+    // Create config with multiple addresses and tokens
+    let config = Config {
+        consensus_data_valid_period: 1_000,
+        price_data_valid_period: 100,
+        required_custody_assets: vec!["USDC".to_string()],
+        required_solana_balances: HashMap::from([(
+            "strategy".to_string(),
+            vec!["jlp_token".to_string(), "token_a".to_string()],
+        )]),
+        required_solana_token_total_supply: vec!["jlp_token".to_string(), "token_a".to_string()],
+        solana_slinky_map: HashMap::from([
+            ("jlp_token".to_string(), PriceTicker::Jlp),
+            (
+                "token_a".to_string(),
+                PriceTicker::Slinky {
+                    asset: "TOKEN_A".to_string(),
+                },
+            ),
+        ]),
+    };
+    config.validate().unwrap();
+    CONFIG.save(deps.as_mut().storage, &config).unwrap();
+
+    // Set up mock prices but missing TOKEN_A price
+    deps.querier.add_price("BTC", "25000000000", 150); // $25,000 BTC
+                                                       // Note: TOKEN_A price is missing
+
+    // Create test data
+    let data = SolanaData {
+        custody_assets: vec![CustodyAsset {
+            owned: 1,
+            locked: 0,
+            guaranteed_usd: 1,
+            decimals: 6,
+            denom: "USDC".to_string(),
+        }],
+        aum_usd: Uint128::new(1_000_000),
+        solana_balances: vec![
+            SolanaBalance {
+                address: "strategy".to_string(),
+                asset: "jlp_token".to_string(),
+                amount: Uint128::new(500_000_000_000),
+            },
+            SolanaBalance {
+                address: "strategy".to_string(),
+                asset: "token_a".to_string(),
+                amount: Uint128::new(100_000_000_000_000),
+            },
+        ],
+        solana_token_total_supply: vec![
+            SolanaTokenTotalSupply {
+                asset: "jlp_token".to_string(),
+                total_supply: Uint128::new(1_000_000_000_000),
+            },
+            SolanaTokenTotalSupply {
+                asset: "token_a".to_string(),
+                total_supply: Uint128::new(500_000_000_000_000),
+            },
+        ],
+        solana_token_decimals: vec![
+            SolanaTokenDecimals {
+                asset: "jlp_token".to_string(),
+                decimals: 6,
+            },
+            SolanaTokenDecimals {
+                asset: "token_a".to_string(),
+                decimals: 9,
+            },
+        ],
+    };
+
+    // Calculate AUM - should fail because TOKEN_A price is missing
+    let result = calculate_aum(deps.as_ref(), env, data);
+    assert!(result.is_err());
+    // The error should be related to missing price for TOKEN_A
+    let error = result.unwrap_err();
+    match error {
+        ContractError::SlinkyAssetPriceMissing { asset } => {
+            assert_eq!(asset, "TOKEN_A");
+        }
+        _ => panic!("Expected SlinkyAssetPriceMissing error, got {:?}", error),
+    }
+}
+
+#[test]
+fn test_migrate() {
+    use crate::contract::migrate;
+    use cosmwasm_schema::cw_serde;
+    use cosmwasm_std::Storage;
+    use jupiter_aum_common::msg::MigrateMsg;
+    use serde_json;
+
+    let mut deps = cosmwasm_std::testing::mock_dependencies();
+    let env = mock_env();
+
+    // simulate pre-migration state
+    #[cw_serde]
+    struct OldConfig {
+        consensus_data_valid_period: u64,
+        required_custody_assets: Vec<String>,
+        price_data_valid_period: u64,
+    }
+    let old_config = OldConfig {
+        consensus_data_valid_period: 650,
+        required_custody_assets: vec![
+            "SOL".to_string(),
+            "USDC".to_string(),
+            "USDT".to_string(),
+            "WBTC".to_string(),
+            "WETH".to_string(),
+        ],
+        price_data_valid_period: 2,
+    };
+    let old_config_bytes = serde_json::to_vec(&old_config).unwrap();
+    deps.storage.set(b"config", &old_config_bytes);
+
+    // execute migration
+    let migrate_msg = MigrateMsg {
+        required_solana_balances: HashMap::from([(
+            "strategy_address".to_string(),
+            vec!["jlp_token".to_string()],
+        )]),
+        required_solana_token_total_supply: vec!["jlp_token".to_string()],
+        solana_slinky_map: HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp)]),
+    };
+    let result = migrate(deps.as_mut(), env, migrate_msg.clone());
+    assert!(result.is_ok(), "Migration should succeed");
+
+    // assert migration succeeds
+    let new_config = CONFIG.load(&deps.storage).unwrap();
+    assert_eq!(
+        new_config.consensus_data_valid_period,
+        old_config.consensus_data_valid_period
+    );
+    assert_eq!(
+        new_config.required_custody_assets,
+        old_config.required_custody_assets
+    );
+    assert_eq!(
+        new_config.price_data_valid_period,
+        old_config.price_data_valid_period
+    );
+    assert_eq!(
+        new_config.required_solana_balances,
+        HashMap::from([(
+            "strategy_address".to_string(),
+            vec!["jlp_token".to_string()],
+        )])
+    );
+    assert_eq!(
+        new_config.required_solana_token_total_supply,
+        vec!["jlp_token".to_string()]
+    );
+    assert_eq!(
+        new_config.solana_slinky_map,
+        HashMap::from([("jlp_token".to_string(), PriceTicker::Jlp,)])
+    );
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	solana "github.com/gagliardetto/solana-go"
+	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 	jupiterclient "github.com/structured-org/aum-messenger/pkg/client/jupiter"
 	neutronclient "github.com/structured-org/aum-messenger/pkg/client/neutron"
@@ -17,8 +18,9 @@ type JupiterClient interface {
 
 // SolanaClient is the definition of the expected Solana client.
 type SolanaClient interface {
-	GetTokenSupply(ctx context.Context, token solana.PublicKey) (*solanarpc.UiTokenAmount, error)
+	GetTokenMint(ctx context.Context, tokenPubKey solana.PublicKey) (*solanatoken.Mint, error)
 	GetTokenAccountBalance(ctx context.Context, token solana.PublicKey, account solana.PublicKey) (*solanarpc.UiTokenAmount, error)
+	GetNativeBalance(ctx context.Context, account solana.PublicKey) (*solanarpc.UiTokenAmount, error)
 }
 
 // NeutronAumReceiverClient is the definition of the expected Neutron AUM receiver client.

@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	solanatoken "github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 )
 
 type MockSolanaClient struct {
 	mu                  sync.RWMutex
-	tokenSupply         *solanarpc.UiTokenAmount
+	tokenMint           *solanatoken.Mint
+	nativeBalance       *solanarpc.UiTokenAmount
 	tokenAccountBalance map[solana.PublicKey]*solanarpc.UiTokenAmount // Map token address to balance
 	timeoutEnabled      bool
 }
@@ -30,34 +32,43 @@ func (m *MockSolanaClient) loadDefaultData() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Load tokenSupply
-	tokenSupplyData, err := MockDataFolder.ReadFile("mock_data/solana/tokenSupply.json")
+	// Load tokenMint
+	tokenMintData, err := MockDataFolder.ReadFile("mock_data/solana/tokenMint.json")
 	if err != nil {
-		panic(fmt.Sprintf("failed to load default tokenSupply: %v", err))
+		panic(fmt.Sprintf("failed to load default tokenMint: %v", err))
 	}
-	if err := json.Unmarshal(tokenSupplyData, &m.tokenSupply); err != nil {
-		panic(fmt.Sprintf("failed to unmarshal default tokenSupply: %v", err))
+	if err := json.Unmarshal(tokenMintData, &m.tokenMint); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal default tokenMint: %v", err))
 	}
 
+	// Load tokenAccountBalance
 	tokenAccountBalanceData, err := MockDataFolder.ReadFile("mock_data/solana/tokenAccountBalance.json")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load default tokenAccountBalance: %v", err))
 	}
-
 	var tokenAccountBalance solanarpc.UiTokenAmount
 	if err := json.Unmarshal(tokenAccountBalanceData, &tokenAccountBalance); err != nil {
 		panic(fmt.Sprintf("failed to unmarshal default tokenAccountBalance: %v", err))
 	}
 	dummyTokenKey, _ := solana.PublicKeyFromBase58("11111111111111111111111111111111") // Placeholder
 	m.tokenAccountBalance[dummyTokenKey] = &tokenAccountBalance
+
+	// Load nativeBalance
+	nativeBalanceData, err := MockDataFolder.ReadFile("mock_data/solana/nativeAccountBalance.json")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load default nativeBalance: %v", err))
+	}
+	if err := json.Unmarshal(nativeBalanceData, &m.nativeBalance); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal default nativeBalance: %v", err))
+	}
 }
 
-func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, _ solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
-	var cp *solanarpc.UiTokenAmount
+func (m *MockSolanaClient) GetTokenMint(ctx context.Context, _ solana.PublicKey) (*solanatoken.Mint, error) {
+	var cp *solanatoken.Mint
 	func() {
 		m.mu.RLock()
 		defer m.mu.RUnlock()
-		cp = m.tokenSupply
+		cp = m.tokenMint
 	}()
 
 	if m.timeoutEnabled {
@@ -70,10 +81,10 @@ func (m *MockSolanaClient) GetTokenSupply(ctx context.Context, _ solana.PublicKe
 	return cp, nil
 }
 
-func (m *MockSolanaClient) SetTokenSupply(supply *solanarpc.UiTokenAmount) {
+func (m *MockSolanaClient) SetTokenMint(tokenMint *solanatoken.Mint) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.tokenSupply = supply
+	m.tokenMint = tokenMint
 }
 
 func (m *MockSolanaClient) GetTokenAccountBalance(ctx context.Context, token solana.PublicKey, account solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
@@ -125,4 +136,29 @@ func (m *MockSolanaClient) DisableTimeout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.timeoutEnabled = false
+}
+
+func (m *MockSolanaClient) GetNativeBalance(ctx context.Context, _ solana.PublicKey) (*solanarpc.UiTokenAmount, error) {
+	var res *solanarpc.UiTokenAmount
+
+	func() {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		res = m.nativeBalance
+	}()
+
+	if m.timeoutEnabled {
+		// Then simulate latency without holding the lock
+		if err := withTimeout(ctx, 1*time.Hour); err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
+
+func (m *MockSolanaClient) SetNativeBalance(nativeBalance *solanarpc.UiTokenAmount) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.nativeBalance = nativeBalance
 }
