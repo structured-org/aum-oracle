@@ -1,0 +1,27 @@
+[package]
+authors = []
+description = "Spot balance based locks contract"
+edition = "2021"
+name = "waitosaur"
+repository = "https://github.com/structured-org/aum-oracle"
+version = "0.1.1"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+cw-storage-plus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+cw-ownable = { workspace = true }
+cw2 = { workspace = true }
+ed25519-zebra = { workspace = true }
+waitosaur-common = { path = "../../packages/waitosaur-common" }
+consensus = { path = "../../packages/consensus" }
+binance-aum-common = { path = "../../packages/binance-aum-common" }

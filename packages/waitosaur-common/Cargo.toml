@@ -1,0 +1,14 @@
+[package]
+name = "waitosaur-common"
+description = "Shared Waitosaur contract interface"
+version = "0.1.0"
+authors = []
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/structured-org/aum-oracle/"
+
+[dependencies]
+cosmwasm-std = { workspace = true }
+thiserror = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-ownable = { workspace = true }
