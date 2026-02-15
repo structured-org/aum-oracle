@@ -50,6 +50,44 @@ cp config.yaml.default config.yaml
 docker compose up
 ```
 
+**Simulation mode (Docker + REST endpoint):**
+
+Simulation mode disables on-chain submission and instead captures the last produced value in memory.
+
+The REST server is always started by the messenger. By default it listens on `http://127.0.0.1:16400`.
+You can override the listen address with `--rest-laddr`.
+
+```bash
+# From repo root
+cp artifacts/aum_messenger/config.yaml.default config.yaml
+# Edit config.yaml with your values
+
+# Run simulation messenger and expose REST on localhost:16400
+docker compose up aum-messenger-sim
+```
+
+Then query:
+
+```bash
+curl -s http://127.0.0.1:16400/health
+curl -s http://127.0.0.1:16400/last | jq .
+```
+
+Notes:
+- Inside Docker you must bind REST to `0.0.0.0:16400` (already set in compose).
+
+**Normal mode + REST (Docker):**
+
+If you want REST access from the host, publish the port and bind to `0.0.0.0` inside the container.
+Example (one-off run):
+
+```bash
+docker run --rm -p 16400:16400 \
+	-v "$PWD/config.yaml:/app/config.yaml:ro" \
+	aum-messenger \
+	--config /app/config.yaml --rest-laddr 0.0.0.0:16400
+```
+
 ### 2. Recorder (`recorder/`)
 
 A Go daemon for periodic TWAER records creation in the TWAER contract

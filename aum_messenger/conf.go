@@ -11,6 +11,17 @@ import (
 )
 
 var configPath = flag.String("config", "config.yaml", "path to config file")
+var simulationEnabled = flag.Bool(
+	"simulation",
+	false,
+	"if set, messenger collects data but does not submit it on-chain; stores only the last collected value in memory",
+)
+
+var restLaddr = flag.String(
+	"rest-laddr",
+	"http://127.0.0.1:16400",
+	"REST listen address for /health and /last. Accepts host:port or full URL (e.g. http://127.0.0.1:16400)",
+)
 
 // readConfig reads app config from the config file.
 func readConfig() *config {

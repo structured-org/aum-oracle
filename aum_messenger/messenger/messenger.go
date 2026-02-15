@@ -114,9 +114,17 @@ func processRound[T any](
 		return nil
 	}
 
-	msgr.Logger().Info("data submitted",
+	submissionMode := "submitted"
+	if p, ok := any(msgr).(SubmissionModeProvider); ok {
+		if mode := p.SubmissionMode(); mode != "" {
+			submissionMode = mode
+		}
+	}
+
+	msgr.Logger().Info("round data processed",
 		zap.Uint64("round", round.Round),
 		zap.Any("data", data),
+		zap.String("submission_mode", submissionMode),
 	)
 	return nextRound
 }
